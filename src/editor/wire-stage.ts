@@ -31,6 +31,7 @@ function wireSelection( editor: Editor ): SelectionOverlay {
 		getCanvas: () => editor.store.current.canvas,
 		setMask: ( mask ) => editor.renderer?.paint.setPaintMask( mask ),
 		onChange: () => editor.stage?.optionsBar.render(),
+		maxRasterPixels: editor.config.maxSelectionPixels,
 	} );
 
 	editor.selection = overlay;
@@ -106,6 +107,8 @@ export function buildStageToolset( editor: Editor ): StageToolset {
 				selection.set( null );
 			},
 			selectAll: () => selection.selectAll(),
+			canStepSelectionBack: () => selection.canStepBack,
+			stepSelectionBack: () => void selection.stepBack(),
 			hasCloneSource: () => !! toolset.tools.getCloneSource(),
 			clearCloneSource: () => toolset.tools.clearCloneSource(),
 			isTypingText: () => true === toolset.text.isEditing,
@@ -159,6 +162,7 @@ export function buildStageToolset( editor: Editor ): StageToolset {
 			// `place()` rather than `open()`: a press that finishes one piece of text
 			// does not also begin the next one.
 			onPlaceText: ( point ) => toolset.text.place( point ),
+			maxEdgePixels: editor.config.maxEdgePixels,
 			// One history entry per stroke, not per dab -- and it carries the tiles the
 			// stroke overwrote, so undoing it puts the pixels back rather than
 			// restoring an identical recipe and appearing to do nothing.

@@ -60,3 +60,62 @@ function lienzo_max_render_pixels() {
 	 */
 	return (int) apply_filters( 'lienzo_max_render_pixels', 80000000 );
 }
+
+/**
+ * Returns the largest raster, in pixels, a boolean selection is worked out on.
+ *
+ * Adding, subtracting and intersecting selections are done by rasterising both
+ * outlines, compositing them, and tracing the result back into paths. That round
+ * trip is exact to the raster it runs on, so this is the precision of every combined
+ * outline on a document larger than it.
+ *
+ * The default of four megapixels is a 2000-square working canvas, which is far more
+ * boundary than the six hundred vertices a traced outline keeps can carry -- so on any
+ * ordinary photograph the vertex budget, not this, is the limiting term. Uncapped, one
+ * intersection on a fifty-megapixel scan would allocate two hundred megabytes.
+ *
+ * Raise it on a site that works with very large scans and cares more about the last
+ * half pixel of a combined edge than about the allocation.
+ *
+ * @since 0.1.0
+ *
+ * @return int Maximum pixels in the boolean working raster.
+ */
+function lienzo_max_selection_pixels() {
+	/**
+	 * Filters the working raster size for boolean selections.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param int $pixels Maximum pixels in the boolean working raster.
+	 */
+	return (int) apply_filters( 'lienzo_max_selection_pixels', 4000000 );
+}
+
+/**
+ * Returns the largest edge field, in pixels, the magnetic lasso will build.
+ *
+ * The magnetic lasso convolves the document once when a trace begins, and follows the
+ * boundaries that pass finds. Past this ceiling the field is built at a stride -- one
+ * field pixel per two, three or four document pixels -- so the boundary is still found,
+ * a little more coarsely, without the read-back and the convolution costing a second
+ * and 150MB before the first anchor.
+ *
+ * The default of two megapixels builds in about 34ms on a 20-megapixel photograph. On
+ * a 50-megapixel scan it is a stride of five, which is the one size where raising this
+ * buys visible precision -- at the cost of the pause before the trace starts.
+ *
+ * @since 0.1.0
+ *
+ * @return int Maximum pixels in the magnetic lasso's edge field.
+ */
+function lienzo_max_edge_pixels() {
+	/**
+	 * Filters the size of the magnetic lasso's edge field.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param int $pixels Maximum pixels in the edge field.
+	 */
+	return (int) apply_filters( 'lienzo_max_edge_pixels', 2000000 );
+}

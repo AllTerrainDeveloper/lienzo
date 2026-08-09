@@ -202,7 +202,20 @@ outline renderer, the mask rasteriser and the brush clipper already speak.
 It runs once per completed gesture, never per pointer move, and the working raster is capped at four
 megapixels: nobody can see a boundary at a finer resolution than the six hundred vertices the tracer
 keeps anyway, and uncapped, one intersection on a fifty-megapixel scan would allocate two hundred
-megabytes to answer a question four hundred points long.
+megabytes to answer a question four hundred points long. A default rather than a rule —
+`lienzo_max_selection_pixels` moves it, and the number travels to the browser in the config blob
+rather than being written into the module, because everything under `model/` and `engine/` is pure
+and a pure function that reads a global is neither testable nor honest.
+
+**And the marquee can be stepped back.** A selection is deliberately not on the undo stack: it
+describes how someone is working rather than what the picture should look like, and an undo that went
+through six marquees before reaching the brush stroke you meant would be worse than no undo at all.
+But an addition made in the wrong mode is a real and common mistake, and "draw it again" is a poor
+answer to it — so the marquee keeps its own history, twenty deep, reached by its own key.
+Cmd/Ctrl+Shift+D, or the **Step back** button beside the modes whose mistakes it undoes. It doubles
+as Photoshop's Reselect, because dropping a selection is a change like any other and stepping back
+from nothing restores what was there. A step back is not itself recorded — two presses go two back,
+where a step that recorded itself would ping-pong between the last two states forever.
 
 That split is also why the marquee got cheaper rather than dearer. A drag now paints a **pending
 outline** — a path attribute, in the accent colour, beside the ants of the selection it is about to
@@ -249,7 +262,8 @@ Three decisions in the field are about photographs rather than about gradient op
   that matters and would push the whole picture into the noise.
 - **Past two megapixels the field is sampled at a stride.** A fifty-megapixel scan would otherwise
   spend a second and 150MB before the first anchor, to place a boundary more precisely than the six
-  hundred vertices a `Selection` keeps could record. A 20-megapixel photograph builds in 34ms.
+  hundred vertices a `Selection` keeps could record. A 20-megapixel photograph builds in 34ms. The
+  ceiling is `lienzo_max_edge_pixels`, for a site that would rather pay the pause.
 
 **The search is never restarted.** Dijkstra settles nodes in cost order, so a node settled for one
 pointer position stays settled for every later one — moving the pointer expands the frontier a
@@ -629,7 +643,7 @@ src/
   ui/tool-rail/            the eighteen tools, two columns, keyboard shortcuts
   ui/stage-tools/          every canvas gesture, through one coordinate conversion
   ui/options-bar/          the contextual strip; a second view of one model
-  ui/picker/               the image grid, read a page at a time
+  ui/picker/               the image grid, read a page at a time as you scroll
   ui/transform-overlay/    the handles; drag maths separated from the DOM
   ui/crop-overlay/         the draggable crop rectangle
   ui/rulers/, ui/swatches.ts, ui/curve-editor.ts, ui/histogram-view.ts, …
@@ -870,6 +884,8 @@ browser implementation gives you a slider that validates and then does nothing.
 | `lienzo_supported_mime_types` | Which images may be opened |
 | `lienzo_max_render_pixels` | Ceiling on a single GPU render |
 | `lienzo_max_upload_bytes` | Ceiling on a saved render |
+| `lienzo_max_selection_pixels` | Raster a boolean selection is worked out on |
+| `lienzo_max_edge_pixels` | Size of the magnetic lasso's edge field |
 | `lienzo_renderer_backend` | `webgl` (default), `webgpu` or `auto` |
 | `lienzo_pixi_url` | Where the classic-admin editor loads PixiJS from |
 | `lienzo_media_screens` | Admin screens the bundle loads on |
@@ -936,9 +952,13 @@ Stated plainly, because each is better read here than discovered:
   blob — and what it answers with is a sentence saying where the editor is and a button that opens
   it. Lienzo lives in the dock and on the wallpaper there; `lienzo_desktop_owns_the_editor` is the
   one filter that decides.
-- **A save from the classic-admin overlay does not put the edit back into the post.** The block
-  editor's image block is repointed, because it can be — but the Media Library row action and the
-  media picker have nowhere to put an answer. Inside the shell that is what the drag bridge is for.
+- **A save from the classic-admin overlay does not always have somewhere to put the edit.** The block
+  editor's image block is repointed, and so is the media modal: the copy joins the modal's library
+  and *replaces* the original in its selection, so pressing Insert afterwards inserts the photograph
+  as you just left it rather than as you found it. The Media Library row action still has nowhere to
+  put an answer — there is no post at the other end of it, only a list — so what it offers is the
+  editor's own banner and a button that opens the copy. Inside the shell, moving an edit somewhere
+  else is what the drag bridge is for.
 - **The classic-admin editor reads a path inside OpenStation's directory** to find PixiJS, because
   the module registry that would otherwise answer is only on the page in desktop mode. The constant
   is resolved rather than the slug, and the file is checked before it is offered — but it is still
@@ -946,16 +966,21 @@ Stated plainly, because each is better read here than discovered:
 - **`big_image_size_threshold`** can silently downscale a saved render. The success toast reports the
   dimensions actually stored rather than the ones requested.
 - **Animated GIFs are not offered for editing**, because a canvas round trip flattens them to one
-  frame, and quietly destroying an animation is worse than declining. They are also skipped by the
-  picker, so a library of them can read as smaller than it is.
+  frame, and quietly destroying an animation is worse than declining. The picker still passes them
+  over — but it now counts what it passed and says so, because a library of nothing but GIFs used to
+  read exactly like an empty one, right down to being invited to upload the photographs it already
+  had.
 - **Boolean selections are exact to the working raster, not to the path.** Adding, subtracting and
   intersecting go through a mask round trip rather than a path clipper, and that raster is capped at
   four megapixels — so on a document larger than that, the combined outline is traced at a reduced
   scale. It is invisible against the tracer's own six-hundred-vertex budget, which costs more
   precision than the scaling does, but it does mean the result is a fresh path and not the two paths
-  that went in. Selections are not part of the undo stack either — they describe how someone is
-  working rather than what the picture should look like — so an addition you did not mean has to be
-  redrawn rather than stepped back.
+  that went in. `lienzo_max_selection_pixels` moves the cap for a site that would rather pay the
+  allocation. Selections are still not part of the undo stack — they describe how someone is working
+  rather than what the picture should look like, and an undo that stepped through six marquees before
+  reaching the brush stroke you meant would be worse than none — so they have their own short history
+  instead: **Step back**, or Cmd/Ctrl+Shift+D, puts the marquee back as it was before the last
+  change. Twenty deep, and separate from the document's undo in both directions.
 - **The magnetic lasso reads the document once, when the trace begins.** It has to: the read-back
   from the GPU and the convolution over it are the one expensive thing the tool does, and repeating
   them per anchor would put that cost on every click instead of the first. The consequence is that
@@ -965,14 +990,20 @@ Stated plainly, because each is better read here than discovered:
   stride — one field pixel per two, three or four document pixels. Against the six-hundred-vertex
   budget every selection path is held to, and against a hand that is six pixels out to begin with,
   this has not been the limiting term; on a 50-megapixel scan it is a stride of five, and there it
-  would be.
+  would be. `lienzo_max_edge_pixels` is the way to buy that precision back, at the price of the pause
+  before the first anchor.
 - **It follows the strongest edge near the pointer, which is not always the one you meant.** Two
   boundaries a few pixels apart — a rim light, a shadow just outside a subject — are genuinely
   ambiguous, and the wire resolves them by cost rather than by intent. Narrowing Width, raising
   Frequency and pinning anchors by hand are the three answers, in that order.
-- **The picker reads the library a page at a time** behind a Load more button rather than loading on
-  scroll: it renders inside a desktop window, so which element actually scrolls is not the picker's
-  to know, and a scroll listener bound to the wrong one silently never fires.
+- **The picker fetches the next page only once the end of the grid has been *seen*.** It loads as you
+  scroll — an `IntersectionObserver` on the footer, which answers "is this visible" having already
+  clipped the element against every scrolling ancestor, so it does not matter which of them moved and
+  the picker never has to guess. What it cannot do is fetch *ahead*: `rootMargin` expands the
+  viewport, not the clip of the desktop window the grid is inside, so inside a window the page is
+  asked for when the footer arrives rather than a screen early. The Load more button stays for the
+  same reason — a window shorter than one row, or a browser with no observer, never produces the
+  callback at all.
 
 ## Licence
 

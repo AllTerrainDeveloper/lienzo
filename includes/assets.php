@@ -115,19 +115,21 @@ function lienzo_enqueue_editor() {
  */
 function lienzo_get_config() {
 	$config = array(
-		'version'         => LIENZO_VERSION,
-		'restUrl'         => esc_url_raw( trailingslashit( rest_url( LIENZO_REST_NAMESPACE ) ) ),
-		'restNonce'       => wp_create_nonce( 'wp_rest' ),
-		'pluginUrl'       => esc_url_raw( LIENZO_URL ),
-		'mediaUrl'        => esc_url_raw( rest_url( 'wp/v2/media' ) ),
-		'supportedMimes'  => lienzo_supported_mime_types(),
-		'maxRenderPixels' => lienzo_max_render_pixels(),
-		'canUpload'       => current_user_can( 'upload_files' ),
-		'desktopMode'     => lienzo_is_desktop_mode_active(),
-		'editorUrl'       => esc_url_raw( lienzo_editor_page_url() ),
-		'pixiUrl'         => esc_url_raw( lienzo_pixi_url() ),
-		'renderer'        => lienzo_renderer_backend(),
-		'schema'          => lienzo_op_schema(),
+		'version'            => LIENZO_VERSION,
+		'restUrl'            => esc_url_raw( trailingslashit( rest_url( LIENZO_REST_NAMESPACE ) ) ),
+		'restNonce'          => wp_create_nonce( 'wp_rest' ),
+		'pluginUrl'          => esc_url_raw( LIENZO_URL ),
+		'mediaUrl'           => esc_url_raw( rest_url( 'wp/v2/media' ) ),
+		'supportedMimes'     => lienzo_supported_mime_types(),
+		'maxRenderPixels'    => lienzo_max_render_pixels(),
+		'maxSelectionPixels' => lienzo_max_selection_pixels(),
+		'maxEdgePixels'      => lienzo_max_edge_pixels(),
+		'canUpload'          => current_user_can( 'upload_files' ),
+		'desktopMode'        => lienzo_is_desktop_mode_active(),
+		'editorUrl'          => esc_url_raw( lienzo_editor_page_url() ),
+		'pixiUrl'            => esc_url_raw( lienzo_pixi_url() ),
+		'renderer'           => lienzo_renderer_backend(),
+		'schema'             => lienzo_op_schema(),
 	);
 
 	/**

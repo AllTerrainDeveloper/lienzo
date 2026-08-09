@@ -34,6 +34,7 @@ Eighteen tools on a two column rail, grouped the way you would expect:
 * Select as a rectangle, an ellipse, a freeform lasso or a polygon
 * A magnetic lasso that snaps to the edge you are tracing, so trace roughly round a subject and the outline finds its boundary for you
 * Build a selection up: add to it, subtract from it, or keep only the overlap, from the options bar or by holding Shift, Alt or both
+* Step a selection back when an addition went the wrong way, with Cmd/Ctrl+Shift+D or the Step back button — which also brings back a selection you dropped
 * Magic wand, which selects the region around the colour you click
 * Crop, with aspect presets
 * Eyedropper, brush, eraser, paint bucket and gradient
@@ -107,7 +108,7 @@ Yes. When a CDN does not send the CORS headers a GPU canvas requires, Lienzo str
 
 = Why is GIF not supported? =
 
-Rendering an animated GIF through a canvas silently flattens it to a single frame. Rather than quietly destroy the animation, Lienzo does not offer to edit them.
+Rendering an animated GIF through a canvas silently flattens it to a single frame. Rather than quietly destroy the animation, Lienzo does not offer to edit them. The photo picker leaves them out for the same reason, and tells you how many it left out, so a library of GIFs does not read as an empty one.
 
 = Are brush strokes stored in the recipe? =
 
@@ -140,6 +141,10 @@ Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and serv
 
 = 0.1.0 =
 * First release.
+* The photo picker loads as you scroll, instead of only when you press Load more.
+* The picker says how many images it cannot open, so a library of animated GIFs no longer reads as an empty one.
+* Editing from the media picker and pressing Insert now inserts the copy you just saved, not the photograph you started with.
+* Selections can be stepped back — Cmd/Ctrl+Shift+D, or the Step back button — which takes back an addition made in the wrong mode and brings back a selection you dropped.
 * Opens with the desktop switched off as well as in a window: an editor page under Media, and an overlay from the Media Library, the media picker and the image block.
 * Magic wand and paint bucket rewritten to walk runs rather than pixels — a twenty-megapixel photo answers in a fifth of a second instead of a few seconds.
 * The wand traces the holes in a region instead of selecting through them.

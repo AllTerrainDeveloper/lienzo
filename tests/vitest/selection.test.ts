@@ -861,6 +861,41 @@ describe( 'combineSelections', () => {
 		}
 	} );
 
+	it( 'works at whatever raster the site asked for', () => {
+		const stub = stubCombine( readback( 40, 40, { x: 10, y: 10, w: 20, h: 20 } ) );
+
+		try {
+			// `lienzo_max_selection_pixels` raised to sixteen megapixels: the whole point
+			// of the filter is that a site working with very large scans can buy back the
+			// precision the default trades away.
+			combineSelections(
+				RECT,
+				OTHER,
+				'add',
+				{ width: 10000, height: 10000 },
+				16_000_000
+			);
+
+			expect( stub.sizes[ 0 ] ).toEqual( { width: 4000, height: 4000 } );
+		} finally {
+			stub.restore();
+		}
+	} );
+
+	it( 'reads a ceiling of nothing as no ceiling at all', () => {
+		const stub = stubCombine( readback( 40, 40, { x: 10, y: 10, w: 20, h: 20 } ) );
+
+		try {
+			// A filter returning zero would otherwise collapse every boolean onto a
+			// one-pixel canvas.
+			combineSelections( RECT, OTHER, 'add', { width: 10000, height: 10000 }, 0 );
+
+			expect( stub.sizes[ 0 ] ).toEqual( { width: 2000, height: 2000 } );
+		} finally {
+			stub.restore();
+		}
+	} );
+
 	it( 'leaves the selection alone when no canvas backend will answer', () => {
 		// jsdom, or a browser that refused a context. Falling back to the base is the
 		// only answer here that cannot lose the user's work.

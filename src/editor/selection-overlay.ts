@@ -32,7 +32,24 @@ export interface SelectionOverlayOptions {
 	setMask: ( mask: HTMLCanvasElement | null ) => void;
 	/** Called after any change, so the options bar can re-render. */
 	onChange: () => void;
+	/**
+	 * Optional. Ceiling on the raster a boolean is worked out on.
+	 *
+	 * From `lienzo_max_selection_pixels`, by way of the config blob. Left out, the
+	 * combiner's own default applies, which is what every test and every caller
+	 * outside the editor wants.
+	 */
+	maxRasterPixels?: number;
 }
+
+/**
+ * How many earlier selections the marquee keeps.
+ *
+ * Enough to undo a run of mistaken additions, few enough that a stack of six-hundred
+ * point lassos is a few tens of kilobytes rather than a leak. Nobody steps back twenty
+ * selections; the number is a bound, not a promise.
+ */
+const MAX_SELECTION_HISTORY = 20;
 
 /** The whole canvas, as a selection. */
 export const SELECT_ALL: Selection = {
@@ -61,6 +78,15 @@ export class SelectionOverlay {
 	 * the GPU sixty times a second.
 	 */
 	private pending: Selection | null = null;
+
+	/**
+	 * The selections this one replaced, oldest first.
+	 *
+	 * Its own history rather than a place on the document's undo stack, because a
+	 * selection is not part of the picture. Undo is for what the image looks like;
+	 * this is for the four-way picker's mistakes.
+	 */
+	private past: Array< Selection | null > = [];
 
 	/**
 	 * The points a magnetic trace has committed to.
@@ -119,12 +145,82 @@ export class SelectionOverlay {
 		return null !== this.selection;
 	}
 
+	/** Whether there is an earlier selection to go back to. */
+	get canStepBack(): boolean {
+		return this.past.length > 0;
+	}
+
 	/**
 	 * Replaces the marquee and rebuilds the mask.
 	 *
 	 * @param selection Selection, or null to clear it.
 	 */
 	set( selection: Selection | null ): void {
+		const next = isEmptySelection( selection ) ? null : selection;
+
+		// A change that changes nothing is not worth a step back. Escape over an empty
+		// canvas is the common one: without this, pressing it a few times would fill the
+		// history with nothing and bury the selection actually worth returning to.
+		if ( next !== this.selection ) {
+			this.remember( this.selection );
+		}
+
+		this.apply( selection );
+	}
+
+	/**
+	 * Puts the selection back as it was before the last change.
+	 *
+	 * A selection is not on the undo stack, deliberately: it describes how someone is
+	 * working rather than what the picture should look like, and an undo that stepped
+	 * through six marquees before reaching the brush stroke you meant would be worse
+	 * than no undo at all. But an addition made in the wrong mode is a real and common
+	 * mistake, and "draw the whole thing again" is a poor answer to it -- so the
+	 * marquee keeps its own short history, reached by its own key.
+	 *
+	 * It doubles as Reselect: dropping a selection is a change like any other, so
+	 * stepping back from nothing restores what was there.
+	 *
+	 * @return Whether there was anything to go back to.
+	 */
+	stepBack(): boolean {
+		const previous = this.past.pop();
+
+		if ( undefined === previous ) {
+			return false;
+		}
+
+		// Not remembered. Stepping back is a way out of a mistake, and a step that
+		// recorded itself would make the next one a step forwards -- two presses and you
+		// are where you started, which is the one behaviour nobody wants from this key.
+		this.apply( previous );
+
+		return true;
+	}
+
+	/**
+	 * Files the selection being replaced, so it can be stepped back to.
+	 *
+	 * Bounded, because these are paths and a magnetic trace carries six hundred points:
+	 * an unbounded ring would hold every selection made in a session for the sake of
+	 * the two anyone ever reaches for.
+	 *
+	 * @param selection Selection about to be replaced.
+	 */
+	private remember( selection: Selection | null ): void {
+		this.past.push( selection );
+
+		if ( this.past.length > MAX_SELECTION_HISTORY ) {
+			this.past.shift();
+		}
+	}
+
+	/**
+	 * Puts a selection in place, with no note of what was there before.
+	 *
+	 * @param selection Selection, or null to clear it.
+	 */
+	private apply( selection: Selection | null ): void {
 		this.selection = isEmptySelection( selection ) ? null : selection;
 		this.pending = null;
 		this.anchors = [];
@@ -176,7 +272,13 @@ export class SelectionOverlay {
 	 */
 	combine( selection: Selection | null, mode: SelectionMode ): void {
 		this.set(
-			combineSelections( this.selection, selection, mode, this.options.getCanvas() )
+			combineSelections(
+				this.selection,
+				selection,
+				mode,
+				this.options.getCanvas(),
+				this.options.maxRasterPixels
+			)
 		);
 	}
 

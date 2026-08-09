@@ -3672,6 +3672,9 @@ fn mainFragment(
   function __(text) {
     return window.wp?.i18n?.__?.(text, "lienzo") ?? text;
   }
+  function _n(single, plural, count) {
+    return window.wp?.i18n?._n?.(single, plural, count, "lienzo") ?? (1 === count ? single : plural);
+  }
   function sprintf(text, ...args) {
     const translated = __(text);
     const impl = window.wp?.i18n?.sprintf;
@@ -7202,6 +7205,7 @@ fn mainFragment(
       this.page = 0;
       this.pages = null;
       this.seen = 0;
+      this.passed = 0;
       this.config = config;
     }
     /** Whether the server has pages the picker has not asked for yet. */
@@ -7211,6 +7215,16 @@ fn mainFragment(
     /** How many editable images have been handed out so far. */
     get count() {
       return this.seen;
+    }
+    /**
+     * How many images were read and passed over, of the pages fetched so far.
+     *
+     * Of the pages *fetched*, not of the library: with pages left this is a running
+     * total and not a final one, which is why the picker phrases it as what it is
+     * passing over rather than as what the library contains.
+     */
+    get skipped() {
+      return this.passed;
     }
     /**
      * Fetches the next page or pages, until something editable turns up.
@@ -7256,9 +7270,11 @@ fn mainFragment(
         this.pages = total;
       }
       const items = await response.json();
-      return items.filter(
+      const editable = items.filter(
         (item) => this.config.supportedMimes.includes(item.mime_type)
       );
+      this.passed += items.length - editable.length;
+      return editable;
     }
   }
   function thumbnailFor(item) {
@@ -7305,37 +7321,75 @@ fn mainFragment(
       onClick: () => void load()
     });
     ui.footer.append(ui.count, more.el);
+    let loading = false;
+    let unwatch = () => {
+    };
     async function load() {
+      if (loading || isStale?.()) {
+        return;
+      }
+      loading = true;
       more.setDisabled(true);
       let items;
       try {
         items = await pager.next();
       } catch (error) {
+        loading = false;
         if (!isStale?.()) {
           fail$1(ui, error);
           more.setDisabled(false);
         }
         return;
       }
+      loading = false;
       if (isStale?.()) {
+        unwatch();
         return;
       }
       for (const item of items) {
         ui.grid.appendChild(renderTile(item, onPick));
       }
       if (0 === pager.count && !pager.hasMore) {
-        showEmpty(ui);
+        unwatch();
+        showEmpty(ui, pager.skipped);
         return;
       }
       ui.status.remove();
       root.append(ui.grid, ui.footer);
-      ui.count.textContent = countLabel(pager.count, pager.hasMore);
+      ui.count.textContent = countLabel(
+        pager.count,
+        pager.skipped,
+        pager.hasMore
+      );
       if (pager.hasMore) {
         more.setDisabled(false);
+        watch();
         return;
       }
+      unwatch();
       more.destroy();
       more.el.remove();
+    }
+    function watch() {
+      if ("undefined" === typeof IntersectionObserver) {
+        return;
+      }
+      unwatch();
+      const observer = new IntersectionObserver((entries) => {
+        if (isStale?.() || !ui.footer.isConnected || !pager.hasMore) {
+          observer.disconnect();
+          return;
+        }
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void load();
+        }
+      });
+      unwatch = () => {
+        observer.disconnect();
+        unwatch = () => {
+        };
+      };
+      observer.observe(ui.footer);
     }
     await load();
   }
@@ -7358,16 +7412,31 @@ fn mainFragment(
     root.replaceChildren(heading, status);
     return { root, grid, footer, status, count };
   }
-  function countLabel(shown, hasMore) {
-    return hasMore ? sprintf(
-      /* translators: %d: number of photos shown so far. */
-      __("Showing the %d most recent photos."),
-      shown
-    ) : sprintf(
-      /* translators: %d: total number of photos. */
-      __("Showing all %d photos."),
-      shown
-    );
+  function countLabel(shown, skipped, hasMore) {
+    let label = __("No photos to show yet.");
+    if (shown > 0) {
+      label = hasMore ? sprintf(
+        /* translators: %d: number of photos shown so far. */
+        __("Showing the %d most recent photos."),
+        shown
+      ) : sprintf(
+        /* translators: %d: total number of photos. */
+        __("Showing all %d photos."),
+        shown
+      );
+    }
+    if (skipped < 1) {
+      return label;
+    }
+    return `${label} ${sprintf(
+      /* translators: %d: number of images that cannot be edited. */
+      _n(
+        "Passing over %d image Lienzo cannot open.",
+        "Passing over %d images Lienzo cannot open.",
+        skipped
+      ),
+      skipped
+    )}`;
   }
   function fail$1(ui, error) {
     ui.status.textContent = error instanceof Error ? error.message : __("Your media library could not be loaded.");
@@ -7376,8 +7445,16 @@ fn mainFragment(
       ui.root.appendChild(ui.status);
     }
   }
-  function showEmpty(ui) {
-    ui.status.textContent = __(
+  function showEmpty(ui, skipped) {
+    ui.status.textContent = skipped > 0 ? sprintf(
+      /* translators: %d: number of images that cannot be edited. */
+      _n(
+        "Your library has %d image, and it is not one Lienzo can open. Lienzo edits JPEG, PNG, WebP and AVIF; an animated GIF is left alone because a canvas would flatten it to a single frame.",
+        "Your library has %d images, and none of them are ones Lienzo can open. Lienzo edits JPEG, PNG, WebP and AVIF; animated GIFs are left alone because a canvas would flatten them to a single frame.",
+        skipped
+      ),
+      skipped
+    ) : __(
       "No editable images yet. Upload a JPEG, PNG, WebP or AVIF to get started."
     );
     const link = document.createElement("a");
@@ -7986,6 +8063,7 @@ fn mainFragment(
         editor.stage?.tools.clearPath();
         editor.selection?.set(null);
       },
+      stepSelectionBack: () => void editor.selection?.stepBack(),
       hasSelection: () => true === editor.selection?.isActive,
       hasPendingPath: () => true === editor.stage?.tools.hasPath,
       getTool: () => editor.state.getTool(),
@@ -8433,7 +8511,7 @@ fn mainFragment(
     subtract: "destination-out",
     intersect: "source-in"
   };
-  function combineSelections(base, incoming, mode, canvas) {
+  function combineSelections(base, incoming, mode, canvas, maxPixels = MAX_COMBINE_PIXELS) {
     const from = isEmptySelection(base) ? null : base;
     const next = isEmptySelection(incoming) ? null : incoming;
     if ("new" === mode) {
@@ -8445,10 +8523,10 @@ fn mainFragment(
     if (!next) {
       return from;
     }
-    return traceCombined(from, next, mode, canvas);
+    return traceCombined(from, next, mode, canvas, maxPixels);
   }
-  function traceCombined(base, incoming, mode, canvas) {
-    const size = workingSize(canvas);
+  function traceCombined(base, incoming, mode, canvas, maxPixels) {
+    const size = workingSize(canvas, maxPixels);
     const baseMask = buildSelectionMask(base, size.width, size.height);
     const nextMask = buildSelectionMask(incoming, size.width, size.height);
     const surface = document.createElement("canvas");
@@ -8471,10 +8549,11 @@ fn mainFragment(
     }
     return { shape: "lasso", points: traced.outer, holes: traced.holes };
   }
-  function workingSize(canvas) {
+  function workingSize(canvas, maxPixels) {
     const width = Math.max(1, Math.round(canvas.width));
     const height = Math.max(1, Math.round(canvas.height));
-    const scale = Math.sqrt(MAX_COMBINE_PIXELS / (width * height));
+    const ceiling = maxPixels >= 1 ? maxPixels : MAX_COMBINE_PIXELS;
+    const scale = Math.sqrt(ceiling / (width * height));
     if (scale >= 1) {
       return { width, height };
     }
@@ -8528,9 +8607,12 @@ fn mainFragment(
     } else if ("a" === key) {
       event.preventDefault();
       target.selectAll();
-    } else if ("d" === key) {
+    } else if ("d" === key && !event.shiftKey) {
       event.preventDefault();
       target.deselect();
+    } else if ("d" === key && event.shiftKey) {
+      event.preventDefault();
+      target.stepSelectionBack();
     } else if ("c" === key) {
       event.preventDefault();
       target.copy();
@@ -8927,6 +9009,17 @@ fn mainFragment(
         onClick: () => bar.options.selectAll()
       })
     );
+    const back = createButton({
+      label: __("Step back"),
+      title: __("Put the selection back as it was before the last change"),
+      variant: "ghost",
+      onClick: () => {
+        bar.options.stepSelectionBack();
+        bar.rebuild();
+      }
+    });
+    back.setDisabled(!bar.options.canStepSelectionBack());
+    bar.add(back);
     const deselect = createButton({
       label: __("Deselect"),
       variant: "ghost",
@@ -9851,13 +9944,14 @@ fn mainFragment(
   const HISTOGRAM_BINS = 256;
   const MAX_SOBEL = 1443;
   const PERCENTILE = 0.99;
-  function buildEdgeField(pixels, width, height, contrast = 0) {
+  function buildEdgeField(pixels, width, height, contrast = 0, maxPixels = MAX_FIELD_PIXELS) {
     if (width < 3 || height < 3) {
       return null;
     }
+    const ceiling = maxPixels >= 1 ? maxPixels : MAX_FIELD_PIXELS;
     const step = Math.max(
       1,
-      Math.ceil(Math.sqrt(width * height / MAX_FIELD_PIXELS))
+      Math.ceil(Math.sqrt(width * height / ceiling))
     );
     const fw = Math.floor(width / step);
     const fh = Math.floor(height / step);
@@ -10187,7 +10281,8 @@ fn mainFragment(
         source.pixels,
         source.width,
         source.height,
-        brush.magneticContrast / 100
+        brush.magneticContrast / 100,
+        this.options.maxEdgePixels
       );
       if (!field) {
         return false;
@@ -11919,6 +12014,7 @@ fn mainFragment(
       this.text.destroy();
     }
   }
+  const MAX_SELECTION_HISTORY = 20;
   const SELECT_ALL = {
     shape: "rect",
     points: [
@@ -11933,6 +12029,7 @@ fn mainFragment(
     constructor(options) {
       this.selection = null;
       this.pending = null;
+      this.past = [];
       this.anchors = [];
       this.sync = () => {
         const viewport = this.options.getViewport();
@@ -11993,12 +12090,66 @@ fn mainFragment(
     get isActive() {
       return null !== this.selection;
     }
+    /** Whether there is an earlier selection to go back to. */
+    get canStepBack() {
+      return this.past.length > 0;
+    }
     /**
      * Replaces the marquee and rebuilds the mask.
      *
      * @param selection Selection, or null to clear it.
      */
     set(selection) {
+      const next = isEmptySelection(selection) ? null : selection;
+      if (next !== this.selection) {
+        this.remember(this.selection);
+      }
+      this.apply(selection);
+    }
+    /**
+     * Puts the selection back as it was before the last change.
+     *
+     * A selection is not on the undo stack, deliberately: it describes how someone is
+     * working rather than what the picture should look like, and an undo that stepped
+     * through six marquees before reaching the brush stroke you meant would be worse
+     * than no undo at all. But an addition made in the wrong mode is a real and common
+     * mistake, and "draw the whole thing again" is a poor answer to it -- so the
+     * marquee keeps its own short history, reached by its own key.
+     *
+     * It doubles as Reselect: dropping a selection is a change like any other, so
+     * stepping back from nothing restores what was there.
+     *
+     * @return Whether there was anything to go back to.
+     */
+    stepBack() {
+      const previous = this.past.pop();
+      if (void 0 === previous) {
+        return false;
+      }
+      this.apply(previous);
+      return true;
+    }
+    /**
+     * Files the selection being replaced, so it can be stepped back to.
+     *
+     * Bounded, because these are paths and a magnetic trace carries six hundred points:
+     * an unbounded ring would hold every selection made in a session for the sake of
+     * the two anyone ever reaches for.
+     *
+     * @param selection Selection about to be replaced.
+     */
+    remember(selection) {
+      this.past.push(selection);
+      if (this.past.length > MAX_SELECTION_HISTORY) {
+        this.past.shift();
+      }
+    }
+    /**
+     * Puts a selection in place, with no note of what was there before.
+     *
+     * @param selection Selection, or null to clear it.
+     */
+    apply(selection) {
       this.selection = isEmptySelection(selection) ? null : selection;
       this.pending = null;
       this.anchors = [];
@@ -12041,7 +12192,13 @@ fn mainFragment(
      */
     combine(selection, mode) {
       this.set(
-        combineSelections(this.selection, selection, mode, this.options.getCanvas())
+        combineSelections(
+          this.selection,
+          selection,
+          mode,
+          this.options.getCanvas(),
+          this.options.maxRasterPixels
+        )
       );
     }
     /** Selects the whole canvas. */
@@ -12177,7 +12334,8 @@ fn mainFragment(
       getViewport: () => editor.renderer?.view.viewport() ?? null,
       getCanvas: () => editor.store.current.canvas,
       setMask: (mask) => editor.renderer?.paint.setPaintMask(mask),
-      onChange: () => editor.stage?.optionsBar.render()
+      onChange: () => editor.stage?.optionsBar.render(),
+      maxRasterPixels: editor.config.maxSelectionPixels
     });
     editor.selection = overlay;
     editor.clipboard = new EditorClipboard({
@@ -12235,6 +12393,8 @@ fn mainFragment(
           selection.set(null);
         },
         selectAll: () => selection.selectAll(),
+        canStepSelectionBack: () => selection.canStepBack,
+        stepSelectionBack: () => void selection.stepBack(),
         hasCloneSource: () => !!toolset.tools.getCloneSource(),
         clearCloneSource: () => toolset.tools.clearCloneSource(),
         isTypingText: () => true === toolset.text.isEditing,
@@ -12284,6 +12444,7 @@ fn mainFragment(
         // `place()` rather than `open()`: a press that finishes one piece of text
         // does not also begin the next one.
         onPlaceText: (point) => toolset.text.place(point),
+        maxEdgePixels: editor.config.maxEdgePixels,
         // One history entry per stroke, not per dab -- and it carries the tiles the
         // stroke overwrote, so undoing it puts the pixels back rather than
         // restoring an identical recipe and appearing to do nothing.
@@ -14027,9 +14188,35 @@ fn mainFragment(
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      openEditor(id);
+      openEditor(id, {
+        onSave: (result) => returnEdit(view, id, result)
+      });
     });
     host.appendChild(button);
+  }
+  function returnEdit(view, sourceId, result) {
+    try {
+      const attachment = window.wp?.media?.attachment?.(result.id);
+      if (!attachment) {
+        return;
+      }
+      attachment.fetch?.();
+      const controller = view.controller;
+      const state2 = controller?.state?.();
+      state2?.get?.("library")?.add?.(
+        attachment
+      );
+      const selection = state2?.get?.("selection");
+      if (!selection?.add) {
+        return;
+      }
+      const original = selection.get?.(sourceId);
+      if (original) {
+        selection.remove?.(original);
+      }
+      selection.add(attachment);
+    } catch {
+    }
   }
   const ATTRIBUTE = "data-lienzo-open";
   function bootOpenButtons() {

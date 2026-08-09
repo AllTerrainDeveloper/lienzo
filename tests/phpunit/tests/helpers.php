@@ -258,4 +258,53 @@ class Tests_Lienzo_Helpers extends WP_UnitTestCase {
 	public function test_admin_body_class_added() {
 		$this->assertStringContainsString( 'lienzo-page', lienzo_admin_body_class( 'wp-admin' ) );
 	}
+
+	/**
+	 * The boolean selection raster defaults to four megapixels and is filterable.
+	 *
+	 * @covers ::lienzo_max_selection_pixels
+	 */
+	public function test_selection_pixels_are_filterable() {
+		$this->assertSame( 4000000, lienzo_max_selection_pixels() );
+
+		add_filter( 'lienzo_max_selection_pixels', array( $this, 'return_sixteen_megapixels' ) );
+
+		$this->assertSame( 16000000, lienzo_max_selection_pixels() );
+
+		remove_filter( 'lienzo_max_selection_pixels', array( $this, 'return_sixteen_megapixels' ) );
+	}
+
+	/**
+	 * The magnetic lasso's edge field defaults to two megapixels and is filterable.
+	 *
+	 * @covers ::lienzo_max_edge_pixels
+	 */
+	public function test_edge_pixels_are_filterable() {
+		$this->assertSame( 2000000, lienzo_max_edge_pixels() );
+
+		add_filter( 'lienzo_max_edge_pixels', array( $this, 'return_sixteen_megapixels' ) );
+
+		$this->assertSame( 16000000, lienzo_max_edge_pixels() );
+
+		remove_filter( 'lienzo_max_edge_pixels', array( $this, 'return_sixteen_megapixels' ) );
+	}
+
+	/**
+	 * Both ceilings reach the browser, which is the only place they are read.
+	 *
+	 * @covers ::lienzo_get_config
+	 */
+	public function test_config_carries_both_ceilings() {
+		$this->assertGreaterThan( 0, lienzo_get_config()['maxSelectionPixels'] );
+		$this->assertGreaterThan( 0, lienzo_get_config()['maxEdgePixels'] );
+	}
+
+	/**
+	 * A filter's answer, not the default.
+	 *
+	 * @return int Sixteen megapixels.
+	 */
+	public function return_sixteen_megapixels() {
+		return 16000000;
+	}
 }

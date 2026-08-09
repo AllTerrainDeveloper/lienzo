@@ -29,6 +29,22 @@ export interface LienzoConfig {
 	mediaUrl: string;
 	supportedMimes: string[];
 	maxRenderPixels: number;
+	/**
+	 * The raster a boolean selection is worked out on, in pixels.
+	 *
+	 * Adding, subtracting and intersecting go through a mask round trip, and this is
+	 * how precise the combined outline is on a document larger than it. Filterable in
+	 * PHP through `lienzo_max_selection_pixels`.
+	 */
+	maxSelectionPixels: number;
+	/**
+	 * The magnetic lasso's edge field, in pixels.
+	 *
+	 * Past this the field is built at a stride, which is what keeps the pause before a
+	 * trace on a fifty-megapixel scan from being a whole second. Filterable in PHP
+	 * through `lienzo_max_edge_pixels`.
+	 */
+	maxEdgePixels: number;
 	canUpload: boolean;
 	/**
 	 * Whether OpenStation is active *for this user*, not merely installed.

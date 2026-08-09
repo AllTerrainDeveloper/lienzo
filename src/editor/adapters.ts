@@ -59,6 +59,7 @@ export function shortcutTarget( editor: Editor ): ShortcutTarget {
 			editor.stage?.tools.clearPath();
 			editor.selection?.set( null );
 		},
+		stepSelectionBack: () => void editor.selection?.stepBack(),
 		hasSelection: () => true === editor.selection?.isActive,
 		hasPendingPath: () => true === editor.stage?.tools.hasPath,
 		getTool: () => editor.state.getTool(),

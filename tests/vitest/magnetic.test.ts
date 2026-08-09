@@ -200,6 +200,27 @@ describe( 'buildEdgeField', () => {
 		expect( field.step ).toBeGreaterThan( 1 );
 		expect( field.width * field.height ).toBeLessThanOrEqual( MAX_FIELD_PIXELS );
 	} );
+
+	it( 'measures whole what a raised ceiling makes room for', () => {
+		const doc = squareDocument();
+		const pixels = doc.width * doc.height;
+
+		// Small enough to be measured whole by default; a ceiling under it forces the
+		// stride, which is what `lienzo_max_edge_pixels` is for in both directions.
+		expect( buildEdgeField( doc.pixels, doc.width, doc.height )!.step ).toBe( 1 );
+		expect(
+			buildEdgeField( doc.pixels, doc.width, doc.height, 0, pixels / 8 )!.step
+		).toBeGreaterThan( 1 );
+	} );
+
+	it( 'reads a ceiling of nothing as no ceiling at all', () => {
+		const doc = squareDocument();
+
+		// A filter returning zero would otherwise ask for a field with no pixels in it.
+		expect(
+			buildEdgeField( doc.pixels, doc.width, doc.height, 0, 0 )!.step
+		).toBe( 1 );
+	} );
 } );
 
 describe( 'LiveWire', () => {

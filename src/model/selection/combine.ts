@@ -31,8 +31,13 @@ import type { Selection, SelectionMode } from './types';
  * carry, and a readback that finishes inside a frame. Uncapped, one intersection on a
  * fifty-megapixel scan would allocate two hundred megabytes to answer a question whose
  * answer is four hundred points long.
+ *
+ * The default, not the rule: a site that works with very large scans can raise it with
+ * `lienzo_max_selection_pixels`, and the editor passes whatever comes back down here.
+ * A parameter rather than a module variable something writes at boot, because this file
+ * is pure and a pure function that reads a global is neither testable nor honest.
  */
-const MAX_COMBINE_PIXELS = 4_000_000;
+export const MAX_COMBINE_PIXELS = 4_000_000;
 
 /**
  * Vertices the combined outline keeps.
@@ -59,13 +64,16 @@ const OPERATIONS: Record<
  * @param incoming  Region just drawn, or null when the gesture produced nothing.
  * @param mode      What the new region does to the old one.
  * @param canvas    Canvas size the selections are expressed against.
+ * @param maxPixels Optional. Ceiling on the working raster, from
+ *                  `lienzo_max_selection_pixels`. Defaults to four megapixels.
  * @return The combined selection, or null when the result covers nothing.
  */
 export function combineSelections(
 	base: Selection | null,
 	incoming: Selection | null,
 	mode: SelectionMode,
-	canvas: { width: number; height: number }
+	canvas: { width: number; height: number },
+	maxPixels = MAX_COMBINE_PIXELS
 ): Selection | null {
 	const from = isEmptySelection( base ) ? null : base;
 	const next = isEmptySelection( incoming ) ? null : incoming;
@@ -87,25 +95,27 @@ export function combineSelections(
 		return from;
 	}
 
-	return traceCombined( from, next, mode, canvas );
+	return traceCombined( from, next, mode, canvas, maxPixels );
 }
 
 /**
  * Rasterises both selections, composites them, and traces the result back.
  *
- * @param base     Selection in place.
- * @param incoming Region just drawn.
- * @param mode     Boolean to perform.
- * @param canvas   Canvas size the selections are expressed against.
+ * @param base      Selection in place.
+ * @param incoming  Region just drawn.
+ * @param mode      Boolean to perform.
+ * @param canvas    Canvas size the selections are expressed against.
+ * @param maxPixels Ceiling on the working raster.
  * @return The combined selection, or a graceful fallback when no canvas is available.
  */
 function traceCombined(
 	base: Selection,
 	incoming: Selection,
 	mode: Exclude< SelectionMode, 'new' >,
-	canvas: { width: number; height: number }
+	canvas: { width: number; height: number },
+	maxPixels: number
 ): Selection | null {
-	const size = workingSize( canvas );
+	const size = workingSize( canvas, maxPixels );
 	const baseMask = buildSelectionMask( base, size.width, size.height );
 	const nextMask = buildSelectionMask( incoming, size.width, size.height );
 	const surface = document.createElement( 'canvas' );
@@ -154,15 +164,22 @@ function traceCombined(
  * used -- only the precision of the boundary changes, and the tracer's vertex budget
  * costs more of that than the scaling does.
  *
- * @param canvas Canvas size.
+ * @param canvas    Canvas size.
+ * @param maxPixels Ceiling on the raster. A value below one pixel is meaningless and
+ *                  is read as the default, so a filter returning zero cannot make
+ *                  every boolean collapse to a one-pixel canvas.
  */
-function workingSize( canvas: { width: number; height: number } ): {
+function workingSize(
+	canvas: { width: number; height: number },
+	maxPixels: number
+): {
 	width: number;
 	height: number;
 } {
 	const width = Math.max( 1, Math.round( canvas.width ) );
 	const height = Math.max( 1, Math.round( canvas.height ) );
-	const scale = Math.sqrt( MAX_COMBINE_PIXELS / ( width * height ) );
+	const ceiling = maxPixels >= 1 ? maxPixels : MAX_COMBINE_PIXELS;
+	const scale = Math.sqrt( ceiling / ( width * height ) );
 
 	if ( scale >= 1 ) {
 		return { width, height };

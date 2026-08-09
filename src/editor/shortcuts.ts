@@ -20,6 +20,8 @@ export interface ShortcutTarget {
 	selectAll: () => void;
 	/** Clears the marquee and any in-progress path. */
 	deselect: () => void;
+	/** Puts the marquee back as it was before the last change. */
+	stepSelectionBack: () => void;
 	/** Whether anything is selected. */
 	hasSelection: () => boolean;
 	/** Whether a polygon, a pen path or a magnetic trace is half-placed on the canvas. */
@@ -84,9 +86,16 @@ function handleCommand( event: KeyboardEvent, target: ShortcutTarget ): void {
 	} else if ( 'a' === key ) {
 		event.preventDefault();
 		target.selectAll();
-	} else if ( 'd' === key ) {
+	} else if ( 'd' === key && ! event.shiftKey ) {
 		event.preventDefault();
 		target.deselect();
+	} else if ( 'd' === key && event.shiftKey ) {
+		// Photoshop's Reselect key, doing rather more: it restores whatever the
+		// selection was before the last change, so it takes back a mistaken addition as
+		// readily as it undoes a deselect. Beside Cmd+D rather than anywhere else
+		// because the two are the same thought in opposite directions.
+		event.preventDefault();
+		target.stepSelectionBack();
 	} else if ( 'c' === key ) {
 		event.preventDefault();
 		target.copy();
