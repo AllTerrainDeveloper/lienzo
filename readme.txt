@@ -156,6 +156,7 @@ Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and serv
 * One top bar instead of two, and a third the height: 31 pixels where the chrome used to take about 90.
 * The picture no longer flickers while a window is being resized.
 * The tool rail and the sidebar meet the top bar, instead of sitting below a strip of background.
+* The top bar is the same height for every tool, so switching tools no longer shifts the picture.
 * Brushes, eraser, paint bucket, gradient, shapes, paths and text typed on the canvas.
 * Retouching: blur, sharpen, smudge, heal and clone stamp.
 * Dodge, burn, desaturate and saturate.

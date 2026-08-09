@@ -184,14 +184,28 @@
 	padding: 3px 8px;
 
 	/*
-	 * The control height, not the control height plus the padding. WordPress's admin
-	 * sets `box-sizing: border-box` globally and the harness does not, so anything that
-	 * counts the padding here is a different number in the two places -- and the larger
-	 * of the two wins, which is how a bar built for thirty-one pixels renders at
-	 * thirty-seven. Stated this way it is a floor in both box models and binds in
-	 * neither: the tallest child already decides.
+	 * A fixed height, not a minimum.
+	 *
+	 * The bar's contents change with the active tool, and letting the tallest of them
+	 * decide means the bar is one height for the marquee and another for the brush --
+	 * so every tool change nudged the canvas up or down and the picture jumped under
+	 * the pointer. It is the frame around the work; it does not get to move.
+	 *
+	 * `box-sizing` is declared rather than inherited because it has to be the same
+	 * number everywhere: WordPress's admin sets `border-box` globally and a page
+	 * outside the admin does not, and a bar built for thirty-one pixels rendered at
+	 * thirty-seven in one of them.
 	 */
-	min-block-size: var( --lz-bar-control );
+	box-sizing: border-box;
+	block-size: calc( var( --lz-bar-control ) + 7px );
+
+	/*
+	 * And the height is honoured. A flex item's `min-height` defaults to `auto`, which
+	 * resolves to its content's minimum -- so a stated height is only ever a *floor*
+	 * until this says otherwise, and one tool with a taller control puts the bar back
+	 * where it was.
+	 */
+	min-block-size: 0;
 	background: var( --lz-surface );
 	border-block-end: 1px solid var( --lz-border );
 	flex: 0 0 auto;
@@ -232,6 +246,7 @@
 	display: flex;
 	align-items: center;
 	flex: 1 1 auto;
+	block-size: 100%;
 
 	/*
 	 * Without this a flex item refuses to shrink below its content, so a long options
@@ -295,6 +310,36 @@
 	inline-size: 22px;
 	padding: 0;
 	font-size: 13px;
+}
+
+/*
+ * And nothing in the bar is taller than the bar.
+ *
+ * The fixed height above is what stops the canvas moving; this is what stops the fixed
+ * height clipping anything. Every tool brings different controls -- the brush three
+ * number fields and a swatch, text a font name and a size, the wand one number -- and
+ * a native `<input>` is a good deal taller than 24px until it is told otherwise.
+ *
+ * Both component prefixes are named because the shell resolves either at runtime, and
+ * a rule that knows only one of them silently misses every other install.
+ */
+.lz-topbar :is( input, select, textarea ),
+.lz-topbar :is( wpd-number-field, wpd-text-field, wpd-color-field, wpd-select ),
+.lz-topbar :is( os-number-field, os-text-field, os-color-field, os-select ) {
+	box-sizing: border-box;
+	block-size: var( --lz-bar-control );
+	min-block-size: 0;
+}
+
+/* A checkbox is square and small; stretching it to the row height would look absurd. */
+.lz-topbar :is( input[ type='checkbox' ], input[ type='radio' ] ) {
+	block-size: auto;
+}
+
+/* The label-and-control rows fill the bar rather than setting its height. */
+.lz-topbar .lz-field,
+.lz-topbar .lz-check {
+	block-size: var( --lz-bar-control );
 }
 
 /* The one action still worth its words sits a little apart from the glyphs. */
@@ -1754,7 +1799,10 @@ input.lz-colour {
 	flex-wrap: nowrap;
 	inline-size: 100%;
 	min-inline-size: 0;
+	block-size: 100%;
 	overflow-x: auto;
+
+	/* The last word on the bar's height: nothing spills out of it downwards. */
 	overflow-y: hidden;
 	scrollbar-width: thin;
 	font-size: 12px;

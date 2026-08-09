@@ -115,11 +115,19 @@ does. It is **one 31-pixel row** now.
 
 Half of that came from merging the rows; the other half came from the row admitting it was mostly
 air. Every control in the bar is exactly `--lz-bar-control` tall — one custom property, declared on
-`.lz-topbar` and applied to buttons, glyphs and segments alike — because a 29px button beside a 26px
-glyph beside a 27px segment is how a row needs forty-seven pixels to hold twenty-four pixels of
-content. And `min-block-size` states the control height rather than the control height plus the
-padding: WordPress's admin sets `box-sizing: border-box` globally, so anything counting the padding
-is a different number in the admin than it is anywhere else, and the larger of the two wins.
+`.lz-topbar` and applied to buttons, glyphs, segments and form controls alike — because a 29px button
+beside a 26px glyph beside a 27px segment is how a row needs forty-seven pixels to hold twenty-four
+pixels of content.
+
+The height is **fixed, not a minimum**. The bar's contents change with the active tool, and letting
+the tallest of them decide meant one height for the marquee and another for the brush — so every tool
+change nudged the canvas and the picture jumped under the pointer. Three declarations make that
+stick, and all three are load-bearing: `box-sizing: border-box`, because WordPress's admin sets it
+globally and a page outside the admin does not, so anything counting the padding is a different
+number in the two places; `block-size` rather than `min-block-size`; and `min-block-size: 0`, because
+a flex item's minimum defaults to its content and a stated height is otherwise only ever a floor.
+Capping the controls is what keeps the fixed height from clipping anything, and `overflow-y: hidden`
+on the options is the backstop for a control nobody anticipated.
 
 The labels went too, where the control already said what it was. "Selection mode" in front of four
 symbols and "Shape" in front of the word "Rectangle" are a hundred pixels each of a one-row bar spent
