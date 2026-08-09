@@ -7212,6 +7212,7 @@ fn mainFragment(
     tile.append(image, caption);
     return tile;
   }
+  const PICKER_CLASS = "lz-picker";
   async function renderPicker(root, config, onPick, isStale) {
     if (isStale?.()) {
       return;
@@ -7259,7 +7260,7 @@ fn mainFragment(
     await load();
   }
   function buildChrome(root) {
-    root.classList.add("lz-picker");
+    root.classList.add(PICKER_CLASS);
     const heading = document.createElement("h2");
     heading.className = "lz-picker__heading";
     heading.textContent = __("Choose a photo to edit");
@@ -12252,7 +12253,9 @@ fn mainFragment(
      */
     constructor(options) {
       this.root = options.root;
+      this.host = options.host;
       this.root.replaceChildren();
+      this.root.classList.remove(PICKER_CLASS);
       this.root.classList.add("lz-editor");
       this.root.classList.add(`lz-editor--${options.host}`);
       this.root.classList.toggle("is-desktop-mode", isDesktopModeEnabled());
@@ -12348,10 +12351,17 @@ fn mainFragment(
       this.backdrop.style.inlineSize = `${viewport.width}px`;
       this.backdrop.style.blockSize = `${viewport.height}px`;
     }
-    /** Empties the root and gives back its classes. */
+    /**
+     * Empties the root and gives back its classes.
+     *
+     * The host modifier goes too, not just `lz-editor`. The same element is handed back
+     * to the picker when a window is emptied, and `lz-editor--window` left behind takes
+     * `block-size: 100%` and `overflow: hidden` with it -- which is a picker that cannot
+     * scroll to the photo you were looking for.
+     */
     destroy() {
       this.root.replaceChildren();
-      this.root.classList.remove("lz-editor");
+      this.root.classList.remove("lz-editor", `lz-editor--${this.host}`);
     }
   }
   function createCompareControl(setBypass) {

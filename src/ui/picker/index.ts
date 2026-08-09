@@ -21,6 +21,16 @@ import { renderTile } from './tile';
 export type { MediaItem } from './types';
 
 /**
+ * The class the picker puts on the element it fills.
+ *
+ * Exported because the picker dresses the element it is *given* -- which, in both
+ * hosts, is the editor's own root -- and something has to take the class off again
+ * when a photo is chosen and the editor moves in. `EditorShell` does, and shares this
+ * constant so the two cannot drift.
+ */
+export const PICKER_CLASS = 'lz-picker';
+
+/**
  * Renders a grid of editable images into an element.
  *
  * @param root    Element to fill.
@@ -131,7 +141,7 @@ interface PickerChrome {
  * @param root Element to fill. Its contents are replaced.
  */
 function buildChrome( root: HTMLElement ): PickerChrome {
-	root.classList.add( 'lz-picker' );
+	root.classList.add( PICKER_CLASS );
 
 	const heading = document.createElement( 'h2' );
 	heading.className = 'lz-picker__heading';

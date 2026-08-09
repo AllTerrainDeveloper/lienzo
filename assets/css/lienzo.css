@@ -753,6 +753,13 @@ button.lz-button:focus-visible {
 
 /* -- Picker ---------------------------------------------------------------- */
 
+/*
+ * The picker dresses the editor's own root element rather than a wrapper inside it,
+ * because it is what fills a window that has no photo in it yet. That is why
+ * `EditorShell` takes the class *off* again when a photo is chosen: left on, this
+ * padding and gap apply to the editor, and a 16px gap between the top bar and the body
+ * is a strip of background where the tool rail should meet the toolbar.
+ */
 .lz-picker {
 	display: flex;
 	flex-direction: column;
