@@ -82,7 +82,7 @@ function buildButton( options: BuildOptions ): ButtonHandle & { el: HTMLElement 
 	 *
 	 * The guard is not belt and braces. A shell button is a custom element, not a
 	 * form control, so the `disabled` attribute is decoration on it -- the browser
-	 * suppresses nothing and every listener still fires. Inside Desktop Mode that
+	 * suppresses nothing and every listener still fires. Inside OpenStation that
 	 * made a greyed-out Save save, a greyed-out Undo undo, and a Reset that was
 	 * supposed to be unavailable throw the edit away.
 	 */

@@ -49,6 +49,16 @@ export function openEditor(
 		return true;
 	}
 
+	// The overlay needs the configuration -- the REST root, the nonce, the op schema --
+	// and this bundle can be on a page that never ran `lienzo_enqueue_editor()`: the
+	// shell enqueues the handle it was registered with, and a screen outside the ones
+	// the plugin enqueues on gets the script and no config. Mounting there would throw
+	// where doing nothing lets the caller's own `href` navigate to the editor page,
+	// which is exactly what that href is for.
+	if ( ! window.lienzoConfig ) {
+		return false;
+	}
+
 	openEditorOverlay( { attachmentId: id, onSave: options.onSave } );
 
 	return true;

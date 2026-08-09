@@ -10,24 +10,27 @@
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       lienzo
+ * Requires Plugins:  desktop-mode
  *
- * Lienzo is at its best as an OpenStation application: it runs as a native window
- * inside the desktop shell -- rendering into the shell's own DOM rather than into an
- * iframe -- and takes its PixiJS from the shell's module registry instead of loading a
- * second copy. Two Pixi 8 instances on one page share GPU resource registries through
- * globals, so one is not merely smaller but safer. Running natively is also what gives
- * the editor the shell's components, its drag bridge and its window chrome, none of
- * which is reachable from inside a chromeless iframe.
+ * Lienzo is an OpenStation application and requires it. That is not a formality: the
+ * rendering library is OpenStation's. Lienzo ships no PixiJS at all and borrows the
+ * shell's, which keeps this plugin a few tens of kilobytes rather than eight hundred,
+ * and keeps exactly one Pixi on the page -- two Pixi 8 instances share GPU resource
+ * registries through globals, so one copy is not merely smaller but safer.
  *
- * It does not *require* any of that. The editor itself needs a canvas, a mount point
- * and Pixi, so with no shell on the site it opens on its own admin page under Media
- * and in an overlay over the media modal and the block editor. `src/platform.ts`
- * resolves every control to a plain-DOM equivalent component by component, and the
- * loader falls back to the vendored Pixi -- so what is lost without the shell is the
- * window, the desktop icon and the drag bridge, and not the editor.
+ * At its best it runs as a **native window** in the shell, rendering into the shell's
+ * own DOM: that is what gives the editor OpenStation's components, its drag bridge and
+ * its window chrome, none of which is reachable from inside a chromeless iframe.
  *
- * The desktop integration therefore sits behind a capability check while everything
- * else loads unconditionally.
+ * With OpenStation installed but switched *off* for a user -- a per-user preference --
+ * there is no shell on the page to render into, and the editor opens on its own admin
+ * page under Media and in an overlay instead. `src/platform.ts` resolves every control
+ * to a plain-DOM equivalent component by component, and PixiJS is loaded straight from
+ * OpenStation's own directory. So classic admin has a real editor; what it does not
+ * have is the window, the desktop icon and the drag bridge.
+ *
+ * With OpenStation absent altogether there is no PixiJS, so nothing loads but the
+ * notice on the plugins screen explaining what is missing.
  *
  * @package Lienzo
  */
@@ -72,26 +75,30 @@ require_once LIENZO_DIR . 'includes/requirements.php';
 add_action( 'plugins_loaded', 'lienzo_boot', 5 );
 
 /**
- * Loads the plugin.
+ * Loads the plugin, once it is known that OpenStation is there to render with.
  *
  * On `plugins_loaded` rather than at file scope, and that is not a detail: plugins are
- * loaded in alphabetical order, so `lienzo` runs *before* the shell and none of its
- * functions exist yet when this file is first read. Asking about the shell then would
- * answer "absent" on every site, every time.
+ * loaded in alphabetical order, so `lienzo` runs *before* `desktop-mode` and none of
+ * its functions exist yet when this file is first read. Checking then would fail on
+ * every site, every time, and the plugin would silently never load.
+ * `Requires Plugins:` governs activation, not load order.
  *
- * Priority 5 leaves room for the desktop registrations at 20 to be added by an include
- * loaded here -- WordPress runs callbacks added to a hook that is already firing, as
- * long as they sit at a later priority.
- *
- * Everything here loads whether or not a shell is present. `desktop-mode.php` is the
- * one file that is about the shell, and every registration inside it is behind its own
- * capability check, so on a site without one it simply registers nothing.
+ * Priority 5 leaves room for the OpenStation registrations at 20 to be added by an
+ * include loaded here -- WordPress runs callbacks added to a hook that is already
+ * firing, as long as they sit at a later priority.
  *
  * @since 0.1.0
  *
  * @return void
  */
 function lienzo_boot() {
+	if ( ! lienzo_requirements_met() ) {
+		// Nothing else loads. Without OpenStation there is no PixiJS to render with, on
+		// any screen, and a half-registered plugin whose editor cannot open is worse
+		// than one that says plainly what it needs.
+		return;
+	}
+
 	require_once LIENZO_DIR . 'includes/helpers.php';
 	require_once LIENZO_DIR . 'includes/recipe.php';
 	require_once LIENZO_DIR . 'includes/post-image.php';

@@ -215,11 +215,11 @@ class Tests_Lienzo_Rest extends WP_UnitTestCase {
 
 		$this->assertStringContainsString( 'lienzo/v1', $config['restUrl'] );
 		$this->assertNotEmpty( $config['restNonce'] );
-		// The Pixi URL is a fallback, not an instruction. The loader asks the shell's
-		// module registry first and only injects this file when nothing has already put
-		// Pixi on the page -- two Pixi 8 instances fight each other over GPU resources,
-		// so the order matters more than the presence.
-		$this->assertStringContainsString( 'pixi.min.js', $config['pixiUrl'] );
+		// A key that is always present and often empty. The loader asks OpenStation's
+		// module registry first and only falls back to this URL when nothing has put
+		// Pixi on the page -- and Lienzo has no copy of its own to offer, so when
+		// OpenStation cannot be located there is honestly nothing to point at.
+		$this->assertArrayHasKey( 'pixiUrl', $config );
 		$this->assertTrue( $config['desktopMode'] );
 		$this->assertGreaterThan( 0, $config['maxRenderPixels'] );
 		$this->assertTrue( $config['canUpload'] );

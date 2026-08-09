@@ -52,7 +52,7 @@ export function buildToolGrid( onSelect: ( tool: ActiveTool ) => void ): ToolGri
 
 		inGroup++;
 
-		// From the kit, so the rail is built from Desktop Mode's buttons when they are
+		// From the kit, so the rail is built from OpenStation's buttons when they are
 		// registered rather than from something that merely resembles them.
 		const button = createIconButton( {
 			glyph: tool.glyph,

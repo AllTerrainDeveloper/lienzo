@@ -5,7 +5,7 @@
 /**
  * Writes a value into a select without disturbing it if it already matches.
  *
- * The adaptive kit hides whether the control is a Desktop Mode component or a plain
+ * The adaptive kit hides whether the control is an OpenStation component or a plain
  * `<select>`, so this looks for the underlying element either way.
  *
  * @param root  The field's root element.

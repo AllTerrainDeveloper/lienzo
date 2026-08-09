@@ -13,15 +13,14 @@ add_action( 'init', 'lienzo_register_assets' );
  * Registers the editor bundle and stylesheet.
  *
  * Registration happens on `init` so that any surface which needs the editor -- the
- * admin page, the media modal, the block editor, a Desktop Mode native window --
+ * admin page, the media modal, the block editor, an OpenStation native window --
  * can simply `wp_enqueue_script( 'lienzo' )` without caring who got there first.
  *
- * PixiJS is deliberately *not* registered as a dependency. It is vendored at
- * `assets/vendor/pixi.min.js` and injected at runtime by `src/engine/pixi-loader.ts`
- * only when `window.PIXI` is absent, because the desktop shell ships its own copy and
- * two Pixi instances on one page corrupt each other's global resources. Enqueuing it
- * unconditionally would also mean 780KB on every media screen for a button that has
- * not been clicked.
+ * PixiJS is deliberately *not* registered as a dependency. It belongs to OpenStation,
+ * and `src/engine/pixi-loader.ts` reaches for it at runtime only when `window.PIXI` is
+ * absent -- through OpenStation's module registry inside the shell, and by URL outside
+ * it. Enqueuing it here would mean 800KB on every media screen for a button that has
+ * not been clicked, and a second Pixi on every page the shell already has one on.
  *
  * @since 0.1.0
  *
@@ -85,7 +84,7 @@ function lienzo_asset_version( $relative ) {
  * `wp_localize_script()`, which casts every scalar to a string on its way to the
  * browser -- `true` arrives as `'1'` and `false` as `''`. That is fine for text and
  * quietly wrong for a flag: a strict check against `true` fails, and the JavaScript
- * concludes Desktop Mode is off while PHP is saying it is on. Booleans and numbers now
+ * concludes OpenStation is off while PHP is saying it is on. Booleans and numbers now
  * arrive as booleans and numbers.
  *
  * @since 0.1.0
@@ -126,7 +125,7 @@ function lienzo_get_config() {
 		'canUpload'       => current_user_can( 'upload_files' ),
 		'desktopMode'     => lienzo_is_desktop_mode_active(),
 		'editorUrl'       => esc_url_raw( lienzo_editor_page_url() ),
-		'pixiUrl'         => esc_url_raw( LIENZO_URL . 'assets/vendor/pixi.min.js' ),
+		'pixiUrl'         => esc_url_raw( lienzo_pixi_url() ),
 		'renderer'        => lienzo_renderer_backend(),
 		'schema'          => lienzo_op_schema(),
 	);
@@ -139,6 +138,44 @@ function lienzo_get_config() {
 	 * @param array $config Configuration handed to the browser.
 	 */
 	return (array) apply_filters( 'lienzo_config', $config );
+}
+
+/**
+ * Returns the URL of OpenStation's vendored PixiJS.
+ *
+ * Lienzo ships no rendering library. Inside the shell the browser asks OpenStation's
+ * module registry for `pixijs` and never comes here; on a classic admin screen that
+ * registry is not on the page, but OpenStation *is* installed -- Lienzo requires it --
+ * so its file can be loaded directly.
+ *
+ * The URL is built from OpenStation's own constant rather than from a slug, so a
+ * rename, a fork or a bundled copy all resolve. Two guards, because this is one
+ * plugin reaching into another's directory: an unresolvable constant and a missing
+ * file both yield an empty string, and the editor then says plainly that it cannot
+ * find PixiJS instead of loading a 404 and failing somewhere stranger.
+ *
+ * @since 0.1.0
+ *
+ * @return string Absolute URL, or an empty string when it cannot be resolved.
+ */
+function lienzo_pixi_url() {
+	$url  = lienzo_shell_constant( 'URL' );
+	$dir  = lienzo_shell_constant( 'DIR' );
+	$file = 'assets/vendor/pixi.min.js';
+
+	$resolved = ( $url && $dir && file_exists( $dir . $file ) ) ? $url . $file : '';
+
+	/**
+	 * Filters where the browser loads PixiJS from.
+	 *
+	 * Only used outside the desktop shell, where OpenStation's module registry is not
+	 * on the page. An empty string means "nowhere", and the editor reports it.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string $resolved Absolute URL, or an empty string.
+	 */
+	return (string) apply_filters( 'lienzo_pixi_url', $resolved );
 }
 
 /**

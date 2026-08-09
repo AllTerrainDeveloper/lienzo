@@ -1,9 +1,9 @@
 <?php
 /**
- * Desktop Mode integration.
+ * OpenStation integration.
  *
  * Every registration in this file is additive and sits behind a `function_exists()`
- * gate. Lienzo is a standalone plugin: with Desktop Mode absent, nothing here
+ * gate. Lienzo is a standalone plugin: with OpenStation absent, nothing here
  * runs and all four standalone hosts continue to work untouched. There is
  * deliberately no `Requires Plugins: desktop-mode` header on the bootstrap.
  *
@@ -17,16 +17,16 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Determines whether Desktop Mode is installed and switched on for the current user.
+ * Determines whether OpenStation is installed and switched on for the current user.
  *
  * Two separate questions, and both matter. `function_exists()` answers "is the
  * plugin active"; `openstation_is_enabled()` answers "has this particular user
- * opted in", since Desktop Mode is a per-user preference rather than a site-wide
+ * opted in", since OpenStation is a per-user preference rather than a site-wide
  * one. Only when both hold should Lienzo present itself as a desktop app.
  *
  * @since 0.1.0
  *
- * @return bool True when Desktop Mode is active for the current user.
+ * @return bool True when OpenStation is active for the current user.
  */
 function lienzo_is_desktop_mode_active() {
 	if ( ! lienzo_shell_has( 'register_window' ) || ! lienzo_shell_has( 'is_enabled' ) ) {
@@ -39,10 +39,10 @@ function lienzo_is_desktop_mode_active() {
 add_action( 'plugins_loaded', 'lienzo_maybe_init_desktop_mode', 20 );
 
 /**
- * Wires up the Desktop Mode integrations, if Desktop Mode is there to wire into.
+ * Wires up the OpenStation integrations, if OpenStation is there to wire into.
  *
  * The gate is on the registration function rather than on a version constant, so a
- * Desktop Mode release that renames itself or drops the API degrades to "no desktop
+ * OpenStation release that renames itself or drops the API degrades to "no desktop
  * integration" instead of a fatal error on every request.
  *
  * @since 0.1.0
@@ -149,7 +149,7 @@ function lienzo_render_desktop_template() {
 }
 
 /**
- * Loads the editor assets into the Desktop Mode shell.
+ * Loads the editor assets into OpenStation.
  *
  * `openstation_mode_init` fires while the shell itself is rendering, which is the
  * documented place for a plugin to enqueue shell-level code. Registering the script
@@ -192,7 +192,7 @@ function lienzo_my_wordpress_action( $actions ) {
 }
 
 /**
- * Determines whether the current request is rendering inside a Desktop Mode window.
+ * Determines whether the current request is rendering inside an OpenStation window.
  *
  * Chromeless requests are the admin page loaded inside a window iframe, with the
  * admin bar and menu suppressed. The editor uses this to drop its own page chrome
@@ -200,7 +200,7 @@ function lienzo_my_wordpress_action( $actions ) {
  *
  * @since 0.1.0
  *
- * @return bool True when rendering inside a Desktop Mode window iframe.
+ * @return bool True when rendering inside an OpenStation window iframe.
  */
 function lienzo_is_desktop_mode_chromeless() {
 	if ( ! lienzo_shell_has( 'is_chromeless_request' ) ) {

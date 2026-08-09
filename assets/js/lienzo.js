@@ -3077,14 +3077,17 @@ fn mainFragment(
     }
     const desktop2 = shell();
     if (desktop2?.loadModules) {
-      await desktop2.loadModules([MODULE_ID]);
+      try {
+        await desktop2.loadModules([MODULE_ID]);
+      } catch {
+      }
       if (window.PIXI) {
         return window.PIXI;
       }
     }
-    return injectVendored();
+    return injectFromShell();
   }
-  function injectVendored() {
+  function injectFromShell() {
     if (injection) {
       return injection;
     }
@@ -3092,7 +3095,7 @@ fn mainFragment(
     if (!url) {
       return Promise.reject(
         new Error(
-          "Lienzo cannot find PixiJS: no desktop shell on this page, and no vendored build in the configuration."
+          "Lienzo needs the desktop shell: PixiJS comes from it, and this page can reach neither its module registry nor its files."
         )
       );
     }
@@ -3103,7 +3106,7 @@ fn mainFragment(
         } else {
           reject(
             new Error(
-              "PixiJS loaded but did not define window.PIXI. The vendored build may be corrupt."
+              "PixiJS loaded but did not define window.PIXI. The shell may be mid-upgrade."
             )
           );
         }
@@ -3112,7 +3115,7 @@ fn mainFragment(
         injection = null;
         reject(new Error(`Could not load PixiJS from ${url}`));
       };
-      const selector = `script[data-lienzo-vendor="${CSS.escape(url)}"]`;
+      const selector = `script[data-lienzo-pixi="${CSS.escape(url)}"]`;
       const existing = document.querySelector(selector);
       if (existing) {
         existing.addEventListener("load", settle, { once: true });
@@ -3122,7 +3125,7 @@ fn mainFragment(
       const script = document.createElement("script");
       script.src = url;
       script.async = true;
-      script.dataset.lienzoVendor = url;
+      script.dataset.lienzoPixi = url;
       script.addEventListener("load", settle, { once: true });
       script.addEventListener("error", fail2, { once: true });
       document.head.appendChild(script);
@@ -3377,7 +3380,7 @@ fn mainFragment(
      *
      * `destroy( true )` on the Application is deliberately *not* used: it releases
      * Pixi's global resource registries, which corrupts any other Pixi application
-     * alive on the page. Desktop Mode runs its own -- wallpapers, widgets, games --
+     * alive on the page. OpenStation runs its own -- wallpapers, widgets, games --
      * so taking that shortcut here would break unrelated windows.
      */
     destroy() {
@@ -6870,7 +6873,15 @@ fn mainFragment(
     if (!id) {
       return false;
     }
+    return openDesktopWindow(id, origin);
+  }
+  function openDesktopWindow(attachmentId = 0, origin = null) {
+    const id = Number(attachmentId) || 0;
     if (desktop()?.openWindow) {
+      if (!id) {
+        desktop()?.openWindow?.(WINDOW_ID, { source: "lienzo" });
+        return true;
+      }
       const live = [...state().openers].pop();
       if (live) {
         live(id, origin);
@@ -6889,6 +6900,9 @@ fn mainFragment(
       return true;
     }
     return false;
+  }
+  function isShellPage() {
+    return void 0 !== desktop()?.openWindow || isDesktopModeEnabled();
   }
   function listenForOpenRequests() {
     if (state().listenerRegistered) {
@@ -12325,6 +12339,10 @@ fn mainFragment(
     const attachmentId = Number(root.dataset.attachment ?? 0);
     instance?.destroy();
     instance = null;
+    if (isShellPage()) {
+      handOverToDesktop(root, attachmentId);
+      return;
+    }
     if (attachmentId) {
       open(root, attachmentId);
     } else {
@@ -12354,6 +12372,13 @@ fn mainFragment(
     const url = new URL(window.location.href);
     url.searchParams.set("attachment", String(attachmentId));
     window.history.replaceState({}, "", url);
+  }
+  function handOverToDesktop(root, attachmentId) {
+    const opened = openDesktopWindow(attachmentId);
+    const message = document.createElement("p");
+    message.className = "lz-page-notice";
+    message.textContent = opened ? __("Opening Lienzo on your desktop…") : __("Lienzo opens as a window on your desktop. Open it from the dock or its icon.");
+    root.replaceChildren(message);
   }
   function showPicker(root) {
     const config = window.lienzoConfig;
@@ -12450,6 +12475,9 @@ fn mainFragment(
     }
     if (openInDesktop(id, options.origin ?? null)) {
       return true;
+    }
+    if (!window.lienzoConfig) {
+      return false;
     }
     openEditorOverlay({ attachmentId: id, onSave: options.onSave });
     return true;

@@ -126,20 +126,38 @@ class Tests_Lienzo_Media_Actions extends WP_UnitTestCase {
 	/**
 	 * The config tells the browser where the classic editor and PixiJS live.
 	 *
-	 * Both are what makes an editor possible with no desktop shell on the page: one is
-	 * where a control points when there is no window to open, the other is the copy of
-	 * Pixi to load when there is no shell to borrow one from.
+	 * Both are what makes an editor possible with no shell on the page: one is where a
+	 * control points when there is no window to open, the other is OpenStation's own
+	 * Pixi, which is the only Pixi there is -- Lienzo ships none.
 	 *
 	 * @covers ::lienzo_get_config
+	 * @covers ::lienzo_pixi_url
 	 */
 	public function test_config_carries_the_classic_admin_inputs() {
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 
+		add_filter( 'lienzo_pixi_url', static fn() => 'https://example.org/os/assets/vendor/pixi.min.js' );
+
 		$config = lienzo_get_config();
 
+		remove_all_filters( 'lienzo_pixi_url' );
+
 		$this->assertStringContainsString( 'page=lienzo', $config['editorUrl'] );
-		$this->assertStringContainsString( 'assets/vendor/pixi.min.js', $config['pixiUrl'] );
+		$this->assertStringContainsString( 'pixi.min.js', $config['pixiUrl'] );
 		$this->assertSame( 'webgl', $config['renderer'] );
+	}
+
+	/**
+	 * With no OpenStation directory to read, the Pixi URL is empty rather than a guess.
+	 *
+	 * One plugin reaching into another's directory should fail loudly and early or not
+	 * at all. The test suite stubs OpenStation's functions but not its constants, so
+	 * this is the unresolvable case, exercised honestly.
+	 *
+	 * @covers ::lienzo_pixi_url
+	 */
+	public function test_pixi_url_is_empty_when_openstation_cannot_be_located() {
+		$this->assertSame( '', lienzo_pixi_url() );
 	}
 
 	/**

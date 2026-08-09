@@ -31,9 +31,9 @@ export interface LienzoConfig {
 	maxRenderPixels: number;
 	canUpload: boolean;
 	/**
-	 * Whether Desktop Mode is active *for this user*, not merely installed.
+	 * Whether OpenStation is active *for this user*, not merely installed.
 	 *
-	 * Desktop Mode is a per-user preference, so the plugin being active says nothing
+	 * OpenStation is a per-user preference, so the plugin being active says nothing
 	 * about whether this person is looking at a desktop. The controls use it to decide
 	 * which house style to fall back to when a component is unavailable.
 	 */
@@ -50,15 +50,16 @@ export interface LienzoConfig {
 	/**
 	 * The classic-admin editor page.
 	 *
-	 * Where a "Edit with Lienzo" control goes when there is no desktop shell to open a
-	 * window in.
+	 * Where an "Edit with Lienzo" control goes when there is no shell on the page to
+	 * open a window in.
 	 */
 	editorUrl: string;
 	/**
-	 * Where the vendored PixiJS build lives.
+	 * Where OpenStation's PixiJS lives.
 	 *
-	 * Only ever loaded when nothing else has put Pixi on the page -- in classic admin,
-	 * where there is no desktop shell to borrow a copy from.
+	 * Lienzo ships none of its own. Inside the shell the module registry answers first
+	 * and this is never used; on a classic admin screen there is no registry, and this
+	 * is OpenStation's own file. Empty when it could not be resolved.
 	 */
 	pixiUrl: string;
 	schema: OpSchema;

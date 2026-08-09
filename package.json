@@ -10,8 +10,7 @@
 	},
 	"scripts": {
 		"build": "npm run build:bundle && npm run deploy",
-		"build:bundle": "npm run vendor && vite build --mode development && vite build --mode production",
-		"vendor": "node bin/vendor-pixi.mjs",
+		"build:bundle": "vite build --mode development && vite build --mode production",
 		"dev": "vite build --mode development --watch",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",

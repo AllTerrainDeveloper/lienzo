@@ -2,6 +2,7 @@
 Contributors: daniellopez
 Tags: image editor, media, photo, layers, filters
 Requires at least: 6.0
+Requires Plugins: desktop-mode
 Tested up to: 7.0
 Requires PHP: 7.4
 Stable tag: 0.1.0
@@ -65,22 +66,24 @@ Saving always writes a new attachment and records the edit as a recipe: the list
 
 Adjustments are composed into a single GPU pass rather than chained one after another. That is not only quicker. It also means the image is quantised once instead of once per adjustment, which is the difference between a clean gradient and visible banding in a sky.
 
+== Requires OpenStation ==
+
+Lienzo runs inside the OpenStation plugin (previously called Desktop Mode), which turns wp-admin into a desktop, and needs it installed. That is not decoration: the rendering engine is OpenStation's. Lienzo ships none of its own and borrows the desktop's, which is why this plugin is a few tens of kilobytes rather than the best part of a megabyte, and why your browser only ever downloads one copy.
+
+Install and activate OpenStation first. Without it, Lienzo tells you what it needs and otherwise stays out of the way.
+
 = Where it opens =
 
-In the classic admin, Lienzo opens under Media → Edit Photos, and over the top of whatever you were doing when you choose "Edit with Lienzo" in the Media Library, in the media picker or on an image block. Nothing to install, nothing to navigate away from.
+With the desktop switched on, Lienzo is a real window: chrome you can move and resize, an icon on the wallpaper, and drag and drop between windows.
 
-= Better with OpenStation =
-
-With the OpenStation plugin (previously called Desktop Mode), which turns wp-admin into a desktop, Lienzo runs as a real window instead: window chrome you can move and resize, an icon on the wallpaper, and drag and drop between windows. It also borrows its rendering engine from the desktop there rather than loading a second copy, so the page is lighter.
-
-Neither is required. Lienzo simply uses the desktop when there is one.
+The desktop is a per-user preference, and with it switched off Lienzo still opens — under Media → Edit Photos, and over the top of whatever you were doing when you choose "Edit with Lienzo" in the Media Library, in the media picker or on an image block. Every tool is the same one. What you do not get is the window, the wallpaper icon and dragging photos between windows.
 
 == Installation ==
 
-1. Upload the `lienzo` folder to `/wp-content/plugins/`, or install it from the Plugins screen.
-2. Activate Lienzo through the Plugins menu.
-3. Open it from Media → Edit Photos, or choose "Edit with Lienzo" on any image in the Media Library.
-4. Optional: install the OpenStation plugin and Lienzo will open as a desktop window, from the dock or its wallpaper icon.
+1. Install and activate the OpenStation plugin.
+2. Upload the `lienzo` folder to `/wp-content/plugins/`, or install it from the Plugins screen.
+3. Activate Lienzo through the Plugins menu.
+4. Open Lienzo from the dock or the desktop, or choose "Edit with Lienzo" on any image in the Media Library. With the desktop switched off, use Media → Edit Photos.
 
 == Frequently Asked Questions ==
 
@@ -110,9 +113,9 @@ No, and the difference decides what re-opening does. Adjustments, crops and tran
 
 That makes a painted save its own original. Re-open it and you see exactly the pixels you saved, with the sliders back at zero, ready to be edited again from there. The editor says so when you save, rather than letting you find out later.
 
-= Can I use it in the classic admin? =
+= Can I use it with the desktop switched off? =
 
-Yes. It opens under Media → Edit Photos, and as an overlay when you choose "Edit with Lienzo" from the Media Library, the media picker or an image block. Every tool is the same one; what you do not get without OpenStation is the movable window, the wallpaper icon and dragging photos between windows.
+Yes. It opens under Media → Edit Photos, and as an overlay when you choose "Edit with Lienzo" from the Media Library, the media picker or an image block. Every tool is the same one; what you do not get is the movable window, the wallpaper icon and dragging photos between windows. OpenStation still has to be installed, because the rendering engine comes from it.
 
 = Does it edit in real colour? =
 
@@ -127,15 +130,15 @@ There is a Light switch at the top of the Adjustments panel. Left on sRGB it beh
 
 == Third-party libraries ==
 
-Rendering uses PixiJS (MIT). A copy ships with this plugin at `assets/vendor/pixi.min.js`, with its licence beside it, and is served from your own site — no external or CDN requests are made, ever.
+This plugin bundles no third-party libraries and makes no external or CDN requests.
 
-It is loaded only when nothing else has already provided it. On a site running OpenStation, Lienzo uses the desktop's copy instead: two instances of the same rendering library on one page share GPU resources through globals, and tearing one down can break the other.
+Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and served from your own server. Lienzo asks OpenStation for it rather than shipping a second copy: that keeps this plugin small, and two instances of the same rendering library on one page share GPU resources through globals, where tearing one down can break the other.
 
 == Changelog ==
 
 = 0.1.0 =
 * First release.
-* Works in the classic admin as well as in an OpenStation window: an editor page under Media, and an overlay from the Media Library, the media picker and the image block.
+* Opens with the desktop switched off as well as in a window: an editor page under Media, and an overlay from the Media Library, the media picker and the image block.
 * Magic wand and paint bucket rewritten to walk runs rather than pixels — a twenty-megapixel photo answers in a fifth of a second instead of a few seconds.
 * The wand traces the holes in a region instead of selecting through them.
 * Optional linear-light exposure, where a stop is a doubling of light rather than of a stored value.

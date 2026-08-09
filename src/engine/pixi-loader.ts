@@ -1,27 +1,32 @@
 /**
- * Getting PixiJS, from the shell where there is one.
+ * Getting PixiJS from the shell.
  *
- * Two sources, in this order:
+ * Lienzo ships no rendering library, and that is a deliberate part of what it *is*:
+ * OpenStation already vendors PixiJS v8 (MIT), so borrowing it keeps this plugin a
+ * few tens of kilobytes instead of eight hundred, and keeps exactly one Pixi on the
+ * page. Two Pixi 8 instances share GPU resource registries through globals, and
+ * tearing one down can invalidate textures belonging to the other. There is no version
+ * to keep in step and no second copy to go stale.
  *
- * 1. **The shell's copy.** OpenStation vendors Pixi v8 and registers it in its module
- *    registry as `pixijs`. Asking for it there is both smaller and safer than loading
- *    a second one: two Pixi 8 instances on a page share GPU resource registries
- *    through globals, and tearing one down can invalidate textures belonging to the
- *    other.
- * 2. **The copy this plugin ships.** In classic admin there is no shell to borrow
- *    from, and an editor with no Pixi cannot draw a pixel. The build vendors
- *    `assets/vendor/pixi.min.js` -- WordPress.org forbids loading code from a CDN, so
- *    it has to be a file inside the plugin -- and it is injected only when nothing
- *    else has already put Pixi on the page.
+ * Three ways to reach the same file, in this order:
  *
- * The order is the whole point. Checking `window.PIXI` and the registry *first* means
- * a page that already has Pixi never gets a second one, and the classic-admin fallback
- * costs nothing on a desktop-shell page because it is never reached.
+ * 1. **`window.PIXI`**, if anything has already put it there.
+ * 2. **The shell's module registry** — `loadModules( [ 'pixijs' ] )`, which is
+ *    idempotent and de-duplicates concurrent callers, so several windows opening at
+ *    once still load one script.
+ * 3. **The shell's own vendored file**, by URL. The registry lives in the shell's
+ *    desktop bundle, so on a *classic* admin screen there is no registry to ask --
+ *    but the plugin is installed and its file is right there, and PHP resolves the
+ *    URL from the shell's own constant rather than either plugin guessing.
  *
- * Both spellings of the shell namespace are read, for the reason set out in
- * `platform.ts`: OpenStation 0.9.9 renamed `wp.desktop` to `wp.os` and Lienzo ships to
- * sites running either version. This file used to read only `wp.desktop`, which meant
- * that on a current shell the loader looked exactly like a page with no shell at all.
+ * The third step is what lets the editor open in classic admin without Lienzo
+ * carrying a second copy of Pixi to do it.
+ *
+ * Both spellings of the namespace are read, for the reason set out in `platform.ts`:
+ * OpenStation 0.9.9 renamed `wp.desktop` to `wp.os` and Lienzo ships to sites running
+ * either version. This file used to read only `wp.desktop`, which meant that on a
+ * current shell the loader looked exactly like a page with no shell at all and every
+ * canvas failed to open with "Lienzo needs OpenStation".
  */
 
 import type * as PixiNamespace from 'pixi.js';
@@ -29,7 +34,7 @@ import type * as PixiNamespace from 'pixi.js';
 /** The Pixi module namespace, as exposed on `window.PIXI` by the UMD build. */
 export type Pixi = typeof PixiNamespace;
 
-/** The id OpenStation registers its Pixi build under. */
+/** The id the shell registers its Pixi build under. */
 const MODULE_ID = 'pixijs';
 
 /** The narrow part of the shell API this file needs. */
@@ -41,12 +46,12 @@ interface DesktopModules {
 let injection: Promise< Pixi > | null = null;
 
 /**
- * Reads the shell's module loader, if the shell is on this page.
+ * Reads the shell's module loader, if the shell's bundle is on this page.
  *
  * Deliberately NOT gated on `isActive()` the way `platform.ts` gates its adapters:
  * that flag answers "should this look like a desktop app", and the module registry
- * works whenever the shell bundle is present. Gating here would load a second Pixi
- * onto a page that already has a perfectly good one.
+ * works whenever the shell bundle is present. Gating here would refuse to reuse a
+ * perfectly good Pixi.
  */
 function shell(): DesktopModules | undefined {
 	const wp = window.wp as
@@ -60,7 +65,7 @@ function shell(): DesktopModules | undefined {
  * Resolves with a usable Pixi namespace.
  *
  * @return The Pixi namespace.
- * @throws {Error} When neither source can produce one.
+ * @throws {Error} When the shell cannot be reached at all.
  */
 export async function loadPixi(): Promise< Pixi > {
 	if ( window.PIXI ) {
@@ -70,27 +75,36 @@ export async function loadPixi(): Promise< Pixi > {
 	const desktop = shell();
 
 	if ( desktop?.loadModules ) {
-		await desktop.loadModules( [ MODULE_ID ] );
+		try {
+			await desktop.loadModules( [ MODULE_ID ] );
+		} catch {
+			// Asking is not the same as the registry having anything to answer with.
+			// OpenStation registers `pixijs` while the *desktop* boots, and with desktop
+			// mode switched off that never happens even though `wp.os` is on the page for
+			// the admin-bar toggle. An unknown id rejects, and letting that reject
+			// propagate would fail the whole editor while the file it wanted sat on disk.
+		}
 
 		if ( window.PIXI ) {
 			return window.PIXI;
 		}
 
-		// The shell said it loaded its module and did not define the global. Falling
-		// through to our own copy is better than failing: the alternative is an editor
-		// that cannot open on a site whose shell is half-upgraded.
+		// Either the registry had no such module, or it said it loaded one and did not
+		// define the global. Both are reasons to go to the file itself rather than to
+		// give up: the alternative is an editor that cannot open on a site whose shell
+		// is present but not running.
 	}
 
-	return injectVendored();
+	return injectFromShell();
 }
 
 /**
- * Injects the copy of Pixi this plugin ships.
+ * Loads the shell's vendored Pixi by URL.
  *
  * @return The Pixi namespace.
- * @throws {Error} When the file is missing from the config or fails to load.
+ * @throws {Error} When PHP could not resolve the shell's URL, or the file fails.
  */
-function injectVendored(): Promise< Pixi > {
+function injectFromShell(): Promise< Pixi > {
 	if ( injection ) {
 		return injection;
 	}
@@ -100,7 +114,7 @@ function injectVendored(): Promise< Pixi > {
 	if ( ! url ) {
 		return Promise.reject(
 			new Error(
-				'Lienzo cannot find PixiJS: no desktop shell on this page, and no vendored build in the configuration.'
+				'Lienzo needs the desktop shell: PixiJS comes from it, and this page can reach neither its module registry nor its files.'
 			)
 		);
 	}
@@ -112,7 +126,7 @@ function injectVendored(): Promise< Pixi > {
 			} else {
 				reject(
 					new Error(
-						'PixiJS loaded but did not define window.PIXI. The vendored build may be corrupt.'
+						'PixiJS loaded but did not define window.PIXI. The shell may be mid-upgrade.'
 					)
 				);
 			}
@@ -129,7 +143,7 @@ function injectVendored(): Promise< Pixi > {
 		// Another bundle -- a second copy of this one, which is exactly what happens
 		// inside the desktop shell -- may already have injected the same script and be
 		// waiting on it. Adopt that tag rather than racing a second one.
-		const selector = `script[data-lienzo-vendor="${ CSS.escape( url ) }"]`;
+		const selector = `script[data-lienzo-pixi="${ CSS.escape( url ) }"]`;
 		const existing = document.querySelector< HTMLScriptElement >( selector );
 
 		if ( existing ) {
@@ -143,7 +157,7 @@ function injectVendored(): Promise< Pixi > {
 
 		script.src = url;
 		script.async = true;
-		script.dataset.lienzoVendor = url;
+		script.dataset.lienzoPixi = url;
 		script.addEventListener( 'load', settle, { once: true } );
 		script.addEventListener( 'error', fail, { once: true } );
 

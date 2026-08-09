@@ -348,7 +348,7 @@ export class GpuContext {
 	 *
 	 * `destroy( true )` on the Application is deliberately *not* used: it releases
 	 * Pixi's global resource registries, which corrupts any other Pixi application
-	 * alive on the page. Desktop Mode runs its own -- wallpapers, widgets, games --
+	 * alive on the page. OpenStation runs its own -- wallpapers, widgets, games --
 	 * so taking that shortcut here would break unrelated windows.
 	 */
 	destroy(): void {

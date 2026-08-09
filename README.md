@@ -18,10 +18,11 @@ text typed directly on the canvas. Undo and redo reach painted pixels, not only 
 Adjustments stay non-destructive: a save always writes a *new* attachment and stores the edit as a
 re-openable recipe, so the original file is never rewritten and repeated edits never compound.
 
-Lienzo runs as a **native window inside OpenStation** where there is one — the dock, a desktop icon,
-a double-clicked image, the Media Library row action, the attachment screen, the media modal and the
-`core/image` block toolbar all open that same window — and as an **admin page under Media plus an
-overlay** where there is not. One editor, two places to put it.
+Lienzo is an **OpenStation application** and requires it: the rendering library is OpenStation's, and
+Lienzo ships none. At its best it runs as a **native window** in the shell — the dock, a desktop
+icon, a double-clicked image, the Media Library row action, the attachment screen, the media modal
+and the `core/image` block toolbar all open that same window. For a user who has switched desktop
+mode *off*, it opens as an **admin page under Media** and as an **overlay** instead.
 
 ## Design in one page
 
@@ -42,9 +43,9 @@ const editor = window.lienzo.mount( element, {
 
 Three things call it and no more: the OpenStation native window, the admin page, and the overlay.
 The row action, the media modal button and the block editor button call `openEditor()`, which picks
-between them — the window when the shell is there to host one, the overlay when it is not — rather
-than each having its own idea of where an editor should appear. Nothing outside `src/api.ts` touches
-Pixi, the recipe model, or REST.
+between them — the window when the shell is on the page to host one, the overlay when desktop mode
+is switched off — rather than each having its own idea of where an editor should appear. Nothing
+outside `src/api.ts` touches Pixi, the recipe model, or REST.
 
 **One GPU pass, not six.** Exposure, contrast, temperature, tint, saturation and hue are all affine
 transforms of RGB, so they are multiplied into a single colour matrix and applied in one shader
@@ -222,39 +223,46 @@ Results land on a raster layer above the image, exactly like a brush stroke, so 
 are never touched. Their extent is in canvas pixels, so a wide blur on a 5000-pixel photo is
 invisible at fit zoom and obvious at 100% — that is arithmetic, not a bug.
 
-## An OpenStation application, and a WordPress plugin
+## An OpenStation application
 
-Inside the OpenStation shell — previously called Desktop Mode — Lienzo runs as a **native window**,
-rendering into the shell's own DOM. That is not a preference: the shell's components, its drag bridge
-and its PixiJS all live in the parent frame, and a chromeless iframe can reach none of them, because
-no component is registered there at all. So inside the shell there is exactly one editing surface,
-and the row action, the media modal button and the block editor button are ways of asking for it.
+Lienzo requires OpenStation — previously called Desktop Mode — and the requirement is load-bearing
+rather than ceremonial: **the rendering library is OpenStation's**. Lienzo ships no PixiJS at all,
+which keeps it a few tens of kilobytes instead of eight hundred and keeps exactly one Pixi on the
+page. Two Pixi 8 instances share GPU resource registries through globals, so one copy is not merely
+smaller but safer. With OpenStation absent there is nothing to render with, on any screen, so
+nothing registers but a notice on the plugins screen saying so.
 
-Outside the shell there are two more, because "runs natively in the desktop" should be the *best* way
-to use Lienzo rather than the only one. A site with no shell installed still has a media library full
-of photographs, and nothing in the editor itself needs the desktop: `src/platform.ts` already resolves
-every control to a plain-DOM equivalent *per component*, and `src/engine/pixi-loader.ts` falls back to
-the PixiJS this plugin ships. So:
+Inside the shell, Lienzo runs as a **native window**, rendering into the shell's own DOM. That is not
+a preference either: the components, the drag bridge and the Pixi all live in the parent frame, and a
+chromeless iframe can reach none of them, because no component is registered there at all. So inside
+the shell there is exactly one editing surface, and the row action, the media modal button and the
+block editor button are ways of asking for it.
 
-| Surface | Where | Why that one |
+But desktop mode is a **per-user preference**, and a user who has switched it off has no shell on the
+page to render into — which until recently left them with an editor they had installed and could not
+open. Everything the editor itself needs survives that: `src/platform.ts` already resolves every
+control to a plain-DOM equivalent *per component*, and the Pixi loader reads OpenStation's own file
+straight from its directory when the module registry is not on the page. So there are three surfaces:
+
+| Surface | When | Why that one |
 |---|---|---|
-| Native window | Inside the shell | Components, drag bridge, shared Pixi |
-| Admin page | `Media → Edit Photos` | Somewhere to land, bookmark and link to |
-| Overlay | Over the current screen | Editing a photo from a half-written post must not navigate away from it |
+| Native window | Desktop mode on | Components, drag bridge, shared Pixi |
+| Admin page | Desktop mode off | Somewhere to land, bookmark and link to |
+| Overlay | Desktop mode off | Editing a photo from a half-written post must not navigate away from it |
 
 `openEditor()` is the single place that chooses. It asks the window first and reads back whether it
-took the request, rather than second-guessing whether the shell is there — and the entry points are
-**links** to the admin page that the bundle upgrades in place, so a control that JavaScript never
+took the request, rather than second-guessing whether the shell is on the page — and the entry points
+are **links** to the admin page that the bundle upgrades in place, so a control that JavaScript never
 reached still goes somewhere sensible instead of doing nothing.
 
-The desktop integration is gated by **capability, not by plugin slug** — do the functions being
-called exist — so a fork, a rename or a bundled copy all work. It is checked on `plugins_loaded`, and
-that detail is load-bearing: plugins load alphabetically, so `lienzo` runs *before* the shell and none
-of its functions exist yet at file scope. Checking there would answer "absent" on every site, every
-time.
+The requirement is checked by **capability, not by plugin slug** — do the functions being called
+exist — so a fork, a rename or a bundled copy all work. It is checked on `plugins_loaded`, and that
+detail is load-bearing: plugins load alphabetically, so `lienzo` runs *before* `desktop-mode` and
+none of its functions exist yet at file scope. Checking there would fail on every site, every time,
+and the plugin would silently never load. `Requires Plugins:` governs activation, not load order.
 
-What is lost without the shell is the window, the wallpaper icon, the file opener and the drag
-bridge. Not the editor.
+What a user loses by switching desktop mode off is the window, the wallpaper icon, the file opener
+and the drag bridge. Not the editor.
 
 ### One name, two spellings
 
@@ -366,28 +374,34 @@ Mutable desktop state therefore lives on a single `window.__lienzoDesktop` singl
 one-time registrations are guarded. **Anything in `src/hosts/desktop-mode.ts` that must be singular
 has to live there**, not in a module-level variable.
 
-## PixiJS comes from the shell, when there is one
+## PixiJS comes from OpenStation
 
-`src/engine/pixi-loader.ts` asks in this order, and the order is the whole design:
+Lienzo ships no rendering library. OpenStation vendors PixiJS v8 (MIT), and
+`src/engine/pixi-loader.ts` reaches for that one copy three ways, in this order:
 
 1. **`window.PIXI`**, if anything has already put it there.
-2. **The shell's copy** — OpenStation vendors PixiJS v8 (MIT) and registers it in its module
-   registry, so `loadModules( [ 'pixijs' ] )` fetches it once however many windows want it.
-3. **The copy this plugin ships**, at `assets/vendor/pixi.min.js`, injected into the page.
+2. **The module registry** — `loadModules( [ 'pixijs' ] )`, which is idempotent and de-duplicates
+   concurrent callers, so several windows opening at once still load one script.
+3. **OpenStation's own file**, by URL. The registry lives in the shell's desktop bundle, so on a
+   *classic* admin screen there is none to ask — but OpenStation is installed, and its file is right
+   there.
 
-Reusing an existing instance is smaller and safer than loading a second: two Pixi 8 instances on a
-page share GPU resource registries through globals, and tearing one down can invalidate textures
-belonging to the other. For the same reason the renderer never calls `app.destroy( true )`, which
-would release those registries out from under unrelated Pixi apps on the page. Checking first means
-the third step is never reached on a desktop page — it exists for classic admin, where there is
-nothing to borrow and an editor with no Pixi cannot draw a pixel.
+The order is the whole design. Reusing an existing instance is smaller and safer than loading a
+second: two Pixi 8 instances on a page share GPU resource registries through globals, and tearing one
+down can invalidate textures belonging to the other. For the same reason the renderer never calls
+`app.destroy( true )`, which would release those registries out from under unrelated Pixi apps on the
+page. Step three is therefore never reached on a desktop page; it exists so the classic-admin editor
+can open without this plugin carrying a second copy of Pixi to do it.
 
-It is **vendored rather than bundled**, and the distinction is the point: bundling would put a second
-Pixi into every page the shell is already running one on. `bin/vendor-pixi.mjs` copies it out of
-`node_modules` at build time along with its licence, the output is committed so a checkout installs
-without npm, and `pixi.js` stays in `devDependencies` for its TypeScript types.
+That URL is built from OpenStation's *own constant* — `OPENSTATION_URL`, falling back to the older
+spelling, exactly as the functions and hooks are resolved — rather than from a hardcoded slug, and
+`file_exists()` is checked before it is advertised. One plugin reaching into another's directory
+should fail loudly and early or not at all: an unresolvable constant or a missing file yields an
+empty string, and the editor then says it cannot find PixiJS instead of loading a 404 and failing
+somewhere stranger. `lienzo_pixi_url` filters the answer.
 
-WordPress.org forbids loading code from a CDN, so it is served from the site either way.
+`pixi.js` stays in `devDependencies` for its TypeScript types only, and is never bundled. No external
+requests are made: OpenStation serves the file from your own site.
 
 ## Layout
 
@@ -448,7 +462,6 @@ src/
   hosts/admin-page.ts      the classic-admin page, and its picker
   hosts/overlay.ts         the full-screen overlay, with its focus trap
   hosts/desktop-mode/      the shell integration: window, icon drop, file drop
-assets/vendor/           PixiJS, copied out of node_modules by the build
 ```
 
 The pure modules carry no Pixi import on purpose: the maths is where the bugs would be, and it is
@@ -460,7 +473,6 @@ all unit-testable in jsdom without a GPU.
 npm install
 npm run build          # builds the bundles and syncs them to the local QA site
 npm run dev            # watch build
-npm run vendor         # re-copy PixiJS out of node_modules (part of every build)
 npm run deploy         # sync only, without rebuilding
 npm run typecheck      # tsc --noEmit
 npm run test           # vitest — the pure modules
@@ -683,6 +695,7 @@ browser implementation gives you a slider that validates and then does nothing.
 | `lienzo_max_render_pixels` | Ceiling on a single GPU render |
 | `lienzo_max_upload_bytes` | Ceiling on a saved render |
 | `lienzo_renderer_backend` | `webgl` (default), `webgpu` or `auto` |
+| `lienzo_pixi_url` | Where the classic-admin editor loads PixiJS from |
 | `lienzo_media_screens` | Admin screens the bundle loads on |
 | `lienzo_config` | The blob handed to the browser |
 | `lienzo_rest_media_payload` | The open-image response |
@@ -730,6 +743,10 @@ Stated plainly, because each is better read here than discovered:
 - **A save from the classic-admin overlay does not put the edit back into the post.** The block
   editor's image block is repointed, because it can be — but the Media Library row action and the
   media picker have nowhere to put an answer. Inside the shell that is what the drag bridge is for.
+- **The classic-admin editor reads a path inside OpenStation's directory** to find PixiJS, because
+  the module registry that would otherwise answer is only on the page in desktop mode. The constant
+  is resolved rather than the slug, and the file is checked before it is offered — but it is still
+  one plugin knowing where another keeps something, and `lienzo_pixi_url` exists to repair it.
 - **`big_image_size_threshold`** can silently downscale a saved render. The success toast reports the
   dimensions actually stored rather than the ones requested.
 - **Animated GIFs are not offered for editing**, because a canvas round trip flattens them to one
@@ -741,6 +758,5 @@ Stated plainly, because each is better read here than discovered:
 
 ## Licence
 
-GPL-2.0-or-later. No external requests are made, ever. Rendering uses PixiJS (MIT): OpenStation's
-copy where there is one, and otherwise the copy vendored at `assets/vendor/pixi.min.js` with its
-licence beside it. Both are served from your own site.
+GPL-2.0-or-later. No third-party libraries are bundled and no external requests are made. Rendering
+uses PixiJS (MIT), which OpenStation vendors and serves from your own site.

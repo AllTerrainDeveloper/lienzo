@@ -1,7 +1,7 @@
 /**
- * The Desktop Mode host.
+ * The OpenStation host.
  *
- * Renders the editor as a native Desktop Mode window -- in the parent shell's DOM
+ * Renders the editor as a native OpenStation window -- in the parent shell's DOM
  * rather than a chromeless iframe -- and wires it into the desktop's own idioms:
  * double-clicking a photo on the wallpaper opens it here, a photo or a product can
  * be dropped onto the icon to open it, a photo can be dragged onto the window to load
@@ -22,7 +22,7 @@ import { registerPeekThumbnail } from './peek';
 /**
  * Registers the native window renderer and the desktop integrations.
  *
- * Safe to call anywhere; no-ops without Desktop Mode.
+ * Safe to call anywhere; no-ops without OpenStation.
  */
 export function bootDesktopMode(): void {
 	if ( ! desktop() ) {
@@ -50,4 +50,4 @@ export function bootDesktopMode(): void {
 	listenForOpenRequests();
 }
 
-export { openInDesktop } from './open-window';
+export { isShellPage, openDesktopWindow, openInDesktop } from './open-window';

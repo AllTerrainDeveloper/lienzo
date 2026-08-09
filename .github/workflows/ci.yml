@@ -72,11 +72,11 @@ jobs:
         run: npm ci
 
       # .wp-env.json mounts the sibling `../alcazaba-plugin` checkout so the
-      # local QA site has Desktop Mode to host Lienzo. That path does not exist
+      # local QA site has OpenStation to host Lienzo. That path does not exist
       # on a runner and wp-env treats a missing mapping as fatal. The override
       # file is merged last and replaces `mappings` wholesale, so this drops the
       # sibling and keeps Lienzo. Nothing is lost: the PHPUnit bootstrap stubs
-      # the two Desktop Mode functions Lienzo requires rather than installing it.
+      # the two OpenStation functions Lienzo requires rather than installing it.
       - name: Point wp-env at this repository only
         run: |
           cat > .wp-env.override.json <<'JSON'

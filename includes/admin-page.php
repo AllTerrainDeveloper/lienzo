@@ -7,13 +7,16 @@
  * mounting works here it works in the media modal, the block editor and a desktop
  * native window, because all four call the same `window.lienzo.mount()`.
  *
- * It exists because "runs natively in the desktop shell" should be the *best* way to
- * use Lienzo, not the only one. A site with no shell installed still has a media
- * library full of photographs, and the editor's own surface -- the tool rail, the
- * panels, the canvas -- needs nothing from the shell: `src/platform.ts` already
- * resolves every control to a plain-DOM equivalent per component, and
- * `src/engine/pixi-loader.ts` falls back to the vendored PixiJS. What the shell adds
- * is the window, the icons and the drag bridge, and none of those is the editor.
+ * It exists because desktop mode is a *per-user preference*. OpenStation is installed
+ * -- Lienzo requires it -- but a user who has switched it off has no shell on the page
+ * to render into, and until now that left them with an editor they had installed and
+ * could not open.
+ *
+ * Everything the editor itself needs survives that: `src/platform.ts` already resolves
+ * every control to a plain-DOM equivalent per component, and `src/engine/pixi-loader.ts`
+ * loads OpenStation's own PixiJS straight from its directory when the module registry
+ * is not on the page. What the shell adds is the window, the icons and the drag bridge,
+ * and none of those is the editor.
  *
  * @package Lienzo
  */

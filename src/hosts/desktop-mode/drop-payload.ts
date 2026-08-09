@@ -56,7 +56,7 @@ export function readDroppedImage(
 		return { attachmentId: tagged };
 	}
 
-	// Then Desktop Mode's, which is what a Media Library tile actually carries: the
+	// Then OpenStation's, which is what a Media Library tile actually carries: the
 	// enhancement makes every `.attachment` draggable and writes the whole record as
 	// JSON. This is the canonical contract for a WordPress media drag and reading it
 	// beats inferring an id from markup, which is what the fallbacks below do.
@@ -92,11 +92,11 @@ export function readDroppedImage(
 	return src ? { url: src } : null;
 }
 
-/** The type Desktop Mode's Media Library enhancement writes its record to. */
+/** The type OpenStation's Media Library enhancement writes its record to. */
 export const WP_MEDIA_TYPE = 'application/x-wp-media-attachment';
 
 /**
- * Reads Desktop Mode's media record off a drag.
+ * Reads OpenStation's media record off a drag.
  *
  * @param transfer The drag's data.
  * @return The attachment, or null when the drag carries no record.

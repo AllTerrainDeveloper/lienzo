@@ -143,6 +143,17 @@
 	block-size: calc( 100vh - var( --wp-admin--admin-bar--height, 32px ) );
 }
 
+/*
+ * What the page says when the editor belongs somewhere else -- desktop mode is on, so
+ * the window is opening and this body is behind the desktop or inside its frame.
+ */
+.lz-page-notice {
+	margin: 0;
+	padding: 24px;
+	color: var( --lz-fg-muted );
+	font-size: 13px;
+}
+
 /* -- Toolbar --------------------------------------------------------------- */
 
 .lz-topbar {

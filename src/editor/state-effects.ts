@@ -54,7 +54,7 @@ function onToolChange( editor: Editor, previous: string ): void {
  * Expands the editor to fill the screen, or gives the space back.
  *
  * Uses the Fullscreen API when it is available and a CSS class when it is not --
- * inside a Desktop Mode window the request is often refused, and an editor that
+ * inside an OpenStation window the request is often refused, and an editor that
  * silently does nothing when you press F is worse than one that just grows.
  *
  * @param editor The editor.

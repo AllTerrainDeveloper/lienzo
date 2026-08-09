@@ -50,7 +50,7 @@ if ( ! $lienzo_tests_dir || ! file_exists( $lienzo_tests_dir . '/includes/functi
 require_once $lienzo_tests_dir . '/includes/functions.php';
 
 /*
- * Stand-ins for the parts of Desktop Mode that Lienzo requires.
+ * Stand-ins for the parts of OpenStation that Lienzo requires.
  *
  * Declared at file scope so they exist before the plugin loads, and deliberately
  * unprefixed: they impersonate another plugin's public API, and prefixing them would

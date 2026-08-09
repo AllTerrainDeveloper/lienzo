@@ -8,8 +8,8 @@
  *
  * The sidebar panels still hold the same settings and stay in sync -- this is a
  * second view of one model, not a second model. Every control comes from the adaptive
- * kit in `controls/`, so the whole bar is built from Desktop Mode components when
- * Desktop Mode is active and from plain inputs when it is not.
+ * kit in `controls/`, so the whole bar is built from OpenStation components when
+ * OpenStation is active and from plain inputs when it is not.
  *
  * This module is the dispatch table. Each tool's controls live in a module of its own,
  * written against `OptionsBuilder` rather than against this class.
