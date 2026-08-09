@@ -115,18 +115,18 @@ export function buildStageToolset( editor: Editor ): StageToolset {
 				editor.strokes?.capture( id, dabRegion( x, y, size ) );
 				renderer.paint.stampBrush( id, image, x, y, size, colour, opacity, erase );
 			},
-			fillMask: ( id, mask, colour, opacity ) => {
-				// A flood fill can reach anywhere, so it offers the whole canvas and
-				// lets the collector decide whether that is affordable.
-				const canvas = store.current.canvas;
-
+			fillMask: ( id, mask, colour, opacity, origin ) => {
+				// Only the rectangle the fill actually reached. A flood fill *can* reach
+				// everywhere, and when it does the collector still declines -- but the
+				// common case, one object on a large photograph, is now a small patch
+				// rather than a whole document offered up and refused.
 				editor.strokes?.capture( id, {
-					x: 0,
-					y: 0,
-					width: canvas.width,
-					height: canvas.height,
+					x: origin.x,
+					y: origin.y,
+					width: mask.width,
+					height: mask.height,
 				} );
-				renderer.paint.fillWithMask( id, mask, colour, opacity );
+				renderer.paint.fillWithMask( id, mask, colour, opacity, origin.x, origin.y );
 			},
 			composite: ( id, source, x, y, opacity ) => {
 				editor.strokes?.capture( id, {

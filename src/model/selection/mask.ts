@@ -8,7 +8,7 @@
  */
 
 import { isEmptySelection, selectionBounds } from './bounds';
-import type { Selection } from './types';
+import type { Point, Selection } from './types';
 
 /**
  * Rasterises a selection into a canvas-sized alpha mask.
@@ -64,23 +64,45 @@ export function buildSelectionMask(
 			bounds.h * canvas.height
 		);
 	} else {
-		selection.points.forEach( ( point, index ) => {
-			const x = point.x * canvas.width;
-			const y = point.y * canvas.height;
+		addContour( ctx, selection.points, canvas );
 
-			if ( index === 0 ) {
-				ctx.moveTo( x, y );
-			} else {
-				ctx.lineTo( x, y );
-			}
-		} );
-
-		ctx.closePath();
+		for ( const hole of selection.holes ?? [] ) {
+			addContour( ctx, hole, canvas );
+		}
 	}
 
-	ctx.fill();
+	// Even-odd, so the wand's inner contours punch holes rather than painting over
+	// them. It changes nothing for a single closed outline, which is every selection a
+	// pointer can draw, so there is no case that wants the other rule.
+	ctx.fill( 'evenodd' );
 
 	return canvas;
+}
+
+/**
+ * Adds one closed contour to the path being built.
+ *
+ * @param ctx     Context to draw into.
+ * @param points  Normalised vertices.
+ * @param canvas  Size to scale them against.
+ */
+function addContour(
+	ctx: CanvasRenderingContext2D,
+	points: Point[],
+	canvas: { width: number; height: number }
+): void {
+	points.forEach( ( point, index ) => {
+		const x = point.x * canvas.width;
+		const y = point.y * canvas.height;
+
+		if ( index === 0 ) {
+			ctx.moveTo( x, y );
+		} else {
+			ctx.lineTo( x, y );
+		}
+	} );
+
+	ctx.closePath();
 }
 
 /**

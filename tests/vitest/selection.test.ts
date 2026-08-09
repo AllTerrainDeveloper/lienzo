@@ -315,31 +315,51 @@ describe( 'traceMask', () => {
 		return { data, width, height };
 	}
 
+	/**
+	 * Clears a rectangle back out of a mask, making a hole.
+	 *
+	 * @param mask Mask to punch.
+	 * @param rect Region to clear.
+	 */
+	function punch(
+		mask: { data: Uint8ClampedArray; width: number; height: number },
+		rect: { x: number; y: number; w: number; h: number }
+	) {
+		for ( let y = rect.y; y < rect.y + rect.h; y++ ) {
+			for ( let x = rect.x; x < rect.x + rect.w; x++ ) {
+				mask.data[ ( y * mask.width + x ) * 4 + 3 ] = 0;
+			}
+		}
+
+		return mask;
+	}
+
 	it( 'returns nothing for an empty mask', () => {
 		expect(
 			traceMask( { data: new Uint8ClampedArray( 400 ), width: 10, height: 10 } )
-		).toEqual( [] );
+		).toEqual( { outer: [], holes: [] } );
 	} );
 
-	it( 'traces a rectangle back to its own corners', () => {
-		const points = traceMask( maskWith( 40, 40, { x: 10, y: 10, w: 20, h: 20 } ) );
+	it( 'traces a rectangle back to its own four corners', () => {
+		const { outer, holes } = traceMask(
+			maskWith( 40, 40, { x: 10, y: 10, w: 20, h: 20 } )
+		);
 
-		expect( points.length ).toBeGreaterThan( 3 );
-
-		const xs = points.map( ( p ) => p.x );
-		const ys = points.map( ( p ) => p.y );
-
-		// 10/40 and 29/40 -- the last filled pixel, not one past it.
-		expect( Math.min( ...xs ) ).toBeCloseTo( 0.25, 5 );
-		expect( Math.max( ...xs ) ).toBeCloseTo( 29 / 40, 5 );
-		expect( Math.min( ...ys ) ).toBeCloseTo( 0.25, 5 );
-		expect( Math.max( ...ys ) ).toBeCloseTo( 29 / 40, 5 );
+		// The boundary runs along pixel *corners*, so it encloses the filled pixels
+		// rather than passing through their centres: 10..30, not 10..29. Rasterising
+		// this path back covers exactly the pixels that were set.
+		expect( outer ).toEqual( [
+			{ x: 0.25, y: 0.25 },
+			{ x: 0.75, y: 0.25 },
+			{ x: 0.75, y: 0.75 },
+			{ x: 0.25, y: 0.75 },
+		] );
+		expect( holes ).toEqual( [] );
 	} );
 
 	it( 'produces coordinates that are normalised, not pixels', () => {
-		for ( const point of traceMask(
-			maskWith( 64, 32, { x: 4, y: 4, w: 40, h: 20 } )
-		) ) {
+		for ( const point of traceMask( maskWith( 64, 32, { x: 4, y: 4, w: 40, h: 20 } ) )
+			.outer ) {
 			expect( point.x ).toBeGreaterThanOrEqual( 0 );
 			expect( point.x ).toBeLessThanOrEqual( 1 );
 			expect( point.y ).toBeGreaterThanOrEqual( 0 );
@@ -348,30 +368,138 @@ describe( 'traceMask', () => {
 	} );
 
 	it( 'thins a long boundary to the requested ceiling', () => {
-		const points = traceMask( maskWith( 200, 200, { x: 2, y: 2, w: 196, h: 196 } ), 40 );
+		const { outer } = traceMask(
+			maskWith( 200, 200, { x: 2, y: 2, w: 196, h: 196 } ),
+			40
+		);
 
-		expect( points.length ).toBeLessThanOrEqual( 41 );
-		expect( points.length ).toBeGreaterThan( 3 );
+		expect( outer.length ).toBeLessThanOrEqual( 41 );
+		expect( outer.length ).toBeGreaterThan( 3 );
 	} );
 
 	it( 'survives a single isolated pixel without looping forever', () => {
-		const points = traceMask( maskWith( 10, 10, { x: 5, y: 5, w: 1, h: 1 } ) );
+		const { outer } = traceMask( maskWith( 10, 10, { x: 5, y: 5, w: 1, h: 1 } ) );
 
-		expect( points ).toEqual( [ { x: 0.5, y: 0.5 } ] );
+		expect( outer ).toEqual( [
+			{ x: 0.5, y: 0.5 },
+			{ x: 0.6, y: 0.5 },
+			{ x: 0.6, y: 0.6 },
+			{ x: 0.5, y: 0.6 },
+		] );
 	} );
 
 	it( 'traces a region that touches the mask edge', () => {
-		const points = traceMask( maskWith( 20, 20, { x: 0, y: 0, w: 20, h: 20 } ) );
+		const { outer } = traceMask( maskWith( 20, 20, { x: 0, y: 0, w: 20, h: 20 } ) );
 
-		expect( points.length ).toBeGreaterThan( 3 );
+		expect( outer ).toEqual( [
+			{ x: 0, y: 0 },
+			{ x: 1, y: 0 },
+			{ x: 1, y: 1 },
+			{ x: 0, y: 1 },
+		] );
+	} );
+
+	it( 'traces the hole in a ring rather than selecting through it', () => {
+		const { outer, holes } = traceMask(
+			punch( maskWith( 40, 40, { x: 8, y: 8, w: 24, h: 24 } ), {
+				x: 16,
+				y: 16,
+				w: 8,
+				h: 8,
+			} )
+		);
+
+		expect( outer ).toHaveLength( 4 );
+		expect( holes ).toHaveLength( 1 );
+		expect( holes[ 0 ] ).toEqual( [
+			{ x: 0.4, y: 0.4 },
+			{ x: 0.4, y: 0.6 },
+			{ x: 0.6, y: 0.6 },
+			{ x: 0.6, y: 0.4 },
+		] );
+	} );
+
+	it( 'traces every hole, not just the first', () => {
+		const mask = maskWith( 60, 60, { x: 5, y: 5, w: 50, h: 50 } );
+
+		punch( mask, { x: 10, y: 10, w: 8, h: 8 } );
+		punch( mask, { x: 30, y: 10, w: 8, h: 8 } );
+		punch( mask, { x: 20, y: 35, w: 12, h: 12 } );
+
+		expect( traceMask( mask ).holes ).toHaveLength( 3 );
+	} );
+
+	it( 'ignores specks, which on a photograph is what most holes are', () => {
+		const mask = maskWith( 40, 40, { x: 4, y: 4, w: 30, h: 30 } );
+
+		punch( mask, { x: 10, y: 10, w: 1, h: 1 } );
+		punch( mask, { x: 20, y: 20, w: 4, h: 4 } );
+
+		// One pixel of noise is not a hole anyone drew; sixteen is a hole.
+		expect( traceMask( mask ).holes ).toHaveLength( 1 );
+	} );
+
+	it( 'keeps two pixels that meet only at a corner apart', () => {
+		// The flood fill spreads through edges, never through corners. An outline that
+		// crossed at the touching corner would claim a pixel the fill itself refused.
+		const mask = maskWith( 20, 20, { x: 4, y: 4, w: 3, h: 3 } );
+
+		for ( let y = 7; y < 10; y++ ) {
+			for ( let x = 7; x < 10; x++ ) {
+				mask.data[ ( y * mask.width + x ) * 4 + 3 ] = 255;
+			}
+		}
+
+		const { outer, holes } = traceMask( mask );
+
+		expect( outer ).toHaveLength( 4 );
+		expect( holes ).toHaveLength( 1 );
+		expect( holes[ 0 ] ).toHaveLength( 4 );
+	} );
+
+	it( 'shares its vertex budget out across the contours', () => {
+		const mask = maskWith( 80, 80, { x: 4, y: 4, w: 70, h: 70 } );
+
+		for ( let i = 0; i < 6; i++ ) {
+			punch( mask, { x: 10 + i * 10, y: 20, w: 6, h: 6 } );
+		}
+
+		const { outer, holes } = traceMask( mask, 40 );
+		const total = outer.length + holes.reduce( ( n, hole ) => n + hole.length, 0 );
+
+		expect( holes ).toHaveLength( 6 );
+		expect( total ).toBeLessThanOrEqual( 80 );
+	} );
+
+	it( 'reads a one-byte-per-pixel mask as well as an RGBA one', () => {
+		// What the flood fill hands over: no RGBA copy of the document in between.
+		const data = new Uint8Array( 40 * 40 );
+
+		for ( let y = 10; y < 30; y++ ) {
+			data.fill( 255, y * 40 + 10, y * 40 + 30 );
+		}
+
+		expect( traceMask( { data, width: 40, height: 40 } ).outer ).toEqual(
+			traceMask( maskWith( 40, 40, { x: 10, y: 10, w: 20, h: 20 } ) ).outer
+		);
 	} );
 
 	it( 'round-trips into a selection the rest of the editor understands', () => {
-		const points = traceMask( maskWith( 40, 40, { x: 8, y: 8, w: 24, h: 24 } ) );
-		const selection: Selection = { shape: 'lasso', points };
+		const { outer, holes } = traceMask(
+			punch( maskWith( 40, 40, { x: 8, y: 8, w: 24, h: 24 } ), {
+				x: 16,
+				y: 16,
+				w: 8,
+				h: 8,
+			} )
+		);
+		const selection: Selection = { shape: 'lasso', points: outer, holes };
+		const d = selectionToPath( selection, 100, 100 );
 
 		expect( isEmptySelection( selection ) ).toBe( false );
-		expect( selectionToPath( selection, 100, 100 ).endsWith( 'Z' ) ).toBe( true );
+		// Two subpaths: the outline, and the hole cut out of it.
+		expect( d.match( /M /g ) ).toHaveLength( 2 );
+		expect( d.endsWith( 'Z' ) ).toBe( true );
 	} );
 } );
 

@@ -11,3 +11,4 @@ export { isEmptySelection, selectionBounds } from './bounds';
 export { appendPathPoint, selectionFromDrag, selectionToPath } from './path';
 export { buildSelectionMask, clipToSelection } from './mask';
 export { traceMask } from './trace';
+export type { TraceableMask, TracedRegion } from './trace';

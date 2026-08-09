@@ -53,14 +53,26 @@ export function selectionToPath(
 		return '';
 	}
 
-	return (
-		`M ${ at( selection.points[ 0 ] ) } ` +
-		selection.points
+	/**
+	 * One closed subpath.
+	 *
+	 * @param points Vertices.
+	 */
+	const contour = ( points: Point[] ) =>
+		`M ${ at( points[ 0 ] ) } ` +
+		points
 			.slice( 1 )
 			.map( ( point ) => `L ${ at( point ) }` )
 			.join( ' ' ) +
-		' Z'
-	);
+		' Z';
+
+	// The holes are drawn too. Marching ants around the outline of a wand selection
+	// with nothing around its holes would claim they are selected, and the ants are
+	// the only thing on screen saying what is.
+	return [ selection.points, ...( selection.holes ?? [] ) ]
+		.filter( ( points ) => points.length > 1 )
+		.map( contour )
+		.join( ' ' );
 }
 
 /**
