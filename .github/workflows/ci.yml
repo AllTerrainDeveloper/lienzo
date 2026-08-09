@@ -39,10 +39,12 @@ jobs:
       - name: Vitest
         run: npm run test
 
-      # assets/js/ and assets/css/ are committed on purpose, so the plugin
-      # installs straight from a checkout with no npm install. That only holds
-      # while the committed bundles match the source: rebuild and fail if the
-      # tree moves, which catches a TypeScript change that was never rebuilt.
+      # assets/ is committed on purpose -- the bundles, and the vendored PixiJS
+      # the classic-admin editor loads when there is no desktop shell to borrow
+      # a copy from -- so the plugin installs straight from a checkout with no
+      # npm install. That only holds while the committed files match the source:
+      # rebuild and fail if the tree moves, which catches a TypeScript change
+      # that was never rebuilt and a Pixi upgrade that was never re-vendored.
       - name: Committed bundles match source
         run: |
           npm run build:bundle
@@ -70,11 +72,11 @@ jobs:
         run: npm ci
 
       # .wp-env.json mounts the sibling `../alcazaba-plugin` checkout so the
-      # local QA site has Desktop Mode to host Lienzo. That path does not exist
+      # local QA site has OpenStation to host Lienzo. That path does not exist
       # on a runner and wp-env treats a missing mapping as fatal. The override
       # file is merged last and replaces `mappings` wholesale, so this drops the
       # sibling and keeps Lienzo. Nothing is lost: the PHPUnit bootstrap stubs
-      # the two Desktop Mode functions Lienzo requires rather than installing it.
+      # the two OpenStation functions Lienzo requires rather than installing it.
       - name: Point wp-env at this repository only
         run: |
           cat > .wp-env.override.json <<'JSON'

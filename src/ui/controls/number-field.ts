@@ -34,7 +34,7 @@ export interface NumberFieldOptions {
  * shell only registers it once a bundle importing it loads -- the text field in
  * numeric mode is used instead: still the shell's own control, still the shell's own
  * styling, and only the parsing has to be done here. A bare `<input type="number">` is
- * the last resort, for a page with no Desktop Mode at all.
+ * the last resort, for a page with no OpenStation at all.
  *
  * @param options Field configuration.
  */
@@ -127,7 +127,7 @@ function componentField( tag: string, options: NumberFieldOptions ): FieldHandle
 }
 
 /**
- * Numeric field built from a native input, for a page with no Desktop Mode at all.
+ * Numeric field built from a native input, for a page with no OpenStation at all.
  *
  * @param options Field configuration.
  */

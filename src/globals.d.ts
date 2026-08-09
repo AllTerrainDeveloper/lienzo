@@ -103,7 +103,7 @@ declare global {
 		};
 		/** Localized by `lienzo_get_config()`. */
 		lienzoConfig?: LienzoConfig;
-		/** Set by the vendored PixiJS build, or by Desktop Mode's copy of it. */
+		/** Set by the vendored PixiJS build, or by OpenStation's copy of it. */
 		PIXI?: Pixi;
 	}
 }

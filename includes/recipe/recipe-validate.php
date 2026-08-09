@@ -117,5 +117,24 @@ function lienzo_validate_recipe( $raw ) {
 			'format'  => $format,
 			'quality' => $quality,
 		),
+		'space'         => lienzo_validate_space( isset( $raw['space'] ) ? $raw['space'] : null ),
 	);
+}
+
+/**
+ * Validates the working space.
+ *
+ * Unrecognised is sRGB rather than an error, and the field being absent is the
+ * ordinary case: every recipe written before schema version 6 predates it. Refusing
+ * would make an old edit unopenable over a field it could not have known to write.
+ *
+ * @since 0.1.0
+ *
+ * @param mixed $raw Candidate space.
+ * @return string A space from `lienzo_working_spaces()`.
+ */
+function lienzo_validate_space( $raw ) {
+	$spaces = lienzo_working_spaces();
+
+	return ( is_string( $raw ) && in_array( $raw, $spaces, true ) ) ? $raw : $spaces[0];
 }

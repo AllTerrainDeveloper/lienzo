@@ -15,7 +15,7 @@
  */
 
 import { __ } from '../i18n';
-import { openInDesktop } from './desktop-mode';
+import { openEditor } from './open';
 
 /** Block attributes the image block exposes that we care about. */
 interface ImageAttributes {
@@ -87,7 +87,24 @@ export function bootBlockEditor(): void {
 							ToolbarButton,
 							{
 								label: __( 'Edit with Lienzo' ),
-								onClick: () => openInDesktop( id ),
+								// A save writes a *new* attachment -- Lienzo never
+								// rewrites an original -- so the block is pointed at
+								// it, or the post would go on showing the photograph
+								// as it was. The stored dimensions go with it: they
+								// described the old file, and a crop changes them.
+								// Only the overlay reports back; a desktop window
+								// outlives this component, and there an edit returns
+								// to a post through the shell's drag bridge.
+								onClick: () =>
+									openEditor( id, {
+										onSave: ( result ) =>
+											props.setAttributes( {
+												id: result.id,
+												url: result.url,
+												width: undefined,
+												height: undefined,
+											} ),
+									} ),
 							},
 							__( 'Lienzo' )
 						)

@@ -9,15 +9,32 @@ import { LUMA_B, LUMA_G, LUMA_R } from './matrix';
 import type { ColorMatrix } from './matrix';
 
 /**
- * Exposure, in stops.
+ * Exposure as a plain gain.
  *
  * The slider's -1..1 maps to plus or minus two stops, which is the useful range for
  * correcting a mis-metered photograph without turning the sliders into a novelty.
  *
+ * Shared by both working spaces, and that is the point: the *number* of stops is the
+ * same either way, only the space the multiplication happens in differs.
+ *
+ * @param v Slider value, -1..1.
+ * @return The factor to multiply by.
+ */
+export function exposureGain( v: number ): number {
+	return Math.pow( 2, v * 2 );
+}
+
+/**
+ * Exposure, in stops, as a matrix.
+ *
+ * What the sRGB working space uses: the gain is applied straight to the encoded
+ * values, which is what core WordPress and most browser editors do. In linear light
+ * the same gain is applied by the shader instead -- see `exposureGain()`.
+ *
  * @param v Slider value, -1..1.
  */
 export function exposureMatrix( v: number ): ColorMatrix {
-	const scale = Math.pow( 2, v * 2 );
+	const scale = exposureGain( v );
 
 	return [
 		scale, 0, 0, 0, 0,

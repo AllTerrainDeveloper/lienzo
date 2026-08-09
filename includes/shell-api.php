@@ -71,6 +71,27 @@ function lienzo_shell_call( $name, ...$args ) {
 }
 
 /**
+ * Resolves a shell constant to whichever name this install has.
+ *
+ * The same two-spellings problem as the functions, one level down: the rename took
+ * `DESKTOP_MODE_URL` to `OPENSTATION_URL` along with everything else.
+ *
+ * @since 0.2.0
+ *
+ * @param string $name Bare constant name, e.g. `URL`.
+ * @return string The value, or an empty string when no shell defines it.
+ */
+function lienzo_shell_constant( $name ) {
+	foreach ( array( 'OPENSTATION_', 'DESKTOP_MODE_' ) as $prefix ) {
+		if ( defined( $prefix . $name ) ) {
+			return (string) constant( $prefix . $name );
+		}
+	}
+
+	return '';
+}
+
+/**
  * Every spelling of a shell hook.
  *
  * Returned as a list so callers can register against all of them. Adding a listener

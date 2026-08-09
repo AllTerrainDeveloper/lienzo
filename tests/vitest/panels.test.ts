@@ -31,6 +31,7 @@ function context(): PanelContext {
 		getRecipe: () => PAYLOAD.recipe,
 		setOp: () => {},
 		setOutput: () => {},
+		setSpace: () => {},
 		setLayer: () => {},
 		setDocument: () => {},
 		getImageSize: () => ( { width: 100, height: 50 } ),

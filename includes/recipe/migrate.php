@@ -21,6 +21,8 @@ defined( 'ABSPATH' ) || exit;
  *   made a transform drag resize the surface it was being measured against.
  * - v4 split the layer's `scale` into `scaleX` and `scaleY`. A v3 layer needs no
  *   rewriting: the validator reads a legacy uniform scale into both axes.
+ * - v6 added the working space. A recipe without one is sRGB, which is exactly what
+ *   `lienzo_validate_space()` already answers, so there is no step for it here.
  *
  * No stored recipe needs re-saving; migration is applied on read.
  *

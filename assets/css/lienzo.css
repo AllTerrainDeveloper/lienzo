@@ -143,6 +143,17 @@
 	block-size: calc( 100vh - var( --wp-admin--admin-bar--height, 32px ) );
 }
 
+/*
+ * What the page says when the editor belongs somewhere else -- desktop mode is on, so
+ * the window is opening and this body is behind the desktop or inside its frame.
+ */
+.lz-page-notice {
+	margin: 0;
+	padding: 24px;
+	color: var( --lz-fg-muted );
+	font-size: 13px;
+}
+
 /* -- Toolbar --------------------------------------------------------------- */
 
 .lz-topbar {
@@ -1446,29 +1457,15 @@ input.lz-field__control {
 /* -- Selection marquee ------------------------------------------------------ */
 
 /*
- * Marching ants: two dashed borders in opposite colours, one animated, so the
- * outline stays visible over both light and dark pixels.
+ * The marquee is an `<svg>` -- see `svg.lz-selection` further down, where the ants
+ * are two stroked paths in opposite colours.
+ *
+ * There is deliberately no dashed `border` or `outline` on the element itself. There
+ * used to be, back when the marquee was a positioned box, and it survived the move to
+ * SVG: the element is sized to the *viewport*, so the leftover rule drew a second,
+ * permanent rectangle of ants around the whole photograph whenever anything was
+ * selected -- claiming a selection nobody had made.
  */
-.lz-selection {
-	position: absolute;
-	z-index: 3;
-	pointer-events: none;
-	outline: 1px dashed rgba( 0, 0, 0, 0.9 );
-	border: 1px dashed rgba( 255, 255, 255, 0.95 );
-	animation: lz-ants 640ms linear infinite;
-}
-
-@keyframes lz-ants {
-	to {
-		background-position: 8px 0;
-	}
-}
-
-@media ( prefers-reduced-motion: reduce ) {
-	.lz-selection {
-		animation: none;
-	}
-}
 
 /* -- Layers ----------------------------------------------------------------- */
 
@@ -1755,6 +1752,12 @@ svg.lz-selection {
 .lz-selection__over {
 	fill: none;
 	stroke-width: 1;
+	/*
+	 * A wand selection carries its holes as extra subpaths, and the quick mask fills
+	 * this path. Under the default non-zero rule the holes would be painted over --
+	 * the mask would claim pixels the selection does not contain.
+	 */
+	fill-rule: evenodd;
 }
 
 /* Solid dark underneath, dashed light on top: visible over any pixels. */

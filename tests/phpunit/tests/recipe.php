@@ -51,6 +51,29 @@ class Tests_Lienzo_Recipe extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The working space round-trips, and anything unrecognised is sRGB.
+	 *
+	 * A recipe written before schema version 6 has no space at all. Refusing one would
+	 * make an old edit unopenable over a field it could not have known to write, so an
+	 * absent or unknown value means the space every earlier recipe was rendered in.
+	 *
+	 * @covers ::lienzo_validate_recipe
+	 * @covers ::lienzo_validate_space
+	 */
+	public function test_working_space() {
+		$recipe          = $this->recipe();
+		$recipe['space'] = 'linear';
+
+		$this->assertSame( 'linear', lienzo_validate_recipe( $recipe )['space'] );
+
+		$recipe['space'] = 'prophoto';
+		$this->assertSame( 'srgb', lienzo_validate_recipe( $recipe )['space'] );
+
+		unset( $recipe['space'] );
+		$this->assertSame( 'srgb', lienzo_validate_recipe( $recipe )['space'] );
+	}
+
+	/**
 	 * A JSON string is accepted as readily as a decoded array.
 	 *
 	 * @covers ::lienzo_validate_recipe

@@ -7,8 +7,8 @@
  * somewhere else (`migrate`, `validate`).
  */
 
-export type { Op, OpType, Recipe, RecipeOutput } from './types';
-export { RECIPE_VERSION } from './types';
+export type { Op, OpType, Recipe, RecipeOutput, WorkingSpace } from './types';
+export { RECIPE_VERSION, WORKING_SPACES } from './types';
 
 export {
 	EFFECT_OP_ORDER,
@@ -37,4 +37,9 @@ export {
 } from './layers';
 
 export { migrateRecipe } from './migrate';
-export { normaliseCurves, normaliseLevels, validateRecipe } from './validate';
+export {
+	normaliseCurves,
+	normaliseLevels,
+	normaliseSpace,
+	validateRecipe,
+} from './validate';

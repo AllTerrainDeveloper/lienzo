@@ -521,8 +521,11 @@ var lienzo = function(exports) {
     }
     return out;
   }
+  function exposureGain(v) {
+    return Math.pow(2, v * 2);
+  }
   function exposureMatrix(v) {
-    const scale = Math.pow(2, v * 2);
+    const scale = exposureGain(v);
     return [
       scale,
       0,
@@ -723,7 +726,7 @@ var lienzo = function(exports) {
       0
     ];
   }
-  const RECIPE_VERSION = 5;
+  const RECIPE_VERSION = 6;
   const MATRIX_OP_ORDER = [
     "exposure",
     "contrast",
@@ -905,7 +908,11 @@ var lienzo = function(exports) {
       activeLayerId: BASE_LAYER_ID,
       curves: {},
       levels: { ...IDENTITY_LEVELS },
-      output: { format: "image/jpeg", quality: 0.92 }
+      output: { format: "image/jpeg", quality: 0.92 },
+      // sRGB, matching core WordPress and every recipe written before the working
+      // space existed. Linear light is a choice someone makes, not a default that
+      // silently re-renders the edits they already saved.
+      space: "srgb"
     };
   }
   function getOp(recipe, type, schema) {
@@ -965,9 +972,9 @@ var lienzo = function(exports) {
       })
     };
   }
-  function setLayers(recipe, layers, active) {
+  function setLayers(recipe, layers, active2) {
     const stack = layers.length > 0 ? layers : recipe.layers;
-    const activeLayerId = active && stack.some((layer) => layer.id === active) ? active : stack.some((layer) => layer.id === recipe.activeLayerId) ? recipe.activeLayerId : stack[stack.length - 1].id;
+    const activeLayerId = active2 && stack.some((layer) => layer.id === active2) ? active2 : stack.some((layer) => layer.id === recipe.activeLayerId) ? recipe.activeLayerId : stack[stack.length - 1].id;
     return { ...recipe, layers: stack, activeLayerId };
   }
   function activeLayer(recipe) {
@@ -998,7 +1005,10 @@ var lienzo = function(exports) {
             transform: normaliseTransform(single.layer)
           }
         ],
-        activeLayerId: BASE_LAYER_ID
+        // Kept when the recipe already had a stack to point into. Overwriting it
+        // would move the active layer back to the image every time an older recipe
+        // was opened, which is a thing a user would notice.
+        activeLayerId: typeof single.activeLayerId === "string" ? single.activeLayerId : BASE_LAYER_ID
       };
     }
     const geometry = raw.geometry ?? {};
@@ -1095,8 +1105,12 @@ var lienzo = function(exports) {
       activeLayerId,
       curves: normaliseCurves(candidate.curves),
       levels: normaliseLevels(candidate.levels),
-      output: { format, quality }
+      output: { format, quality },
+      space: normaliseSpace(candidate.space)
     };
+  }
+  function normaliseSpace(raw) {
+    return raw === "linear" ? "linear" : "srgb";
   }
   function normaliseCurves(raw) {
     if (!raw || typeof raw !== "object") {
@@ -1151,12 +1165,13 @@ var lienzo = function(exports) {
         return IDENTITY;
     }
   }
-  function composeAdjustments(ops, schema) {
+  function composeAdjustments(ops, schema, space = "srgb") {
     const byType = /* @__PURE__ */ new Map();
     for (const op of ops) {
       byType.set(op.type, op.v);
     }
     let matrix = IDENTITY;
+    let exposure = 1;
     for (const type of MATRIX_OP_ORDER) {
       const value = byType.get(type);
       if (value === void 0) {
@@ -1166,10 +1181,15 @@ var lienzo = function(exports) {
       if (Math.abs(value - rest) < 1e-9) {
         continue;
       }
+      if (type === "exposure" && space === "linear") {
+        exposure = exposureGain(value);
+        continue;
+      }
       matrix = multiply(matrixForOp(type, value), matrix);
     }
     return {
       matrix,
+      exposure,
       vibrance: byType.get("vibrance") ?? 0,
       sharpen: byType.get("sharpen") ?? 0,
       vignette: byType.get("vignette") ?? 0,
@@ -1237,8 +1257,34 @@ uniform float uSharpen;
 uniform float uVignette;
 uniform float uGrain;
 uniform float uSeed;
+uniform float uExposure;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+
+/**
+ * The sRGB transfer curve, and its inverse.
+ *
+ * The piecewise IEC 61966-2-1 definition rather than a plain 2.2 power: the linear
+ * segment near black is what keeps the darkest few values from collapsing into each
+ * other and back, which on an 8-bit shadow is visible as posterisation.
+ */
+vec3 toLinear( vec3 c )
+{
+	return mix(
+		c / 12.92,
+		pow( ( c + 0.055 ) / 1.055, vec3( 2.4 ) ),
+		step( vec3( 0.04045 ), c )
+	);
+}
+
+vec3 toSrgb( vec3 c )
+{
+	return mix(
+		c * 12.92,
+		1.055 * pow( c, vec3( 1.0 / 2.4 ) ) - 0.055,
+		step( vec3( 0.0031308 ), c )
+	);
+}
 
 /**
  * Scales saturation by how unsaturated a pixel already is.
@@ -1297,6 +1343,18 @@ void main( void )
 
 	if ( color.a > 0.0 ) {
 		color.rgb /= color.a;
+	}
+
+	if ( uExposure != 1.0 ) {
+		// Exposure in linear light. A stop is a doubling of the light that reached the
+		// sensor, and the stored value is not that light -- it is the light through the
+		// sRGB transfer curve. Multiplying the stored value instead is what makes a
+		// "+1 stop" in most browser editors land somewhere other than where the same
+		// correction in a raw developer would.
+		//
+		// Only when the working space is linear: in sRGB this uniform is 1 and the
+		// exposure travels inside the colour matrix, exactly as it always did.
+		color.rgb = clamp( toSrgb( toLinear( clamp( color.rgb, 0.0, 1.0 ) ) * uExposure ), 0.0, 1.0 );
 	}
 
 	vec4 result;
@@ -1363,6 +1421,203 @@ void main( void )
 }
 `
   );
+  const ADJUST_WGSL = (
+    /* wgsl */
+    `
+struct GlobalFilterUniforms {
+	uInputSize: vec4<f32>,
+	uInputPixel: vec4<f32>,
+	uInputClamp: vec4<f32>,
+	uOutputFrame: vec4<f32>,
+	uGlobalFrame: vec4<f32>,
+	uOutputTexture: vec4<f32>,
+};
+
+struct AdjustUniforms {
+	uColorMatrix: array<vec4<f32>, 5>,
+	uVibrance: f32,
+	uLutMix: f32,
+	uSharpen: f32,
+	uVignette: f32,
+	uGrain: f32,
+	uSeed: f32,
+	uExposure: f32,
+};
+
+@group(0) @binding(0) var<uniform> gfu: GlobalFilterUniforms;
+@group(0) @binding(1) var uTexture: texture_2d<f32>;
+@group(0) @binding(2) var uSampler: sampler;
+
+@group(1) @binding(0) var<uniform> adjustUniforms: AdjustUniforms;
+@group(1) @binding(1) var uLut: texture_2d<f32>;
+@group(1) @binding(2) var uLutSampler: sampler;
+
+const LUMA = vec3<f32>( 0.2126, 0.7152, 0.0722 );
+
+struct VSOutput {
+	@builtin(position) position: vec4<f32>,
+	@location(0) uv: vec2<f32>,
+};
+
+fn filterVertexPosition( aPosition: vec2<f32> ) -> vec4<f32>
+{
+	var position = aPosition * gfu.uOutputFrame.zw + gfu.uOutputFrame.xy;
+
+	position.x = position.x * ( 2.0 / gfu.uOutputTexture.x ) - 1.0;
+	position.y = position.y * ( 2.0 * gfu.uOutputTexture.z / gfu.uOutputTexture.y ) - gfu.uOutputTexture.z;
+
+	return vec4<f32>( position, 0.0, 1.0 );
+}
+
+fn filterTextureCoord( aPosition: vec2<f32> ) -> vec2<f32>
+{
+	return aPosition * ( gfu.uOutputFrame.zw * gfu.uInputSize.zw );
+}
+
+@vertex
+fn mainVertex( @location(0) aPosition: vec2<f32> ) -> VSOutput
+{
+	return VSOutput(
+		filterVertexPosition( aPosition ),
+		filterTextureCoord( aPosition ),
+	);
+}
+
+/** The sRGB transfer curve, and its inverse. See the GLSL twin for why it is piecewise. */
+fn toLinear( c: vec3<f32> ) -> vec3<f32>
+{
+	return mix(
+		c / 12.92,
+		pow( ( c + 0.055 ) / 1.055, vec3<f32>( 2.4 ) ),
+		step( vec3<f32>( 0.04045 ), c )
+	);
+}
+
+fn toSrgb( c: vec3<f32> ) -> vec3<f32>
+{
+	return mix(
+		c * 12.92,
+		1.055 * pow( c, vec3<f32>( 1.0 / 2.4 ) ) - 0.055,
+		step( vec3<f32>( 0.0031308 ), c )
+	);
+}
+
+/** Scales saturation by how unsaturated a pixel already is. */
+fn applyVibrance( color: vec3<f32>, amount: f32 ) -> vec3<f32>
+{
+	let mx = max( color.r, max( color.g, color.b ) );
+	let mn = min( color.r, min( color.g, color.b ) );
+	let chroma = mx - mn;
+	let luma = dot( color, LUMA );
+	let scale = 1.0 + amount * ( 1.0 - chroma );
+
+	return mix( vec3<f32>( luma ), color, vec3<f32>( scale ) );
+}
+
+/** Cheap hash for film grain. */
+fn hash( p: vec2<f32> ) -> f32
+{
+	return fract( sin( dot( p, vec2<f32>( 12.9898, 78.233 ) ) ) * 43758.5453 );
+}
+
+@fragment
+fn mainFragment(
+	@builtin(position) position: vec4<f32>,
+	@location(0) uv: vec2<f32>,
+) -> @location(0) vec4<f32> {
+	var color = textureSample( uTexture, uSampler, uv );
+
+	if ( adjustUniforms.uSharpen > 0.0 ) {
+		// Unsharp mask, at one texel of the render target -- which is what keeps a
+		// sharpen previewed at 900px looking the same saved at 6000px.
+		let texel = gfu.uInputSize.zw;
+
+		var blurred =
+			textureSample( uTexture, uSampler, uv + vec2<f32>( texel.x, 0.0 ) ) +
+			textureSample( uTexture, uSampler, uv - vec2<f32>( texel.x, 0.0 ) ) +
+			textureSample( uTexture, uSampler, uv + vec2<f32>( 0.0, texel.y ) ) +
+			textureSample( uTexture, uSampler, uv - vec2<f32>( 0.0, texel.y ) );
+
+		blurred *= 0.25;
+
+		color += ( color - blurred ) * adjustUniforms.uSharpen * 1.5;
+	}
+
+	if ( color.a > 0.0 ) {
+		color = vec4<f32>( color.rgb / color.a, color.a );
+	}
+
+	if ( adjustUniforms.uExposure != 1.0 ) {
+		// Exposure in linear light; 1.0 in an sRGB working space, where it rides in
+		// the colour matrix instead.
+		color = vec4<f32>(
+			clamp( toSrgb( toLinear( clamp( color.rgb, vec3<f32>( 0.0 ), vec3<f32>( 1.0 ) ) ) * adjustUniforms.uExposure ), vec3<f32>( 0.0 ), vec3<f32>( 1.0 ) ),
+			color.a
+		);
+	}
+
+	let cm = adjustUniforms.uColorMatrix;
+	var result = vec4<f32>( 0.0 );
+
+	result.r = cm[0][0] * color.r + cm[0][1] * color.g + cm[0][2] * color.b
+		+ cm[0][3] * color.a + cm[1][0];
+	result.g = cm[1][1] * color.r + cm[1][2] * color.g + cm[1][3] * color.b
+		+ cm[2][0] * color.a + cm[2][1];
+	result.b = cm[2][2] * color.r + cm[2][3] * color.g + cm[3][0] * color.b
+		+ cm[3][1] * color.a + cm[3][2];
+	result.a = cm[3][3] * color.r + cm[4][0] * color.g + cm[4][1] * color.b
+		+ cm[4][2] * color.a + cm[4][3];
+
+	if ( adjustUniforms.uVibrance != 0.0 ) {
+		result = vec4<f32>(
+			applyVibrance( clamp( result.rgb, vec3<f32>( 0.0 ), vec3<f32>( 1.0 ) ), adjustUniforms.uVibrance ),
+			result.a
+		);
+	}
+
+	result = vec4<f32>( clamp( result.rgb, vec3<f32>( 0.0 ), vec3<f32>( 1.0 ) ), result.a );
+
+	if ( adjustUniforms.uVignette != 0.0 || adjustUniforms.uGrain > 0.0 ) {
+		let span = max( gfu.uInputClamp.zw - gfu.uInputClamp.xy, vec2<f32>( 1e-6 ) );
+		let local = ( uv - gfu.uInputClamp.xy ) / span;
+
+		if ( adjustUniforms.uVignette != 0.0 ) {
+			let d = length( local - 0.5 ) / 0.7071;
+			let falloff = smoothstep( 0.35, 1.0, d );
+
+			result = vec4<f32>( result.rgb * ( 1.0 - falloff * adjustUniforms.uVignette ), result.a );
+		}
+
+		if ( adjustUniforms.uGrain > 0.0 ) {
+			let noise = hash( position.xy + adjustUniforms.uSeed ) - 0.5;
+			let luma = dot( result.rgb, LUMA );
+			let weight = 1.0 - abs( luma - 0.5 ) * 2.0;
+
+			result = vec4<f32>(
+				result.rgb + noise * adjustUniforms.uGrain * 0.25 * weight,
+				result.a
+			);
+		}
+
+		result = vec4<f32>( clamp( result.rgb, vec3<f32>( 0.0 ), vec3<f32>( 1.0 ) ), result.a );
+	}
+
+	if ( adjustUniforms.uLutMix > 0.0 ) {
+		// Sampled at texel centres, so a hard step in a curve stays hard.
+		let coord = ( result.rgb * 255.0 + 0.5 ) / 256.0;
+
+		result = vec4<f32>(
+			textureSample( uLut, uLutSampler, vec2<f32>( coord.r, 0.5 ) ).r,
+			textureSample( uLut, uLutSampler, vec2<f32>( coord.g, 0.5 ) ).g,
+			textureSample( uLut, uLutSampler, vec2<f32>( coord.b, 0.5 ) ).b,
+			result.a
+		);
+	}
+
+	return vec4<f32>( result.rgb * result.a, result.a );
+}
+`
+  );
   const IDENTITY_MATRIX = [
     1,
     0,
@@ -1394,12 +1649,15 @@ void main( void )
     constructor(gpu, schema) {
       this.uniforms = {
         matrix: [],
+        exposure: 1,
         vibrance: 0,
         sharpen: 0,
         vignette: 0,
         grain: 0,
         blur: 0
       };
+      this.space = "srgb";
+      this.ops = [];
       this.lut = null;
       this.lutActive = false;
       this.bypassed = false;
@@ -1433,7 +1691,8 @@ void main( void )
         uSharpen: { value: 0, type: "f32" },
         uVignette: { value: 0, type: "f32" },
         uGrain: { value: 0, type: "f32" },
-        uSeed: { value: 0, type: "f32" }
+        uSeed: { value: 0, type: "f32" },
+        uExposure: { value: 1, type: "f32" }
       });
       return new this.gpu.pixi.Filter({
         glProgram: this.gpu.pixi.GlProgram.from({
@@ -1441,12 +1700,22 @@ void main( void )
           fragment: ADJUST_FRAG,
           name: "lienzo-adjust"
         }),
+        // The WebGPU half. Pixi picks a program by backend and *skips* a filter
+        // that has none for the active one, with no error and no visible sign
+        // beyond the image looking unedited -- which is why this shipping is what
+        // lets the renderer stop pinning itself to WebGL.
+        gpuProgram: this.gpu.pixi.GpuProgram.from({
+          vertex: { source: ADJUST_WGSL, entryPoint: "mainVertex" },
+          fragment: { source: ADJUST_WGSL, entryPoint: "mainFragment" }
+        }),
         resources: {
           adjustUniforms: uniforms,
           // A second texture needs both its source and its sampler style. Binding
           // only the source leaves the sampler unresolved and the program fails to
           // link -- which surfaces as "Could not initialize shader" and a blank
           // canvas, because Pixi silently skips a filter it could not compile.
+          //
+          // Their order here is the order of the `@group(1)` bindings in the WGSL.
           uLut: this.lutTexture().source,
           uLutSampler: this.lutTexture().source.style
         }
@@ -1493,8 +1762,26 @@ void main( void )
      */
     setOps(ops) {
       const hadBlur = this.hasBlur;
-      this.uniforms = composeAdjustments(ops, this.schema);
+      this.ops = ops;
+      this.uniforms = composeAdjustments(ops, this.schema, this.space);
       return hadBlur !== this.hasBlur;
+    }
+    /**
+     * Sets the working space the adjustments are computed in.
+     *
+     * The ops are recomposed rather than merely flagged, because the space decides
+     * whether exposure belongs in the colour matrix or beside it.
+     *
+     * @param space Working space.
+     * @return True when the state changed.
+     */
+    setSpace(space) {
+      if (this.space === space) {
+        return false;
+      }
+      this.space = space;
+      this.uniforms = composeAdjustments(this.ops, this.schema, space);
+      return true;
     }
     /**
      * Temporarily shows the unedited image, for a before/after comparison.
@@ -1532,6 +1819,7 @@ void main( void )
       group.uniforms.uVignette = off ? 0 : this.uniforms.vignette;
       group.uniforms.uGrain = off ? 0 : this.uniforms.grain;
       group.uniforms.uSeed = this.seed;
+      group.uniforms.uExposure = off ? 1 : this.uniforms.exposure;
     }
     /** Frees the tone table. */
     release() {
@@ -1575,7 +1863,7 @@ void main( void )
       if (!this.layers.has(BASE_LAYER_ID)) {
         this.layers.set(BASE_LAYER_ID, source);
       }
-      const target = this.gpu.createTarget(canvas.width, canvas.height);
+      const target = this.gpu.createTarget(canvas.width, canvas.height, true);
       const holder = this.gpu.container();
       for (const layer of stack) {
         const texture = this.layers.get(layer.id);
@@ -1593,9 +1881,24 @@ void main( void )
     }
     /**
      * Reads the composed document as raw bytes, for flood fill.
+     *
+     * Through a resolve, because the composed texture is half-float where the GPU
+     * allows it and half-float samples read back as bytes are not the numbers anyone
+     * wanted. The blit costs one full-canvas draw and only happens when something asks
+     * for pixels -- the eyedropper, the wand, the paint bucket -- never per frame.
      */
     readPixels() {
-      return this.target ? this.gpu.extractPixels(this.target) : null;
+      if (!this.target) {
+        return null;
+      }
+      const resolved = this.gpu.resolve(this.target);
+      try {
+        return this.gpu.extractPixels(resolved.texture);
+      } finally {
+        if (resolved.owned) {
+          resolved.texture.destroy(true);
+        }
+      }
     }
     /**
      * Reads one composed pixel.
@@ -1662,7 +1965,11 @@ void main( void )
       if (!this.target || width < 1 || height < 1) {
         return null;
       }
-      const full = this.gpu.extractCanvas(this.target);
+      const resolved = this.gpu.resolve(this.target);
+      const full = this.gpu.extractCanvas(resolved.texture);
+      if (resolved.owned) {
+        resolved.texture.destroy(true);
+      }
       const out = document.createElement("canvas");
       out.width = Math.round(width);
       out.height = Math.round(height);
@@ -2093,11 +2400,11 @@ void main( void )
     clip.release();
     texture.destroy(true);
   }
-  function fillWithMask(ctx, layerId, mask, colour, opacity) {
+  function fillWithMask(ctx, layerId, mask, colour, opacity, x = 0, y = 0) {
     const target = ctx.layers.ensurePaintable(layerId, ctx.canvas);
     const texture = ctx.gpu.textureFrom(mask);
     const sprite = ctx.gpu.sprite(texture);
-    sprite.position.set(0, 0);
+    sprite.position.set(Math.round(x), Math.round(y));
     sprite.alpha = opacity;
     sprite.tint = colour;
     const clip = ctx.layers.clip(sprite);
@@ -2237,15 +2544,17 @@ void main( void )
       this.host.onChange();
     }
     /**
-     * Paints a full-canvas mask into a layer.
+     * Paints a mask into a layer.
      *
      * @param layerId Target layer.
-     * @param mask    Canvas-sized mask, opaque where the fill applies.
+     * @param mask    Mask, opaque where the fill applies.
      * @param colour  CSS colour.
      * @param opacity 0..1.
+     * @param x       Where the mask's top-left corner sits, in canvas pixels.
+     * @param y       Where the mask's top-left corner sits, in canvas pixels.
      */
-    fillWithMask(layerId, mask, colour, opacity) {
-      fillWithMask(this.ctx, layerId, mask, colour, opacity);
+    fillWithMask(layerId, mask, colour, opacity, x = 0, y = 0) {
+      fillWithMask(this.ctx, layerId, mask, colour, opacity, x, y);
       this.host.onChange();
     }
     /**
@@ -2320,10 +2629,15 @@ void main( void )
     /**
      * Sets the adjustments to render.
      *
+     * The space first, because it decides whether exposure is composed into the colour
+     * matrix or handed to the shader beside it.
+     *
      * @param ops        Recipe ops.
+     * @param space      Working space the adjustments are computed in.
      * @param blurTarget Width the blur radius should be scaled to.
      */
-    setOps(ops, blurTarget) {
+    setOps(ops, space, blurTarget) {
+      this.adjust.setSpace(space);
       if (this.adjust.setOps(ops)) {
         this.rebuildChain();
       }
@@ -2752,6 +3066,7 @@ void main( void )
     return { width: texture?.width ?? 0, height: texture?.height ?? 0 };
   }
   const MODULE_ID = "pixijs";
+  let injection = null;
   function shell() {
     const wp = window.wp;
     return wp?.os ?? wp?.desktop;
@@ -2761,18 +3076,61 @@ void main( void )
       return window.PIXI;
     }
     const desktop2 = shell();
-    if (!desktop2?.loadModules) {
-      throw new Error(
-        "Lienzo needs Desktop Mode: PixiJS comes from the desktop shell, which is not on this page."
+    if (desktop2?.loadModules) {
+      try {
+        await desktop2.loadModules([MODULE_ID]);
+      } catch {
+      }
+      if (window.PIXI) {
+        return window.PIXI;
+      }
+    }
+    return injectFromShell();
+  }
+  function injectFromShell() {
+    if (injection) {
+      return injection;
+    }
+    const url = window.lienzoConfig?.pixiUrl;
+    if (!url) {
+      return Promise.reject(
+        new Error(
+          "Lienzo needs the desktop shell: PixiJS comes from it, and this page can reach neither its module registry nor its files."
+        )
       );
     }
-    await desktop2.loadModules([MODULE_ID]);
-    if (!window.PIXI) {
-      throw new Error(
-        "Desktop Mode loaded its PixiJS module but window.PIXI is still undefined."
-      );
-    }
-    return window.PIXI;
+    injection = new Promise((resolve, reject) => {
+      const settle = () => {
+        if (window.PIXI) {
+          resolve(window.PIXI);
+        } else {
+          reject(
+            new Error(
+              "PixiJS loaded but did not define window.PIXI. The shell may be mid-upgrade."
+            )
+          );
+        }
+      };
+      const fail2 = () => {
+        injection = null;
+        reject(new Error(`Could not load PixiJS from ${url}`));
+      };
+      const selector = `script[data-lienzo-pixi="${CSS.escape(url)}"]`;
+      const existing = document.querySelector(selector);
+      if (existing) {
+        existing.addEventListener("load", settle, { once: true });
+        existing.addEventListener("error", fail2, { once: true });
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = url;
+      script.async = true;
+      script.dataset.lienzoPixi = url;
+      script.addEventListener("load", settle, { once: true });
+      script.addEventListener("error", fail2, { once: true });
+      document.head.appendChild(script);
+    });
+    return injection;
   }
   class GpuContext {
     /**
@@ -2781,25 +3139,31 @@ void main( void )
      */
     constructor(pixi, app) {
       this.solid = null;
+      this.precision = null;
       this.pixi = pixi;
       this.app = app;
     }
     /**
      * Boots Pixi and attaches a canvas to a host element.
      *
-     * WebGL is requested explicitly rather than letting Pixi prefer WebGPU. The
-     * adjustment filter ships a GLSL program only, and Pixi silently *skips* a
-     * filter that has no program for the active backend -- which would show the
-     * unedited image with no error at all. Pinning the backend makes that
-     * impossible. Adding a WGSL program later is what would lift this.
+     * The backend used to be pinned to WebGL, for a good reason: the adjustment filter
+     * shipped a GLSL program only, and Pixi silently *skips* a filter that has no
+     * program for the active backend, which shows the unedited image with no error at
+     * all. It now ships a WGSL program too, so the pin is a preference rather than a
+     * requirement -- but the default is still WebGL, because that is the path with
+     * years of use behind it and `auto` is a choice a site should make deliberately.
      *
-     * @param host Element the canvas fills.
+     * `auto` asks Pixi for WebGPU and lets it fall back to WebGL by itself on a
+     * browser that has none.
+     *
+     * @param host       Element the canvas fills.
+     * @param preference Which backend to ask for.
      */
-    static async create(host) {
+    static async create(host, preference = "webgl") {
       const pixi = await loadPixi();
       const app = new pixi.Application();
       await app.init({
-        preference: "webgl",
+        preference: "auto" === preference ? "webgpu" : preference,
         backgroundAlpha: 0,
         antialias: false,
         autoDensity: true,
@@ -2808,6 +3172,20 @@ void main( void )
       app.canvas.classList.add("lz-canvas");
       host.appendChild(app.canvas);
       return new GpuContext(pixi, app);
+    }
+    /**
+     * Which backend Pixi actually chose.
+     *
+     * Worth asking rather than assuming once `auto` is a supported preference: WebGPU
+     * falls back to WebGL by itself, silently and correctly, and the only way to know
+     * which one is running is to look.
+     */
+    get backend() {
+      return this.app.renderer.gl ? "webgl" : "webgpu";
+    }
+    /** Whether intermediate render targets are half-float here. */
+    get hasPreciseTargets() {
+      return this.halfFloat;
     }
     /** The drawing surface, in CSS pixels. */
     get screen() {
@@ -2832,14 +3210,77 @@ void main( void )
     /**
      * Creates a render target.
      *
-     * @param width  Width in pixels.
-     * @param height Height in pixels.
+     * @param width   Width in pixels.
+     * @param height  Height in pixels.
+     * @param precise Whether to ask for sixteen bits per channel. Only worth it for a
+     *                texture that is *sampled again* rather than read back or encoded:
+     *                the extra precision is spent on the next pass, and the last pass
+     *                is eight bits either way.
      */
-    createTarget(width, height) {
+    createTarget(width, height, precise = false) {
       return this.pixi.RenderTexture.create({
         width: Math.max(1, Math.round(width)),
-        height: Math.max(1, Math.round(height))
+        height: Math.max(1, Math.round(height)),
+        ...precise && this.halfFloat ? { format: "rgba16float" } : {}
       });
+    }
+    /**
+     * Whether half-float render targets are usable.
+     *
+     * WebGL2 can *sample* a half-float texture always but can only *render into* one
+     * with `EXT_color_buffer_half_float` (or `EXT_color_buffer_float`, which implies
+     * it), and without the extension the framebuffer is merely incomplete -- no
+     * exception, nothing drawn. Asking the context is the only honest way to know.
+     */
+    get halfFloat() {
+      if (this.precision === null) {
+        this.precision = this.detectHalfFloat();
+      }
+      return this.precision;
+    }
+    /** Works out whether this renderer can draw into a half-float texture. */
+    detectHalfFloat() {
+      try {
+        const renderer = this.app.renderer;
+        if (!renderer.gl) {
+          return false;
+        }
+        return !!renderer.gl.getExtension("EXT_color_buffer_half_float") || !!renderer.gl.getExtension("EXT_color_buffer_float");
+      } catch {
+        return false;
+      }
+    }
+    /**
+     * An eight-bit copy of a target, for anything that reads pixels back.
+     *
+     * A half-float texture cannot be read with `readPixels` as bytes -- the values come
+     * back reinterpreted, which shows up as an eyedropper picking nonsense. One blit
+     * resolves it, and only when someone actually asks for pixels rather than on every
+     * frame. An eight-bit target is returned as it stands, with `owned` false, so the
+     * caller knows not to free something it did not create.
+     *
+     * @param target Texture to resolve.
+     */
+    resolve(target) {
+      if (!this.isHalfFloat(target)) {
+        return { texture: target, owned: false };
+      }
+      const copy = this.pixi.RenderTexture.create({
+        width: target.width,
+        height: target.height
+      });
+      const sprite = this.sprite(target);
+      this.draw(sprite, copy, true);
+      sprite.destroy();
+      return { texture: copy, owned: true };
+    }
+    /**
+     * Whether a texture holds half-float samples.
+     *
+     * @param texture Texture to test.
+     */
+    isHalfFloat(texture) {
+      return texture.source.format === "rgba16float";
     }
     /**
      * Wraps a source in a texture.
@@ -2939,7 +3380,7 @@ void main( void )
      *
      * `destroy( true )` on the Application is deliberately *not* used: it releases
      * Pixi's global resource registries, which corrupts any other Pixi application
-     * alive on the page. Desktop Mode runs its own -- wallpapers, widgets, games --
+     * alive on the page. OpenStation runs its own -- wallpapers, widgets, games --
      * so taking that shortcut here would break unrelated windows.
      */
     destroy() {
@@ -2972,6 +3413,9 @@ void main( void )
       })),
       zoom: subject.zoom,
       spriteScale: subject.spriteScale,
+      viewport: subject.viewport ? { ...subject.viewport } : null,
+      backend: subject.backend,
+      preciseIntermediates: subject.precise,
       documentScaleMode: scaleModeOf(document2),
       sourceScaleMode: scaleModeOf(subject.source),
       hasDocumentTexture: !!document2,
@@ -3013,7 +3457,10 @@ void main( void )
      * @param options Renderer options.
      */
     static async create(options) {
-      return new EditorRenderer(await GpuContext.create(options.host), options);
+      return new EditorRenderer(
+        await GpuContext.create(options.host, options.backend ?? "webgl"),
+        options
+      );
     }
     /** The texture every downstream stage reads. */
     displayTexture() {
@@ -3095,10 +3542,11 @@ void main( void )
     /**
      * Sets the adjustments to render.
      *
-     * @param ops Recipe ops.
+     * @param ops   Recipe ops.
+     * @param space Working space the adjustments are computed in.
      */
-    setOps(ops) {
-      this.filters.setOps(ops, this.blurTarget());
+    setOps(ops, space = "srgb") {
+      this.filters.setOps(ops, space, this.blurTarget());
       this.histogram.schedule();
     }
     /**
@@ -3171,7 +3619,10 @@ void main( void )
         source: this.texture,
         document: this.pixels.texture,
         zoom: this.view.zoom,
-        spriteScale: this.sprite ? Math.abs(this.sprite.scale.x) : null
+        spriteScale: this.sprite ? Math.abs(this.sprite.scale.x) : null,
+        viewport: this.view.viewport(),
+        backend: this.gpu.backend,
+        precise: this.gpu.hasPreciseTargets
       });
     }
     /** Releases everything. */
@@ -3985,12 +4436,38 @@ void main( void )
       }
     };
   }
+  function workingSpaceField(ctx) {
+    const field = createSegmented({
+      label: __("Light"),
+      value: ctx.getRecipe().space,
+      options: [
+        { value: "srgb", label: __("sRGB") },
+        { value: "linear", label: __("Linear") }
+      ],
+      onChange: (value) => ctx.setSpace("linear" === value ? "linear" : "srgb")
+    });
+    return {
+      el: field.el,
+      destroy: field.destroy,
+      sync: (recipe) => field.setValue(recipe.space)
+    };
+  }
   function registerAdjustmentPanels() {
     registerPanel({
       id: "adjustments",
       title: __("Adjustments"),
       order: 20,
-      render: (host, ctx) => renderAdjustments(host, ctx, PANEL_OP_ORDER)
+      render: (host, ctx) => {
+        const space = workingSpaceField(ctx);
+        host.appendChild(space.el);
+        const off = ctx.onRecipeChange(space.sync);
+        const teardown = renderAdjustments(host, ctx, PANEL_OP_ORDER);
+        return () => {
+          off();
+          space.destroy();
+          teardown();
+        };
+      }
     });
     registerPanel({
       id: "effects",
@@ -4088,76 +4565,132 @@ void main( void )
     points.push(to);
     return points;
   }
-  function floodFillMask(pixels, width, height, startX, startY, tolerance) {
+  const MATCH = 1;
+  const MISS = 2;
+  const INSIDE = 255;
+  function floodFillRegion(pixels, width, height, startX, startY, tolerance) {
     const x0 = Math.round(startX);
     const y0 = Math.round(startY);
-    if (x0 < 0 || y0 < 0 || x0 >= width || y0 >= height) {
+    if (width < 1 || height < 1 || x0 < 0 || y0 < 0 || x0 >= width || y0 >= height) {
       return null;
     }
-    const at = (x, y) => (y * width + x) * 4;
-    const seed = at(x0, y0);
-    const target = [
-      pixels[seed],
-      pixels[seed + 1],
-      pixels[seed + 2],
-      pixels[seed + 3]
-    ];
-    const matches = (index) => Math.abs(pixels[index] - target[0]) <= tolerance && Math.abs(pixels[index + 1] - target[1]) <= tolerance && Math.abs(pixels[index + 2] - target[2]) <= tolerance && Math.abs(pixels[index + 3] - target[3]) <= tolerance;
-    return scanlineFill(width, height, x0, y0, matches, at);
-  }
-  function scanlineFill(width, height, x0, y0, matches, at) {
-    const filled = new Uint8Array(width * height);
-    const stack = [x0, y0];
+    const state2 = new Uint8Array(width * height);
+    const seed = (y0 * width + x0) * 4;
+    const target0 = pixels[seed];
+    const target1 = pixels[seed + 1];
+    const target2 = pixels[seed + 2];
+    const target3 = pixels[seed + 3];
+    const tol = Math.max(0, Math.min(255, Math.round(tolerance)));
     let count = 0;
+    let minX = width;
+    let minY = height;
+    let maxX = -1;
+    let maxY = -1;
+    const open2 = (index) => {
+      const known = state2[index];
+      if (known !== 0) {
+        return known === MATCH;
+      }
+      const p = index * 4;
+      const matches = pixels[p] - target0 <= tol && target0 - pixels[p] <= tol && (pixels[p + 1] - target1 <= tol && target1 - pixels[p + 1] <= tol) && (pixels[p + 2] - target2 <= tol && target2 - pixels[p + 2] <= tol) && (pixels[p + 3] - target3 <= tol && target3 - pixels[p + 3] <= tol);
+      state2[index] = matches ? MATCH : MISS;
+      return matches;
+    };
+    const claim = (index, x, y) => {
+      state2[index] = INSIDE;
+      count++;
+      if (x < minX) {
+        minX = x;
+      }
+      if (x > maxX) {
+        maxX = x;
+      }
+      if (y < minY) {
+        minY = y;
+      }
+      if (y > maxY) {
+        maxY = y;
+      }
+    };
+    const stack = [x0, x0, y0, 1, x0, x0, y0 - 1, -1];
     while (stack.length > 0) {
+      const dy = stack.pop();
       const y = stack.pop();
-      const seedX = stack.pop();
-      if (y < 0 || y >= height || filled[y * width + seedX]) {
+      let x2 = stack.pop();
+      let x1 = stack.pop();
+      if (y < 0 || y >= height) {
         continue;
       }
-      let left = seedX;
-      let right = seedX;
-      while (left > 0 && matches(at(left - 1, y)) && !filled[y * width + left - 1]) {
-        left--;
-      }
-      while (right < width - 1 && matches(at(right + 1, y)) && !filled[y * width + right + 1]) {
-        right++;
-      }
-      for (let x = left; x <= right; x++) {
-        filled[y * width + x] = 1;
-        count++;
-        for (const ny of [y - 1, y + 1]) {
-          if (ny < 0 || ny >= height) {
-            continue;
-          }
-          if (matches(at(x, ny)) && !filled[ny * width + x]) {
-            stack.push(x, ny);
-          }
+      const row = y * width;
+      let x = x1;
+      if (open2(row + x)) {
+        while (x > 0 && open2(row + x - 1)) {
+          claim(row + x - 1, x - 1, y);
+          x--;
         }
+        if (x < x1) {
+          stack.push(x, x1 - 1, y - dy, -dy);
+        }
+      }
+      while (x1 <= x2) {
+        while (x1 < width && open2(row + x1)) {
+          claim(row + x1, x1, y);
+          x1++;
+        }
+        if (x1 > x) {
+          stack.push(x, x1 - 1, y + dy, dy);
+        }
+        if (x1 - 1 > x2) {
+          stack.push(x2 + 1, x1 - 1, y - dy, -dy);
+        }
+        x1++;
+        while (x1 <= x2 && !open2(row + x1)) {
+          x1++;
+        }
+        x = x1;
       }
     }
     if (count === 0) {
       return null;
     }
+    return {
+      state: state2,
+      width,
+      height,
+      bounds: { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 },
+      count
+    };
+  }
+  function regionToCanvas(region) {
+    const { bounds, state: state2, width } = region;
     const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = bounds.width;
+    canvas.height = bounds.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) {
       return null;
     }
-    const mask = ctx.createImageData(width, height);
-    for (let i = 0; i < filled.length; i++) {
-      if (!filled[i]) {
-        continue;
+    const image = ctx.createImageData(bounds.width, bounds.height);
+    const words = new Uint32Array(image.data.buffer);
+    for (let y = 0; y < bounds.height; y++) {
+      const from = (bounds.y + y) * width + bounds.x;
+      const to = y * bounds.width;
+      for (let x = 0; x < bounds.width; x++) {
+        if (state2[from + x] === INSIDE) {
+          words[to + x] = 4294967295;
+        }
       }
-      mask.data[i * 4] = 255;
-      mask.data[i * 4 + 1] = 255;
-      mask.data[i * 4 + 2] = 255;
-      mask.data[i * 4 + 3] = 255;
     }
-    ctx.putImageData(mask, 0, 0);
+    ctx.putImageData(image, 0, 0);
     return canvas;
+  }
+  function floodFillMask(pixels, width, height, startX, startY, tolerance) {
+    const region = floodFillRegion(pixels, width, height, startX, startY, tolerance);
+    if (!region) {
+      return null;
+    }
+    const mask = regionToCanvas(region);
+    return mask ? { region, mask } : null;
   }
   const RETOUCH_MODES = [
     { value: "blur", label: "Blur" },
@@ -6340,7 +6873,15 @@ void main( void )
     if (!id) {
       return false;
     }
+    return openDesktopWindow(id, origin);
+  }
+  function openDesktopWindow(attachmentId = 0, origin = null) {
+    const id = Number(attachmentId) || 0;
     if (desktop()?.openWindow) {
+      if (!id) {
+        desktop()?.openWindow?.(WINDOW_ID, { source: "lienzo" });
+        return true;
+      }
       const live = [...state().openers].pop();
       if (live) {
         live(id, origin);
@@ -6351,7 +6892,7 @@ void main( void )
       desktop()?.openWindow?.(WINDOW_ID, { source: "lienzo" });
       return true;
     }
-    if (window.parent && window.parent !== window) {
+    if (isDesktopModeEnabled() && window.parent && window.parent !== window) {
       window.parent.postMessage(
         { type: OPEN_MESSAGE, attachmentId: id },
         window.location.origin
@@ -6359,6 +6900,9 @@ void main( void )
       return true;
     }
     return false;
+  }
+  function isShellPage() {
+    return void 0 !== desktop()?.openWindow || isDesktopModeEnabled();
   }
   function listenForOpenRequests() {
     if (state().listenerRegistered) {
@@ -6879,7 +7423,7 @@ void main( void )
     let editor = null;
     let releaseDrop = null;
     let session = 0;
-    const open = (attachmentId2, origin = null) => {
+    const open2 = (attachmentId2, origin = null) => {
       session++;
       editor?.destroy();
       root.replaceChildren();
@@ -6899,17 +7443,17 @@ void main( void )
         }
       });
     };
-    state().openers.add(open);
+    state().openers.add(open2);
     const attachmentId = takePending();
     const pendingOrigin = takePendingOrigin();
     if (attachmentId) {
-      open(attachmentId, pendingOrigin);
+      open2(attachmentId, pendingOrigin);
     } else if (config) {
       const mine = session;
       void renderPicker(
         root,
         config,
-        (id) => open(id),
+        (id) => open2(id),
         () => session !== mine
       );
     }
@@ -6917,7 +7461,7 @@ void main( void )
       if (editor) {
         void editor.addImageLayer(dropped);
       } else if (dropped.attachmentId) {
-        open(dropped.attachmentId);
+        open2(dropped.attachmentId);
       }
     };
     try {
@@ -6928,7 +7472,7 @@ void main( void )
     const releaseFiles = attachFileDrop(root, drop);
     return () => {
       releaseFiles();
-      state().openers.delete(open);
+      state().openers.delete(open2);
       state().previewUrl = "";
       state().previewTitle = "";
       releaseDrop?.();
@@ -6982,7 +7526,7 @@ void main( void )
     host.querySelector(".lz-saved")?.remove();
     const banner = document.createElement("p");
     banner.className = "lz-saved";
-    const open = createButton({
+    const open2 = createButton({
       label: __("Open the saved copy"),
       variant: "secondary",
       onClick: onOpen
@@ -6993,11 +7537,11 @@ void main( void )
           "Saved a copy. Painted layers were baked into it, so re-opening shows those pixels rather than the sliders. "
         ) : __("Saved a copy. ")
       ),
-      open.el
+      open2.el
     );
     host.prepend(banner);
     return () => {
-      open.destroy();
+      open2.destroy();
       banner.remove();
     };
   }
@@ -7164,6 +7708,7 @@ void main( void )
       getRecipe: () => store.current,
       setOp: (type, value) => store.setOp(type, value),
       setOutput: (patch) => store.setOutput(patch),
+      setSpace: (space) => store.setSpace(space),
       setLayer: (layer, label) => store.setLayerTransform(layer, label),
       setDocument: (canvas, layer, label) => store.setDocument(canvas, layer, label),
       getImageSize: deps.getImageSize,
@@ -7282,7 +7827,7 @@ void main( void )
   function pushToRenderer(renderer, recipe, scope) {
     const all = "all" === scope;
     if (all || "ops" === scope) {
-      renderer.setOps(recipe.ops);
+      renderer.setOps(recipe.ops, recipe.space);
     }
     if (all || "document" === scope) {
       renderer.setDocument(recipe.canvas, recipe.layers, recipe.activeLayerId);
@@ -8220,7 +8765,8 @@ void main( void )
     if (selection.points.length < 2) {
       return "";
     }
-    return `M ${at(selection.points[0])} ` + selection.points.slice(1).map((point) => `L ${at(point)}`).join(" ") + " Z";
+    const contour = (points) => `M ${at(points[0])} ` + points.slice(1).map((point) => `L ${at(point)}`).join(" ") + " Z";
+    return [selection.points, ...selection.holes ?? []].filter((points) => points.length > 1).map(contour).join(" ");
   }
   function thinPath(contour, maxPoints, width, height) {
     const stride = Math.max(1, Math.ceil(contour.length / Math.max(3, maxPoints)));
@@ -8285,19 +8831,25 @@ void main( void )
         bounds.h * canvas.height
       );
     } else {
-      selection.points.forEach((point, index) => {
-        const x = point.x * canvas.width;
-        const y = point.y * canvas.height;
-        if (index === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      });
-      ctx.closePath();
+      addContour(ctx, selection.points, canvas);
+      for (const hole of selection.holes ?? []) {
+        addContour(ctx, hole, canvas);
+      }
     }
-    ctx.fill();
+    ctx.fill("evenodd");
     return canvas;
+  }
+  function addContour(ctx, points, canvas) {
+    points.forEach((point, index) => {
+      const x = point.x * canvas.width;
+      const y = point.y * canvas.height;
+      if (index === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+    ctx.closePath();
   }
   function clipToSelection(region, selection, canvas, origin) {
     const mask = buildSelectionMask(selection, canvas.width, canvas.height);
@@ -8311,60 +8863,132 @@ void main( void )
     ctx.restore();
     return true;
   }
+  const MAX_HOLES = 63;
+  const MIN_HOLE_AREA = 4;
+  const MAX_LOOPS = 4096;
+  const STEP = [
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+    [0, -1]
+  ];
   function traceMask(mask, maxPoints = 400) {
     const { width, height, data } = mask;
-    const filled = (x, y) => x >= 0 && y >= 0 && x < width && y < height && data[(y * width + x) * 4 + 3] > 127;
-    let start = null;
-    for (let y = 0; y < height && !start; y++) {
-      for (let x = 0; x < width; x++) {
-        if (filled(x, y)) {
-          start = { x, y };
+    if (width < 1 || height < 1) {
+      return { outer: [], holes: [] };
+    }
+    const stride = data.length >= width * height * 4 ? 4 : 1;
+    const last = stride - 1;
+    const filled = (x, y) => x >= 0 && y >= 0 && x < width && y < height && data[(y * width + x) * stride + last] > 127;
+    const contours = walkContours(filled, width, height, mask.bounds);
+    if (contours.length === 0) {
+      return { outer: [], holes: [] };
+    }
+    const budgets = shareBudget(contours, maxPoints);
+    const paths = contours.map(
+      (contour, index) => thinPath(contour, budgets[index], width, height)
+    );
+    return { outer: paths[0], holes: paths.slice(1) };
+  }
+  function walkContours(filled, width, height, bounds) {
+    const cols = width + 1;
+    const visited = new Uint8Array(cols * (height + 1));
+    const contours = [];
+    const fromX = Math.max(0, bounds ? bounds.x : 0);
+    const fromY = Math.max(0, bounds ? bounds.y : 0);
+    const toX = Math.min(width, bounds ? bounds.x + bounds.width : width);
+    const toY = Math.min(height, bounds ? bounds.y + bounds.height : height);
+    const leaves = (x, y, direction) => {
+      switch (direction) {
+        case 0:
+          return filled(x, y) && !filled(x, y - 1);
+        case 1:
+          return filled(x - 1, y) && !filled(x, y);
+        case 2:
+          return filled(x - 1, y - 1) && !filled(x - 1, y);
+        default:
+          return filled(x, y - 1) && !filled(x - 1, y - 1);
+      }
+    };
+    for (let y = fromY; y <= toY && contours.length < MAX_LOOPS; y++) {
+      for (let x = fromX; x <= toX && contours.length < MAX_LOOPS; x++) {
+        const corner = y * cols + x;
+        for (let d = 0; d < 4; d++) {
+          if (visited[corner] & 1 << d || !leaves(x, y, d)) {
+            continue;
+          }
+          contours.push(walkLoop(x, y, d, leaves, visited, cols, width, height));
+        }
+      }
+    }
+    return rank(contours);
+  }
+  function rank(contours) {
+    if (contours.length < 2) {
+      return contours;
+    }
+    const holes = contours.slice(1).map((contour) => ({ contour, area: contourArea(contour) })).filter((hole) => hole.area >= MIN_HOLE_AREA).sort((a, b) => b.area - a.area).slice(0, MAX_HOLES).map((hole) => hole.contour);
+    return [contours[0], ...holes];
+  }
+  function contourArea(contour) {
+    let sum = 0;
+    for (let i = 0; i < contour.length; i++) {
+      const a = contour[i];
+      const b = contour[(i + 1) % contour.length];
+      sum += a.x * b.y - b.x * a.y;
+    }
+    return Math.abs(sum) / 2;
+  }
+  function walkLoop(startX, startY, startD, leaves, visited, cols, width, height) {
+    const points = [];
+    const limit = (width + 1) * (height + 1) * 4;
+    let x = startX;
+    let y = startY;
+    let d = startD;
+    let lastD = -1;
+    for (let step = 0; step < limit; step++) {
+      visited[y * cols + x] |= 1 << d;
+      if (d !== lastD) {
+        points.push({ x, y });
+        lastD = d;
+      }
+      x += STEP[d][0];
+      y += STEP[d][1];
+      let next = -1;
+      for (const candidate of [(d + 1) % 4, d, (d + 3) % 4]) {
+        if (leaves(x, y, candidate)) {
+          next = candidate;
           break;
         }
       }
+      if (next < 0) {
+        break;
+      }
+      d = next;
+      if (x === startX && y === startY && d === startD) {
+        break;
+      }
     }
-    if (!start) {
-      return [];
+    if (points.length > 2 && lastD === startD) {
+      points.shift();
     }
-    const ring = [
-      [-1, 0],
-      [-1, -1],
-      [0, -1],
-      [1, -1],
-      [1, 0],
-      [1, 1],
-      [0, 1],
-      [-1, 1]
+    return points;
+  }
+  function shareBudget(contours, maxPoints) {
+    const budget = Math.max(3, maxPoints);
+    if (contours.length === 1) {
+      return [budget];
+    }
+    const outer = Math.max(4, Math.round(budget / 2));
+    const holes = contours.slice(1);
+    const total = holes.reduce((sum, hole) => sum + hole.length, 0) || 1;
+    const spare = budget - outer;
+    return [
+      outer,
+      ...holes.map(
+        (hole) => Math.max(4, Math.round(spare * hole.length / total))
+      )
     ];
-    const contour = [start];
-    let current = start;
-    let entry = 0;
-    const limit = width * height * 4 + 8;
-    for (let step = 0; step < limit; step++) {
-      let moved = false;
-      for (let i = 1; i <= 8; i++) {
-        const direction = (entry + i) % 8;
-        const next = {
-          x: current.x + ring[direction][0],
-          y: current.y + ring[direction][1]
-        };
-        if (!filled(next.x, next.y)) {
-          continue;
-        }
-        entry = (direction + 5) % 8;
-        current = next;
-        moved = true;
-        break;
-      }
-      if (!moved) {
-        break;
-      }
-      if (current.x === start.x && current.y === start.y) {
-        break;
-      }
-      contour.push(current);
-    }
-    return thinPath(contour, maxPoints, width, height);
   }
   function renderSelectOptions(bar) {
     bar.add(
@@ -9072,7 +9696,7 @@ void main( void )
     if (!source) {
       return null;
     }
-    return floodFillMask(
+    return floodFillRegion(
       source.pixels,
       source.width,
       source.height,
@@ -9082,26 +9706,45 @@ void main( void )
     );
   }
   function floodFill(options, point) {
-    const mask = matchRegion(options, point);
-    if (!mask) {
+    const source = options.readDocument();
+    if (!source) {
+      return;
+    }
+    const filled = floodFillMask(
+      source.pixels,
+      source.width,
+      source.height,
+      point.x,
+      point.y,
+      options.getBrush().tolerance
+    );
+    if (!filled) {
       return;
     }
     const brush = options.getBrush();
-    options.fillMask(options.getTargetLayerId(), mask, brush.colour, brush.opacity);
+    options.fillMask(
+      options.getTargetLayerId(),
+      filled.mask,
+      brush.colour,
+      brush.opacity,
+      filled.region.bounds
+    );
     options.onStrokeEnd();
   }
   function magicWand(options, point) {
-    const mask = matchRegion(options, point);
-    if (!mask) {
+    const region = matchRegion(options, point);
+    if (!region) {
       return;
     }
-    const ctx = mask.getContext("2d");
-    const pixels = ctx?.getImageData(0, 0, mask.width, mask.height);
-    if (!pixels) {
-      return;
-    }
-    const points = traceMask(pixels);
-    options.setSelection(points.length > 2 ? { shape: "lasso", points } : null);
+    const traced = traceMask({
+      data: region.state,
+      width: region.width,
+      height: region.height,
+      bounds: region.bounds
+    });
+    options.setSelection(
+      traced.outer.length > 2 ? { shape: "lasso", points: traced.outer, holes: traced.holes } : null
+    );
   }
   function routePress(options, gesture, tool, point, event) {
     const norm = () => normalise(options.getCanvas(), point);
@@ -9883,9 +10526,9 @@ void main( void )
      *
      * @param active Tool now in use.
      */
-    sync(active) {
+    sync(active2) {
       for (const [id, button] of this.buttons) {
-        button.setPressed(id === active);
+        button.setPressed(id === active2);
       }
       this.swatches.sync();
       this.syncModes();
@@ -10122,9 +10765,9 @@ void main( void )
   }
   function paintTarget(store, renderer) {
     const recipe = store.current;
-    const active = recipe.layers.find((layer2) => layer2.id === recipe.activeLayerId);
-    if (active && isPaintSheet(store, renderer, active.id)) {
-      return active.id;
+    const active2 = recipe.layers.find((layer2) => layer2.id === recipe.activeLayerId);
+    if (active2 && isPaintSheet(store, renderer, active2.id)) {
+      return active2.id;
     }
     const existing = recipe.layers.find(
       (layer2) => "raster" === layer2.kind && isPaintSheet(store, renderer, layer2.id)
@@ -10224,15 +10867,14 @@ void main( void )
           editor.strokes?.capture(id, dabRegion(x, y, size));
           renderer.paint.stampBrush(id, image, x, y, size, colour, opacity, erase);
         },
-        fillMask: (id, mask, colour, opacity) => {
-          const canvas = store.current.canvas;
+        fillMask: (id, mask, colour, opacity, origin) => {
           editor.strokes?.capture(id, {
-            x: 0,
-            y: 0,
-            width: canvas.width,
-            height: canvas.height
+            x: origin.x,
+            y: origin.y,
+            width: mask.width,
+            height: mask.height
           });
-          renderer.paint.fillWithMask(id, mask, colour, opacity);
+          renderer.paint.fillWithMask(id, mask, colour, opacity, origin.x, origin.y);
         },
         composite: (id, source, x, y, opacity) => {
           editor.strokes?.capture(id, {
@@ -10328,7 +10970,8 @@ void main( void )
     const renderer = await EditorRenderer.create({
       host: editor.shell.stage,
       maxRenderPixels: editor.config.maxRenderPixels,
-      schema: payload.schema
+      schema: payload.schema,
+      backend: editor.config.renderer
     });
     if (editor.isDestroyed) {
       renderer.destroy();
@@ -10433,9 +11076,9 @@ void main( void )
       return true;
     }
   }
-  function writeSidebarOpen(open) {
+  function writeSidebarOpen(open2) {
     try {
-      window.localStorage.setItem(SIDEBAR_KEY, open ? "open" : "closed");
+      window.localStorage.setItem(SIDEBAR_KEY, open2 ? "open" : "closed");
     } catch {
     }
   }
@@ -11206,11 +11849,31 @@ void main( void )
       this.replace({ ...current, output: { ...current.output, ...patch } }, "document");
     }
     /**
+     * Switches the working space the adjustments are computed in.
+     *
+     * Undoable, unlike the output settings beside it: this one changes the pixels. An
+     * exposure set in sRGB lands somewhere else in linear light, and a user who does
+     * not like where it landed should be able to press undo rather than hunt for the
+     * control again.
+     *
+     * @param space New working space.
+     */
+    setSpace(space) {
+      if (this.current.space === space) {
+        return;
+      }
+      this.push({ ...this.current, space }, "space", "ops");
+    }
+    /**
      * Applies a saved look, keeping this image's own geometry.
      *
      * Geometry is deliberately untouched. A preset describes a look; the crop
      * describes this particular frame, and replacing it would silently re-crop the
      * photograph the moment a look was applied.
+     *
+     * The working space *is* part of the look, and comes with it: it decides what an
+     * exposure op means, so a look made in linear light and replayed in sRGB is a
+     * different look. A preset saved before the field existed was made in sRGB.
      *
      * @param preset Preset to apply.
      */
@@ -11221,7 +11884,8 @@ void main( void )
           ...current,
           ops: preset.recipe.ops ?? [],
           curves: preset.recipe.curves ?? {},
-          levels: preset.recipe.levels ?? current.levels
+          levels: preset.recipe.levels ?? current.levels,
+          space: normaliseSpace(preset.recipe.space)
         },
         "preset",
         "all"
@@ -11265,11 +11929,11 @@ void main( void )
     label.textContent = __("Tools");
     el.appendChild(label);
     el.setAttribute("aria-controls", "lz-sidebar");
-    const setOpen = (open) => {
-      root.classList.toggle("is-sidebar-hidden", !open);
-      el.setAttribute("aria-expanded", String(open));
-      el.hidden = open;
-      writeSidebarOpen(open);
+    const setOpen = (open2) => {
+      root.classList.toggle("is-sidebar-hidden", !open2);
+      el.setAttribute("aria-expanded", String(open2));
+      el.hidden = open2;
+      writeSidebarOpen(open2);
       onToggle();
     };
     el.addEventListener("click", () => setOpen(true));
@@ -11356,8 +12020,8 @@ void main( void )
      *
      * @param open Whether the sidebar should be visible.
      */
-    setSidebarOpen(open) {
-      this.sidebarTab.setOpen(open);
+    setSidebarOpen(open2) {
+      this.sidebarTab.setOpen(open2);
     }
     /**
      * Positions the canvas backdrop over wherever the canvas currently is.
@@ -11664,6 +12328,160 @@ void main( void )
     void editor.boot();
     return editor;
   }
+  let instance = null;
+  function bootAdminPage() {
+    const root = document.querySelector(
+      '[data-lienzo-root][data-host="page"]'
+    );
+    if (!root) {
+      return;
+    }
+    const attachmentId = Number(root.dataset.attachment ?? 0);
+    instance?.destroy();
+    instance = null;
+    if (isShellPage()) {
+      handOverToDesktop(root, attachmentId);
+      return;
+    }
+    if (attachmentId) {
+      open(root, attachmentId);
+    } else {
+      showPicker(root);
+    }
+    window.addEventListener(
+      "pagehide",
+      () => {
+        instance?.destroy();
+        instance = null;
+      },
+      { once: true }
+    );
+  }
+  function open(root, attachmentId) {
+    instance?.destroy();
+    root.replaceChildren();
+    instance = mount(root, {
+      attachmentId,
+      host: "page",
+      // Closing the only thing on the page has nowhere to go but back to the library.
+      onClose: () => {
+        window.location.href = window.lienzoConfig?.editorUrl ?? "upload.php";
+      }
+    });
+    window.lienzoEditor = instance;
+    const url = new URL(window.location.href);
+    url.searchParams.set("attachment", String(attachmentId));
+    window.history.replaceState({}, "", url);
+  }
+  function handOverToDesktop(root, attachmentId) {
+    const opened = openDesktopWindow(attachmentId);
+    const message = document.createElement("p");
+    message.className = "lz-page-notice";
+    message.textContent = opened ? __("Opening Lienzo on your desktop…") : __("Lienzo opens as a window on your desktop. Open it from the dock or its icon.");
+    root.replaceChildren(message);
+  }
+  function showPicker(root) {
+    const config = window.lienzoConfig;
+    if (!config) {
+      root.textContent = __("Lienzo could not load its configuration.");
+      return;
+    }
+    void renderPicker(root, config, (id) => open(root, id));
+  }
+  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  let active = null;
+  function openEditorOverlay(options) {
+    active?.close();
+    const previousFocus = document.activeElement;
+    const backdrop = document.createElement("div");
+    backdrop.className = "lz-overlay";
+    const dialog = document.createElement("div");
+    dialog.className = "lz-overlay__dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-label", __("Edit image with Lienzo"));
+    const mountPoint = document.createElement("div");
+    mountPoint.className = "lz-overlay__editor";
+    dialog.appendChild(mountPoint);
+    backdrop.appendChild(dialog);
+    let editor = null;
+    let closed = false;
+    const close = () => {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      active = null;
+      document.removeEventListener("keydown", onKeyDown, true);
+      editor?.destroy();
+      backdrop.remove();
+      document.body.classList.remove("lz-overlay-open");
+      previousFocus?.focus?.();
+      options.onClose?.();
+    };
+    function onKeyDown(event) {
+      if (event.key === "Escape") {
+        if (event.defaultPrevented) {
+          return;
+        }
+        event.stopPropagation();
+        event.preventDefault();
+        close();
+        return;
+      }
+      if (event.key !== "Tab") {
+        return;
+      }
+      const focusable = Array.from(
+        dialog.querySelectorAll(FOCUSABLE)
+      ).filter((el) => el.offsetParent !== null);
+      if (focusable.length === 0) {
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    backdrop.addEventListener("pointerdown", (event) => {
+      if (event.target === backdrop) {
+        close();
+      }
+    });
+    document.addEventListener("keydown", onKeyDown, true);
+    document.body.appendChild(backdrop);
+    document.body.classList.add("lz-overlay-open");
+    editor = mount(mountPoint, {
+      attachmentId: options.attachmentId,
+      host: "modal",
+      onClose: close,
+      onSave: options.onSave
+    });
+    window.requestAnimationFrame(() => {
+      dialog.querySelector(FOCUSABLE)?.focus();
+    });
+    active = { close };
+    return { close };
+  }
+  function openEditor(attachmentId, options = {}) {
+    const id = Number(attachmentId) || 0;
+    if (!id) {
+      return false;
+    }
+    if (openInDesktop(id, options.origin ?? null)) {
+      return true;
+    }
+    if (!window.lienzoConfig) {
+      return false;
+    }
+    openEditorOverlay({ attachmentId: id, onSave: options.onSave });
+    return true;
+  }
   function bootBlockEditor() {
     const element = window.wp?.element;
     const hooks = window.wp?.hooks;
@@ -11697,7 +12515,22 @@ void main( void )
               ToolbarButton,
               {
                 label: __("Edit with Lienzo"),
-                onClick: () => openInDesktop(id)
+                // A save writes a *new* attachment -- Lienzo never
+                // rewrites an original -- so the block is pointed at
+                // it, or the post would go on showing the photograph
+                // as it was. The stored dimensions go with it: they
+                // described the old file, and a crop changes them.
+                // Only the overlay reports back; a desktop window
+                // outlives this component, and there an edit returns
+                // to a post through the shell's drag bridge.
+                onClick: () => openEditor(id, {
+                  onSave: (result) => props.setAttributes({
+                    id: result.id,
+                    url: result.url,
+                    width: void 0,
+                    height: void 0
+                  })
+                })
               },
               __("Lienzo")
             )
@@ -11759,7 +12592,7 @@ void main( void )
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      openInDesktop(id);
+      openEditor(id);
     });
     host.appendChild(button);
   }
@@ -11778,13 +12611,18 @@ void main( void )
       if (!attachmentId) {
         return;
       }
-      event.preventDefault();
-      openInDesktop(attachmentId);
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+      if (openEditor(attachmentId)) {
+        event.preventDefault();
+      }
     });
   }
   const version = window.lienzoConfig?.version ?? "0.0.0";
   function boot() {
     bootDesktopMode();
+    bootAdminPage();
     bootOpenButtons();
     bootMediaDrag();
     bootMediaModal();
@@ -11797,6 +12635,8 @@ void main( void )
   }
   exports.listPanels = listPanels;
   exports.mount = mount;
+  exports.openEditor = openEditor;
+  exports.openEditorOverlay = openEditorOverlay;
   exports.openInDesktop = openInDesktop;
   exports.registerPanel = registerPanel;
   exports.unregisterPanel = unregisterPanel;

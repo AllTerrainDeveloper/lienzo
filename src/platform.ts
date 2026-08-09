@@ -41,10 +41,10 @@ function desktop(): WpDesktopLike | undefined {
 }
 
 /**
- * Whether the Desktop Mode shell is running.
+ * Whether OpenStation is running.
  *
  * Used for presentation decisions only. Never gate a capability on this -- gate on
- * the specific method being present, so a Desktop Mode version that lacks one
+ * the specific method being present, so an OpenStation version that lacks one
  * feature still gets every other.
  */
 export function isDesktopMode(): boolean {
@@ -52,7 +52,7 @@ export function isDesktopMode(): boolean {
 }
 
 /**
- * Whether Desktop Mode is switched on for this user.
+ * Whether OpenStation is switched on for this user.
  *
  * Distinct from `isDesktopMode()`, which only reports whether the shell's JavaScript
  * happens to be on the page. This reads the flag PHP put in the config, which comes
@@ -176,7 +176,7 @@ export function onShellEvent(
 /**
  * Performs an HTTP request.
  *
- * Routed through Desktop Mode's `fetch` when available so the shell can show
+ * Routed through OpenStation's `fetch` when available so the shell can show
  * in-flight activity on the window's title bar. Falls back to the platform fetch.
  *
  * @param input Request target.
@@ -219,7 +219,7 @@ export function toast( message: string, type: ToastType = 'info' ): void {
 let toastHost: HTMLElement | null = null;
 
 /**
- * Minimal toast for installs without Desktop Mode.
+ * Minimal toast for installs without OpenStation.
  *
  * @param message Text to show.
  * @param type    Severity.

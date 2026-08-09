@@ -10,10 +10,11 @@ node_modules/
 # Release output. Rebuilt by `npm run plugin:package`, so it is never a source of truth.
 /dist/
 
-# Per-machine wp-env overrides. CI writes one to drop the sibling Desktop Mode mapping,
+# Per-machine wp-env overrides. CI writes one to drop the sibling OpenStation mapping,
 # which exists only on a development machine -- see .github/workflows/ci.yml.
 /.wp-env.override.json
 
-# assets/js/ is deliberately committed: the plugin must be installable straight from a
-# checkout, without an npm install. Pixi is no longer vendored here; it comes from the
-# Desktop Mode shell at runtime.
+# assets/ is deliberately committed -- the bundles, and the PixiJS that bin/vendor-pixi.mjs
+# copies out of node_modules into assets/vendor/ -- because the plugin must be installable
+# straight from a checkout, without an npm install. On a site running the desktop shell that
+# vendored copy is never loaded; the shell's own is used instead.

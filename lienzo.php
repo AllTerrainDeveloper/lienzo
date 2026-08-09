@@ -12,19 +12,25 @@
  * Text Domain:       lienzo
  * Requires Plugins:  desktop-mode
  *
- * Lienzo is a Desktop Mode application. It runs as a native window inside the
- * desktop shell -- rendering into the shell's own DOM rather than into an iframe --
- * and takes its PixiJS from the shell's module registry instead of shipping a second
- * copy. Two Pixi 8 instances on one page share GPU resource registries through
- * globals, so one is not merely smaller but safer.
+ * Lienzo is an OpenStation application and requires it. That is not a formality: the
+ * rendering library is OpenStation's. Lienzo ships no PixiJS at all and borrows the
+ * shell's, which keeps this plugin a few tens of kilobytes rather than eight hundred,
+ * and keeps exactly one Pixi on the page -- two Pixi 8 instances share GPU resource
+ * registries through globals, so one copy is not merely smaller but safer.
  *
- * Running natively is what gives the editor the shell's `<wpd-*>` components, its
- * drag bridge and its window chrome. None of that is reachable from inside a
- * chromeless iframe, where no component is registered at all.
+ * At its best it runs as a **native window** in the shell, rendering into the shell's
+ * own DOM: that is what gives the editor OpenStation's components, its drag bridge and
+ * its window chrome, none of which is reachable from inside a chromeless iframe.
  *
- * Everything therefore sits behind `lienzo_can_run()`: with Desktop Mode absent or
- * switched off for the user, the plugin registers nothing but the notice explaining
- * why.
+ * With OpenStation installed but switched *off* for a user -- a per-user preference --
+ * there is no shell on the page to render into, and the editor opens on its own admin
+ * page under Media and in an overlay instead. `src/platform.ts` resolves every control
+ * to a plain-DOM equivalent component by component, and PixiJS is loaded straight from
+ * OpenStation's own directory. So classic admin has a real editor; what it does not
+ * have is the window, the desktop icon and the drag bridge.
+ *
+ * With OpenStation absent altogether there is no PixiJS, so nothing loads but the
+ * notice on the plugins screen explaining what is missing.
  *
  * @package Lienzo
  */
@@ -69,15 +75,15 @@ require_once LIENZO_DIR . 'includes/requirements.php';
 add_action( 'plugins_loaded', 'lienzo_boot', 5 );
 
 /**
- * Loads the plugin, once it is known that Desktop Mode is there to host it.
+ * Loads the plugin, once it is known that OpenStation is there to render with.
  *
  * On `plugins_loaded` rather than at file scope, and that is not a detail: plugins are
  * loaded in alphabetical order, so `lienzo` runs *before* `desktop-mode` and none of
- * its functions exist yet when this file is first read. Checking then would fail every
- * time, on every site, and the plugin would silently never load. `Requires Plugins`
- * governs activation, not load order.
+ * its functions exist yet when this file is first read. Checking then would fail on
+ * every site, every time, and the plugin would silently never load.
+ * `Requires Plugins:` governs activation, not load order.
  *
- * Priority 5 leaves room for the Desktop Mode registrations at 20 to be added by an
+ * Priority 5 leaves room for the OpenStation registrations at 20 to be added by an
  * include loaded here -- WordPress runs callbacks added to a hook that is already
  * firing, as long as they sit at a later priority.
  *
@@ -87,8 +93,9 @@ add_action( 'plugins_loaded', 'lienzo_boot', 5 );
  */
 function lienzo_boot() {
 	if ( ! lienzo_requirements_met() ) {
-		// Nothing else loads. A half-registered plugin whose editor cannot open is
-		// worse than one that says plainly what it needs.
+		// Nothing else loads. Without OpenStation there is no PixiJS to render with, on
+		// any screen, and a half-registered plugin whose editor cannot open is worse
+		// than one that says plainly what it needs.
 		return;
 	}
 
@@ -100,6 +107,7 @@ function lienzo_boot() {
 	require_once LIENZO_DIR . 'includes/render.php';
 	require_once LIENZO_DIR . 'includes/rest.php';
 	require_once LIENZO_DIR . 'includes/assets.php';
+	require_once LIENZO_DIR . 'includes/admin-page.php';
 	require_once LIENZO_DIR . 'includes/media-actions.php';
 	require_once LIENZO_DIR . 'includes/desktop-mode.php';
 }

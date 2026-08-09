@@ -2,7 +2,7 @@
  * The public mount API.
  *
  * There are five places the editor has to appear: the full-screen admin page, the
- * media modal, the block editor, a Desktop Mode native window, and eventually
+ * media modal, the block editor, an OpenStation native window, and eventually
  * anything a third party builds. Rather than five implementations, there is one
  * mountable editor and five thin adapters that call `mount()`. Nothing outside this
  * package touches Pixi, the recipe model or REST.
@@ -15,7 +15,7 @@ import type { EditorInstance, MountOptions } from './types';
  * Mounts the editor into an element.
  *
  * Returns synchronously with a usable handle; loading happens in the background
- * behind a progress state. That matters because the media modal and Desktop Mode
+ * behind a progress state. That matters because the media modal and OpenStation
  * both want to place the editor before they know how long the image will take.
  *
  * @param element Element to fill. Its contents are replaced.

@@ -2,7 +2,7 @@
  * The shell API, as Lienzo uses it.
  *
  * These types are hand-written on purpose. Taking the `desktop-mode` npm package as a
- * dependency would mean Lienzo could not build with Desktop Mode absent from disk, and
+ * dependency would mean Lienzo could not build with OpenStation absent from disk, and
  * a standalone plugin has to.
  *
  * Everything here is feature-detected. This module also loads on plain WordPress admin
@@ -19,7 +19,7 @@ export const WINDOW_ID = 'lienzo';
 /**
  * The parts of the shell's native render context this file uses.
  *
- * Declared here rather than imported: Lienzo builds without Desktop Mode present on
+ * Declared here rather than imported: Lienzo builds without OpenStation present on
  * disk, so its types are described narrowly at the point of use.
  */
 export interface NativeRenderContext {
@@ -75,13 +75,13 @@ export interface DesktopApi {
 	};
 }
 
-/** A file on the Desktop Mode desktop. */
+/** A file on the OpenStation desktop. */
 export interface DesktopFileLike {
 	ref: () => string;
 	type?: () => string;
 }
 
-/** A Desktop Mode drag payload. */
+/** An OpenStation drag payload. */
 export interface DragPayloadLike {
 	type: string;
 	data?: Record< string, unknown >;
@@ -119,7 +119,7 @@ export interface TilePayloadHandler {
 	) => void;
 }
 
-/** Returns the Desktop Mode API when the shell is actually mounted. */
+/** Returns the OpenStation API when the shell is actually mounted. */
 export function desktop(): DesktopApi | undefined {
 	// `os` is the current name and `desktop` the one it had before the rename. Both
 	// are read, current first, because Lienzo ships to sites running either version.

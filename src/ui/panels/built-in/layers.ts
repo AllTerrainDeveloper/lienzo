@@ -13,8 +13,8 @@ import type { PanelContext } from '../types';
 /**
  * Builds one row of the layer stack.
  *
- * The row's controls come from the adaptive kit, so a layers palette inside Desktop
- * Mode is built from its buttons rather than from look-alikes. Rows are rebuilt on
+ * The row's controls come from the adaptive kit, so a layers palette inside
+ * OpenStation is built from its buttons rather than from look-alikes. Rows are rebuilt on
  * every change, so their handles are handed back for teardown rather than held.
  *
  * @param layer Layer this row describes.

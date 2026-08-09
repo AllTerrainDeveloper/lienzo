@@ -6,12 +6,16 @@
  */
 
 /**
+ * Tests for includes/shell-api.php.
+ *
  * @group lienzo
  * @group lienzo-shell-api
  */
 class Tests_Lienzo_Shell_Api extends WP_UnitTestCase {
 
 	/**
+	 * Both spellings are offered, the current one first.
+	 *
 	 * @covers ::lienzo_shell_hooks
 	 */
 	public function test_offers_both_hook_spellings_current_first() {
@@ -22,6 +26,8 @@ class Tests_Lienzo_Shell_Api extends WP_UnitTestCase {
 	}
 
 	/**
+	 * With no shell on the site, nothing resolves and nothing pretends to.
+	 *
 	 * @covers ::lienzo_shell_function
 	 */
 	public function test_reports_nothing_when_no_shell_is_present() {
@@ -30,6 +36,8 @@ class Tests_Lienzo_Shell_Api extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Calling into an absent shell does nothing rather than fataling.
+	 *
 	 * @covers ::lienzo_shell_call
 	 */
 	public function test_calling_an_absent_function_is_a_no_op_rather_than_fatal() {
@@ -56,6 +64,8 @@ class Tests_Lienzo_Shell_Api extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A site running both -- mid-upgrade, with a cached bundle -- gets the current one.
+	 *
 	 * @covers ::lienzo_shell_function
 	 */
 	public function test_prefers_the_current_spelling_when_both_exist() {
@@ -66,7 +76,16 @@ class Tests_Lienzo_Shell_Api extends WP_UnitTestCase {
 	}
 }
 
-// Stand-ins for a shell. Declared at file scope so they exist before the run.
+/*
+ * Stand-ins for a shell, declared at file scope so they exist before the run.
+ *
+ * Deliberately unprefixed and deliberately in the same file as the test case: they
+ * impersonate another plugin's public API, which is the whole point of a resolver that
+ * looks functions up by name, and prefixing them would defeat it.
+ *
+ * phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedFunctionFound
+ * phpcs:disable Universal.Files.SeparateFunctionsFromOO.Mixed
+ */
 if ( ! function_exists( 'desktop_mode_lienzo_probe' ) ) {
 	/**
 	 * A shell function that only ships under the older name.

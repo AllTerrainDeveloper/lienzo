@@ -1,19 +1,19 @@
 /**
  * Controls that adapt to the host.
  *
- * Inside Desktop Mode the shell registers a kit of web components that
+ * Inside OpenStation the shell registers a kit of web components that
  * carry the desktop's theming, spacing and dark-mode handling. Using them makes
- * Lienzo look like it belongs. Outside Desktop Mode they do not exist, so every
+ * Lienzo look like it belongs. Outside OpenStation they do not exist, so every
  * factory here builds a plain-DOM equivalent instead.
  *
  * Detection is per tag and happens at build time rather than being inferred from
- * "is Desktop Mode running". The shell registers a core subset of components
+ * "is OpenStation running". The shell registers a core subset of components
  * eagerly and the rest only when a bundle importing them happens to load, so the
  * only trustworthy question is whether *this* tag is in the custom element registry
  * right now. An unregistered tag renders as inert markup with no error, which is
  * exactly the kind of silent breakage worth spending a `customElements.get()` on.
  *
- * The native fallbacks read Desktop Mode's CSS custom properties where they exist,
+ * The native fallbacks read OpenStation's CSS custom properties where they exist,
  * so even the fallback path inherits the desktop's palette.
  *
  * This module is the whole public surface. One control per file behind it, so adding

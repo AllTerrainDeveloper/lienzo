@@ -35,6 +35,16 @@ export interface Selection {
 	 * For `lasso` and `polygon` they are the vertices, implicitly closed.
 	 */
 	points: Point[];
+	/**
+	 * Inner boundaries cut out of that path.
+	 *
+	 * Only the magic wand produces them -- a drag has one outline by definition -- and
+	 * they are what stops a wand selection of a region with holes from selecting
+	 * through them. Each is a closed path like `points`, and they are filled *even-odd*
+	 * together with it: a loop inside the outline is a hole, and a loop inside that is
+	 * solid again, to any depth. Absent on every hand-drawn selection.
+	 */
+	holes?: Point[][];
 }
 
 /** How many points a lasso keeps; enough for a smooth outline, few enough to stay fast. */

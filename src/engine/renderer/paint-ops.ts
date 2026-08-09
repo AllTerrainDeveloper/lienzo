@@ -77,26 +77,34 @@ export function stampBrush( ctx: PaintContext, options: StampOptions ): void {
 }
 
 /**
- * Paints a full-canvas mask into a layer.
+ * Paints a mask into a layer.
+ *
+ * The mask covers the pixels the fill reached rather than the whole canvas, so a fill
+ * of one object on a large photograph uploads a small texture instead of a document-
+ * sized one.
  *
  * @param ctx     Paint context.
  * @param layerId Target layer.
- * @param mask    Canvas-sized mask, opaque where the fill applies.
+ * @param mask    Mask, opaque where the fill applies.
  * @param colour  CSS colour.
  * @param opacity 0..1.
+ * @param x       Where the mask's top-left corner sits, in canvas pixels.
+ * @param y       Where the mask's top-left corner sits, in canvas pixels.
  */
 export function fillWithMask(
 	ctx: PaintContext,
 	layerId: string,
 	mask: HTMLCanvasElement,
 	colour: string,
-	opacity: number
+	opacity: number,
+	x = 0,
+	y = 0
 ): void {
 	const target = ctx.layers.ensurePaintable( layerId, ctx.canvas );
 	const texture = ctx.gpu.textureFrom( mask );
 	const sprite = ctx.gpu.sprite( texture );
 
-	sprite.position.set( 0, 0 );
+	sprite.position.set( Math.round( x ), Math.round( y ) );
 	sprite.alpha = opacity;
 	sprite.tint = colour;
 

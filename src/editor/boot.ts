@@ -3,7 +3,7 @@
  *
  * Four stages, each of which can fail: fetch the payload, decode the pixels, start the
  * renderer, wire the stage to it. Every one of them checks whether the editor was
- * destroyed while it was waiting -- a Desktop Mode window closed mid-load is not a rare
+ * destroyed while it was waiting -- an OpenStation window closed mid-load is not a rare
  * case, and finishing the sequence into a torn-down editor leaks a WebGL context.
  */
 
@@ -69,6 +69,7 @@ async function startRenderer( editor: Editor ): Promise< void > {
 		host: editor.shell.stage,
 		maxRenderPixels: editor.config.maxRenderPixels,
 		schema: payload.schema,
+		backend: editor.config.renderer,
 	} );
 
 	if ( editor.isDestroyed ) {

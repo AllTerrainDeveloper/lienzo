@@ -139,20 +139,24 @@ export class PaintApi {
 	}
 
 	/**
-	 * Paints a full-canvas mask into a layer.
+	 * Paints a mask into a layer.
 	 *
 	 * @param layerId Target layer.
-	 * @param mask    Canvas-sized mask, opaque where the fill applies.
+	 * @param mask    Mask, opaque where the fill applies.
 	 * @param colour  CSS colour.
 	 * @param opacity 0..1.
+	 * @param x       Where the mask's top-left corner sits, in canvas pixels.
+	 * @param y       Where the mask's top-left corner sits, in canvas pixels.
 	 */
 	fillWithMask(
 		layerId: string,
 		mask: HTMLCanvasElement,
 		colour: string,
-		opacity: number
+		opacity: number,
+		x = 0,
+		y = 0
 	): void {
-		fillWithMask( this.ctx, layerId, mask, colour, opacity );
+		fillWithMask( this.ctx, layerId, mask, colour, opacity, x, y );
 		this.host.onChange();
 	}
 

@@ -25,5 +25,9 @@ export function defaultRecipe( source: number, canvas?: CanvasSize ): Recipe {
 		curves: {},
 		levels: { ...IDENTITY_LEVELS },
 		output: { format: 'image/jpeg', quality: 0.92 },
+		// sRGB, matching core WordPress and every recipe written before the working
+		// space existed. Linear light is a choice someone makes, not a default that
+		// silently re-renders the edits they already saved.
+		space: 'srgb',
 	};
 }

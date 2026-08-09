@@ -8,7 +8,7 @@
 
 import { readConfig } from '../../editor/config';
 import { RestClient } from '../../net/rest';
-import { toast } from '../../platform';
+import { isDesktopModeEnabled, toast } from '../../platform';
 import { __ } from '../../i18n';
 import type { PostOrigin } from '../../types';
 import { desktop, state, WINDOW_ID } from './desktop-api';
@@ -38,7 +38,34 @@ export function openInDesktop(
 		return false;
 	}
 
+	return openDesktopWindow( id, origin );
+}
+
+/**
+ * Opens the desktop window, with or without an image.
+ *
+ * Without one it opens on its own picker, which is what the dock and the wallpaper
+ * icon do. The classic-admin page uses that when someone reaches it while desktop mode
+ * is on: the shell hides the whole admin body behind the desktop, so an editor mounted
+ * into that page would be a live WebGL context inside a `display: none` container.
+ *
+ * @param attachmentId Attachment to edit, or 0 for the picker.
+ * @param origin       Optional. The post it came from.
+ * @return True when the request was handled or forwarded.
+ */
+export function openDesktopWindow(
+	attachmentId = 0,
+	origin: PostOrigin | null = null
+): boolean {
+	const id = Number( attachmentId ) || 0;
+
 	if ( desktop()?.openWindow ) {
+		if ( ! id ) {
+			desktop()?.openWindow?.( WINDOW_ID, { source: 'lienzo' } );
+
+			return true;
+		}
+
 		// The most recently rendered window is the one on screen. Load into it rather
 		// than focusing a window showing something else and leaving the id parked.
 		const live = [ ...state().openers ].pop();
@@ -55,7 +82,15 @@ export function openInDesktop(
 		return true;
 	}
 
-	if ( window.parent && window.parent !== window ) {
+	// A chromeless iframe: the window manager only exists in the top frame, so the
+	// request is posted up to the listener `bootDesktopMode()` installed there.
+	//
+	// Gated on desktop mode being *on for this user*, not merely on being framed.
+	// Returning true here is a promise that something will open, and the caller's
+	// fallback -- the classic-admin overlay -- is skipped on the strength of it. An
+	// admin page that happens to be embedded in someone else's iframe with no shell
+	// above it would otherwise post into the void and open nothing at all.
+	if ( isDesktopModeEnabled() && window.parent && window.parent !== window ) {
 		window.parent.postMessage(
 			{ type: OPEN_MESSAGE, attachmentId: id },
 			window.location.origin
@@ -65,6 +100,16 @@ export function openInDesktop(
 	}
 
 	return false;
+}
+
+/**
+ * Whether this page is the shell's, rather than a classic admin screen.
+ *
+ * The question the classic-admin page has to ask before mounting anything: with the
+ * desktop running, `#wpbody` is hidden behind it and nothing in there can be seen.
+ */
+export function isShellPage(): boolean {
+	return undefined !== desktop()?.openWindow || isDesktopModeEnabled();
 }
 
 /**

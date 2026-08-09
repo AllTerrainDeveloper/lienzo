@@ -8,8 +8,8 @@
 
 import { __ } from '../../../i18n';
 import { EFFECT_OP_ORDER, OP_LABELS, PANEL_OP_ORDER, getOp } from '../../../model/recipe';
-import type { OpType } from '../../../model/recipe';
-import { createSlider } from '../../controls';
+import type { OpType, Recipe } from '../../../model/recipe';
+import { createSegmented, createSlider } from '../../controls';
 import type { SliderHandle } from '../../controls';
 import { registerPanel } from '../registry';
 import type { PanelContext } from '../types';
@@ -112,13 +112,60 @@ export function renderAdjustments(
 	};
 }
 
+/**
+ * The working-space picker.
+ *
+ * At the top of the Adjustments panel rather than in Output, because it is not an
+ * encoding setting: it decides what a stop of exposure *means*. In sRGB the gain is
+ * applied to the stored values, which is what core WordPress and most browser editors
+ * do. In linear light the transfer curve is undone first, so a stop is a doubling of
+ * light -- which is what a camera, and a raw developer, mean by one.
+ *
+ * @param ctx Panel context.
+ * @return The control, and its teardown.
+ */
+function workingSpaceField( ctx: PanelContext ): {
+	el: HTMLElement;
+	destroy: () => void;
+	sync: ( recipe: Recipe ) => void;
+} {
+	const field = createSegmented( {
+		label: __( 'Light' ),
+		value: ctx.getRecipe().space,
+		options: [
+			{ value: 'srgb', label: __( 'sRGB' ) },
+			{ value: 'linear', label: __( 'Linear' ) },
+		],
+		onChange: ( value ) => ctx.setSpace( 'linear' === value ? 'linear' : 'srgb' ),
+	} );
+
+	return {
+		el: field.el,
+		destroy: field.destroy,
+		sync: ( recipe ) => field.setValue( recipe.space ),
+	};
+}
+
 /** Registers the Adjustments and Effects panels. */
 export function registerAdjustmentPanels(): void {
 	registerPanel( {
 		id: 'adjustments',
 		title: __( 'Adjustments' ),
 		order: 20,
-		render: ( host, ctx ) => renderAdjustments( host, ctx, PANEL_OP_ORDER ),
+		render: ( host, ctx ) => {
+			const space = workingSpaceField( ctx );
+
+			host.appendChild( space.el );
+
+			const off = ctx.onRecipeChange( space.sync );
+			const teardown = renderAdjustments( host, ctx, PANEL_OP_ORDER );
+
+			return () => {
+				off();
+				space.destroy();
+				teardown();
+			};
+		},
 	} );
 
 	registerPanel( {

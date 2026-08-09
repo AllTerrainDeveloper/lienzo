@@ -11,7 +11,7 @@ import { openInDesktop } from './open-window';
  *
  * Registered with `isDefault: false` so it appears alongside the built-in media
  * editor rather than silently replacing it; a user who wants it as the default sets
- * that in Desktop Mode's own file associations.
+ * that in OpenStation's own file associations.
  */
 export function registerFileOpener(): void {
 	const files = desktop()?.files;

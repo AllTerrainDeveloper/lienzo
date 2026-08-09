@@ -10,7 +10,7 @@
  * joins them.
  */
 
-import type { Op } from '../../model/recipe';
+import type { Op, WorkingSpace } from '../../model/recipe';
 import type { Curves, Levels } from '../lut';
 import type { AdjustPipeline, AdjustFilter } from './adjust-pipeline';
 import type { GpuContext, GpuSprite } from './gpu';
@@ -67,10 +67,16 @@ export class ScreenFilters {
 	/**
 	 * Sets the adjustments to render.
 	 *
+	 * The space first, because it decides whether exposure is composed into the colour
+	 * matrix or handed to the shader beside it.
+	 *
 	 * @param ops        Recipe ops.
+	 * @param space      Working space the adjustments are computed in.
 	 * @param blurTarget Width the blur radius should be scaled to.
 	 */
-	setOps( ops: Op[], blurTarget: number ): void {
+	setOps( ops: Op[], space: WorkingSpace, blurTarget: number ): void {
+		this.adjust.setSpace( space );
+
 		if ( this.adjust.setOps( ops ) ) {
 			this.rebuildChain();
 		}

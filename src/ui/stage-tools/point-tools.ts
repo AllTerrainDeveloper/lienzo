@@ -6,7 +6,8 @@
  * matching against an invisible layer's contents would look arbitrary.
  */
 
-import { floodFillMask } from '../../engine/brush';
+import { floodFillMask, floodFillRegion } from '../../engine/brush';
+import type { FloodRegion } from '../../engine/brush';
 import { rgbToHex } from '../../engine/paint-shapes';
 import { traceMask } from '../../model/selection';
 import type { Point } from '../../model/selection';
@@ -65,19 +66,16 @@ export function zoomAtPointer(
  *
  * @param options Tool wiring.
  * @param point   Canvas coordinates.
- * @return The matched region as a mask, or null when nothing matched.
+ * @return The matched region, or null when nothing matched.
  */
-function matchRegion(
-	options: StageToolsOptions,
-	point: Point
-): HTMLCanvasElement | null {
+function matchRegion( options: StageToolsOptions, point: Point ): FloodRegion | null {
 	const source = options.readDocument();
 
 	if ( ! source ) {
 		return null;
 	}
 
-	return floodFillMask(
+	return floodFillRegion(
 		source.pixels,
 		source.width,
 		source.height,
@@ -90,46 +88,73 @@ function matchRegion(
 /**
  * Floods the region matching the colour under the pointer.
  *
+ * The bitmap covers the pixels the fill reached rather than the whole document, and is
+ * placed at its own origin. On a twenty-megapixel photograph, filling one object used
+ * to allocate and upload eighty megabytes to carry a few thousand pixels.
+ *
  * @param options Tool wiring.
  * @param point   Canvas coordinates.
  */
 export function floodFill( options: StageToolsOptions, point: Point ): void {
-	const mask = matchRegion( options, point );
+	const source = options.readDocument();
 
-	if ( ! mask ) {
+	if ( ! source ) {
+		return;
+	}
+
+	const filled = floodFillMask(
+		source.pixels,
+		source.width,
+		source.height,
+		point.x,
+		point.y,
+		options.getBrush().tolerance
+	);
+
+	if ( ! filled ) {
 		return;
 	}
 
 	const brush = options.getBrush();
 
-	options.fillMask( options.getTargetLayerId(), mask, brush.colour, brush.opacity );
+	options.fillMask(
+		options.getTargetLayerId(),
+		filled.mask,
+		brush.colour,
+		brush.opacity,
+		filled.region.bounds
+	);
 	options.onStrokeEnd();
 }
 
 /**
  * Selects the contiguous region matching the colour under the pointer.
  *
- * The same flood fill the paint bucket uses, traced into a path -- which is the whole
- * reason the wand was cheap to add.
+ * The same flood fill the paint bucket uses, traced into paths -- which is the whole
+ * reason the wand was cheap to add. The region is traced directly, without ever being
+ * drawn to a canvas and read back: it is already one byte per pixel, and reading a
+ * twenty-megapixel canvas back is the most expensive thing this tool could do.
  *
  * @param options Tool wiring.
  * @param point   Canvas coordinates.
  */
 export function magicWand( options: StageToolsOptions, point: Point ): void {
-	const mask = matchRegion( options, point );
+	const region = matchRegion( options, point );
 
-	if ( ! mask ) {
+	if ( ! region ) {
 		return;
 	}
 
-	const ctx = mask.getContext( '2d' );
-	const pixels = ctx?.getImageData( 0, 0, mask.width, mask.height );
+	const traced = traceMask( {
+		data: region.state,
+		width: region.width,
+		height: region.height,
+		bounds: region.bounds,
+	} );
 
-	if ( ! pixels ) {
-		return;
-	}
-
-	const points = traceMask( pixels );
-
-	options.setSelection( points.length > 2 ? { shape: 'lasso', points } : null );
+	options.setSelection(
+		traced.outer.length > 2
+			? { shape: 'lasso', points: traced.outer, holes: traced.holes }
+			: null
+	);
 }

@@ -7,7 +7,7 @@
  * without opening anything.
  *
  * Clicking a swatch opens a popover holding the adaptive colour field, so the picker is
- * a Desktop Mode control when Desktop Mode is present, plus a palette of the shades
+ * an OpenStation control when OpenStation is present, plus a palette of the shades
  * people actually reach for. A bare `<input type="color">` in the rail would be a
  * 56px-wide native dialog trigger and nothing else.
  */

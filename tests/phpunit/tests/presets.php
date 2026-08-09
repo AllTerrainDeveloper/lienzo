@@ -92,6 +92,26 @@ class Tests_Lienzo_Presets extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A preset carries the working space its look was made in.
+	 *
+	 * Unlike the crop, this one *is* part of the look: the space decides what an
+	 * exposure op means, so a look made in linear light and replayed in sRGB is a
+	 * different look, and a preset that does not reproduce is not a preset.
+	 *
+	 * @covers ::lienzo_recipe_to_preset
+	 */
+	public function test_preset_keeps_the_working_space() {
+		$recipe          = $this->recipe();
+		$recipe['space'] = 'linear';
+
+		$this->assertSame( 'linear', lienzo_recipe_to_preset( $recipe )['space'] );
+
+		unset( $recipe['space'] );
+
+		$this->assertSame( 'srgb', lienzo_recipe_to_preset( $recipe )['space'] );
+	}
+
+	/**
 	 * Saving and listing round-trips.
 	 *
 	 * @covers ::lienzo_save_preset

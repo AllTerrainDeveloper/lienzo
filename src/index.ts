@@ -1,19 +1,24 @@
 /**
  * Bundle entry point.
  *
- * Publishes the API on `window.lienzo` and boots the desktop integration plus the
- * controls that open it. There is one editing surface -- the native window -- because
- * that is the only place the shell's Pixi, components and drag bridge are reachable;
- * everything else on this list is a way of asking for it.
+ * Publishes the API on `window.lienzo` and boots every host that might have a mount
+ * point on this screen. There are two editing surfaces and one rule for choosing
+ * between them: inside the desktop shell it is a native window, because that is the
+ * only place the shell's Pixi, components and drag bridge are reachable, and
+ * everywhere else it is the classic-admin page or an overlay over the current screen.
+ * `openEditor()` is the one place that decides.
  */
 
 import { mount } from './editor';
 import type { EditorInstance, MountOptions } from './editor';
+import { bootAdminPage } from './hosts/admin-page';
 import { bootBlockEditor } from './hosts/block-editor';
 import { bootDesktopMode, openInDesktop } from './hosts/desktop-mode';
 import { bootMediaDrag } from './hosts/media-drag';
 import { bootMediaModal } from './hosts/media-modal';
+import { openEditor } from './hosts/open';
 import { bootOpenButtons } from './hosts/open-buttons';
+import { openEditorOverlay } from './hosts/overlay';
 import { listPanels, registerPanel, unregisterPanel } from './ui/panels';
 import type { PanelDef } from './ui/panels';
 
@@ -28,12 +33,23 @@ import type { PanelDef } from './ui/panels';
 export interface LienzoApi {
 	mount: typeof mount;
 	/**
-	 * Opens an image in the desktop window.
+	 * Opens an image in whichever surface this page can offer.
 	 *
-	 * The only way in. The editor renders into the shell's own DOM, so there is no
-	 * in-page overlay and no full-screen admin page to link to.
+	 * The way in. A desktop window inside the shell, an overlay outside it -- callers
+	 * should not have to know which, and every one of Lienzo's own entry points goes
+	 * through here.
+	 */
+	openEditor: typeof openEditor;
+	/**
+	 * Opens an image in the desktop window specifically.
+	 *
+	 * Returns false when there is no shell to open one in, which is what
+	 * `openEditor()` uses to decide. Prefer that unless you specifically want the
+	 * window and nothing else.
 	 */
 	openInDesktop: typeof openInDesktop;
+	/** Opens an image in a full-screen overlay over the current screen. */
+	openEditorOverlay: typeof openEditorOverlay;
 	registerPanel: typeof registerPanel;
 	unregisterPanel: typeof unregisterPanel;
 	listPanels: typeof listPanels;
@@ -53,6 +69,7 @@ export const version: string = window.lienzoConfig?.version ?? '0.0.0';
 /** Starts every host that has a mount point on this screen. */
 function boot(): void {
 	bootDesktopMode();
+	bootAdminPage();
 	bootOpenButtons();
 	bootMediaDrag();
 	bootMediaModal();
@@ -65,5 +82,13 @@ if ( document.readyState === 'loading' ) {
 	boot();
 }
 
-export { mount, openInDesktop, registerPanel, unregisterPanel, listPanels };
+export {
+	mount,
+	openEditor,
+	openEditorOverlay,
+	openInDesktop,
+	registerPanel,
+	unregisterPanel,
+	listPanels,
+};
 export type { EditorInstance, MountOptions, PanelDef };

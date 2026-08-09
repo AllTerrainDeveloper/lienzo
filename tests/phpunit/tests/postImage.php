@@ -6,6 +6,8 @@
  */
 
 /**
+ * Tests for includes/post-image.php.
+ *
  * @group lienzo
  * @group lienzo-post-image
  */
@@ -14,15 +16,15 @@ class Tests_Lienzo_Post_Image extends WP_UnitTestCase {
 	/**
 	 * Makes an attachment of a given type.
 	 *
-	 * @param string $mime MIME type.
-	 * @param int    $parent Optional parent post.
+	 * @param string $mime      MIME type.
+	 * @param int    $parent_id Optional. Post to attach it to.
 	 * @return int Attachment ID.
 	 */
-	private function make_attachment( $mime = 'image/jpeg', $parent = 0 ) {
+	private function make_attachment( $mime = 'image/jpeg', $parent_id = 0 ) {
 		return self::factory()->attachment->create_object(
 			array(
 				'file'           => 'lienzo-' . wp_generate_password( 6, false ) . '.jpg',
-				'post_parent'    => $parent,
+				'post_parent'    => $parent_id,
 				'post_mime_type' => $mime,
 				'post_type'      => 'attachment',
 			)
@@ -30,6 +32,8 @@ class Tests_Lienzo_Post_Image extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The featured image comes first in the chain.
+	 *
 	 * @covers ::lienzo_post_image_id
 	 */
 	public function test_prefers_the_featured_image() {
@@ -42,12 +46,14 @@ class Tests_Lienzo_Post_Image extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Then the product gallery, in its own order.
+	 *
 	 * @covers ::lienzo_post_image_id
 	 */
 	public function test_falls_back_to_the_product_gallery() {
-		$post    = self::factory()->post->create();
-		$first   = $this->make_attachment();
-		$second  = $this->make_attachment();
+		$post   = self::factory()->post->create();
+		$first  = $this->make_attachment();
+		$second = $this->make_attachment();
 
 		update_post_meta( $post, '_product_image_gallery', "$first,$second" );
 
@@ -55,6 +61,8 @@ class Tests_Lienzo_Post_Image extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Then anything attached to the post at all.
+	 *
 	 * @covers ::lienzo_post_image_id
 	 */
 	public function test_falls_back_to_an_attached_image() {
@@ -81,6 +89,8 @@ class Tests_Lienzo_Post_Image extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A post with no picture says so rather than guessing.
+	 *
 	 * @covers ::lienzo_post_image_id
 	 */
 	public function test_reports_nothing_for_a_post_with_no_image() {
@@ -88,6 +98,8 @@ class Tests_Lienzo_Post_Image extends WP_UnitTestCase {
 	}
 
 	/**
+	 * So does a post that is not there.
+	 *
 	 * @covers ::lienzo_post_image_id
 	 */
 	public function test_reports_nothing_for_a_post_that_does_not_exist() {
@@ -95,6 +107,8 @@ class Tests_Lienzo_Post_Image extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The chain is filterable, which is how an unusual post type joins it.
+	 *
 	 * @covers ::lienzo_post_image_id
 	 */
 	public function test_a_filter_can_answer_for_a_post_type_lienzo_cannot_read() {
@@ -131,6 +145,8 @@ class Tests_Lienzo_Post_Image extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Saving needs to know which slot the image came from to put it back.
+	 *
 	 * @covers ::lienzo_post_image_slot
 	 */
 	public function test_names_the_slot_an_image_occupies() {

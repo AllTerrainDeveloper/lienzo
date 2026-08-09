@@ -18,9 +18,11 @@ text typed directly on the canvas. Undo and redo reach painted pixels, not only 
 Adjustments stay non-destructive: a save always writes a *new* attachment and stores the edit as a
 re-openable recipe, so the original file is never rewritten and repeated edits never compound.
 
-Lienzo runs as a **native window inside OpenStation**, which it requires. The dock, a desktop icon,
-a double-clicked image, the Media Library row action, the attachment screen, the media modal and the
-`core/image` block toolbar all open that same window.
+Lienzo is an **OpenStation application** and requires it: the rendering library is OpenStation's, and
+Lienzo ships none. At its best it runs as a **native window** in the shell — the dock, a desktop
+icon, a double-clicked image, the Media Library row action, the attachment screen, the media modal
+and the `core/image` block toolbar all open that same window. For a user who has switched desktop
+mode *off*, it opens as an **admin page under Media** and as an **overlay** instead.
 
 ## Design in one page
 
@@ -39,9 +41,11 @@ const editor = window.lienzo.mount( element, {
 // editor.getRecipe() / editor.setRecipe() / editor.destroy()
 ```
 
-The OpenStation native window is the only thing that calls it. The row action, the media modal
-button and the block editor button all ask for that window instead of mounting an editor of their
-own. Nothing outside `src/api.ts` touches Pixi, the recipe model, or REST.
+Three things call it and no more: the OpenStation native window, the admin page, and the overlay.
+The row action, the media modal button and the block editor button call `openEditor()`, which picks
+between them — the window when the shell is on the page to host one, the overlay when desktop mode
+is switched off — rather than each having its own idea of where an editor should appear. Nothing
+outside `src/api.ts` touches Pixi, the recipe model, or REST.
 
 **One GPU pass, not six.** Exposure, contrast, temperature, tint, saturation and hue are all affine
 transforms of RGB, so they are multiplied into a single colour matrix and applied in one shader
@@ -183,11 +187,35 @@ Copying respects the shape you drew. A texture can only be read as a rectangle, 
 lifted block is clipped back through the selection mask with `destination-in` — without
 that, copying an ellipse or a lasso gave you its bounding box, corners and all.
 
+`engine/brush/flood-fill.ts` is the search behind both the paint bucket and the wand, and on a
+twenty-megapixel photograph the search *is* the tool. Three things keep it instant. The stack
+carries **runs**, one entry per row a run spreads into, rather than one entry per pixel — the
+earlier version pushed both vertical neighbours of every filled pixel, so filling a whole photo
+queued forty million coordinates through a JavaScript array; the same fill now peaks at a hundred
+entries and takes 41ms instead of 355ms. Matching is **memoised as it is discovered** rather than
+precomputed, so a ten-pixel fill costs ten comparisons and not twenty million. And the **bounding
+box travels with the region**, so the mask is rasterised at the size the fill actually reached, the
+texture uploaded to the GPU is that size, and undo records that rectangle instead of offering the
+whole document to a collector that would only refuse it.
+
 `model/selection.ts` gained `traceMask()`, and that is why the magic wand was cheap: it reuses the
-paint bucket's flood fill, then traces the region into a closed path. The rest of the editor speaks
+paint bucket's flood fill, then traces the region into closed paths. The rest of the editor speaks
 in paths, so converting once here means the outline renderer, the mask rasteriser and the brush
-clipper all work unchanged. Only the outer contour is traced, so a region with holes selects through
-them — a real limitation, and the right trade against carrying two selection models.
+clipper all work unchanged.
+
+*Every* boundary is traced, not only the outer one — a wand over a leaf selects the leaf and not the
+sky showing through the holes in it. That did not cost a second selection model: a `Selection` grew
+an optional `holes`, the contours are closed paths in the format the editor already speaks, and both
+rasterisers fill them **even-odd**, so an inner loop punches a hole and a loop inside *that* fills
+again, to any depth.
+
+The walk is on the lattice of pixel *corners* rather than on the pixels themselves, which is what
+makes it exact: the path encloses the pixels that are set instead of a version of the region eroded
+by half a pixel, so rasterising the outline back reproduces the flood fill. Where two filled pixels
+meet only at a corner it turns rather than crossing, because the flood fill spreads through edges
+and not through corners, and an outline that disagreed would claim a pixel the fill itself refused.
+Holes below four pixels are dropped and the largest sixty-three kept: a wand over foliage finds
+thousands of one-pixel gaps, and past a point each is a vertex spent on something nobody can see.
 
 Retouching reads the *composed document* rather than the layer, because the base image layer is not
 canvas-aligned: reading it directly would blur the wrong pixels the moment the image had been moved.
@@ -197,21 +225,44 @@ invisible at fit zoom and obvious at 100% — that is arithmetic, not a bug.
 
 ## An OpenStation application
 
-Lienzo requires the OpenStation plugin — previously called Desktop Mode — and runs as a **native
-window** in the desktop shell, rendering into the shell's own DOM. That is the whole design, not a
-preference: the shell's components, its drag bridge and its PixiJS all live in the parent frame, and a
-chromeless iframe can reach none of them — no component is registered there at all. There is
-therefore one editing surface, and the row action, the media modal button and the block editor button
-are all ways of asking for it rather than places the editor mounts.
+Lienzo requires OpenStation — previously called Desktop Mode — and the requirement is load-bearing
+rather than ceremonial: **the rendering library is OpenStation's**. Lienzo ships no PixiJS at all,
+which keeps it a few tens of kilobytes instead of eight hundred and keeps exactly one Pixi on the
+page. Two Pixi 8 instances share GPU resource registries through globals, so one copy is not merely
+smaller but safer. With OpenStation absent there is nothing to render with, on any screen, so
+nothing registers but a notice on the plugins screen saying so.
+
+Inside the shell, Lienzo runs as a **native window**, rendering into the shell's own DOM. That is not
+a preference either: the components, the drag bridge and the Pixi all live in the parent frame, and a
+chromeless iframe can reach none of them, because no component is registered there at all. So inside
+the shell there is exactly one editing surface, and the row action, the media modal button and the
+block editor button are ways of asking for it.
+
+But desktop mode is a **per-user preference**, and a user who has switched it off has no shell on the
+page to render into — which until recently left them with an editor they had installed and could not
+open. Everything the editor itself needs survives that: `src/platform.ts` already resolves every
+control to a plain-DOM equivalent *per component*, and the Pixi loader reads OpenStation's own file
+straight from its directory when the module registry is not on the page. So there are three surfaces:
+
+| Surface | When | Why that one |
+|---|---|---|
+| Native window | Desktop mode on | Components, drag bridge, shared Pixi |
+| Admin page | Desktop mode off | Somewhere to land, bookmark and link to |
+| Overlay | Desktop mode off | Editing a photo from a half-written post must not navigate away from it |
+
+`openEditor()` is the single place that chooses. It asks the window first and reads back whether it
+took the request, rather than second-guessing whether the shell is on the page — and the entry points
+are **links** to the admin page that the bundle upgrades in place, so a control that JavaScript never
+reached still goes somewhere sensible instead of doing nothing.
 
 The requirement is checked by **capability, not by plugin slug** — do the functions being called
 exist — so a fork, a rename or a bundled copy all work. It is checked on `plugins_loaded`, and that
-detail is load-bearing: plugins load alphabetically, so `lienzo` runs *before* the shell and
+detail is load-bearing: plugins load alphabetically, so `lienzo` runs *before* `desktop-mode` and
 none of its functions exist yet at file scope. Checking there would fail on every site, every time,
 and the plugin would silently never load. `Requires Plugins:` governs activation, not load order.
 
-With the shell absent or switched off, nothing registers but a notice on the plugins screen
-saying why. Classic admin therefore has no editor — the deliberate cost of running natively.
+What a user loses by switching desktop mode off is the window, the wallpaper icon, the file opener
+and the drag bridge. Not the editor.
 
 ### One name, two spellings
 
@@ -323,19 +374,34 @@ Mutable desktop state therefore lives on a single `window.__lienzoDesktop` singl
 one-time registrations are guarded. **Anything in `src/hosts/desktop-mode.ts` that must be singular
 has to live there**, not in a module-level variable.
 
-## PixiJS comes from the shell
+## PixiJS comes from OpenStation
 
-Lienzo ships no rendering library. The shell vendors PixiJS v8 (MIT) and registers it in its
-module registry, so `src/engine/pixi-loader.ts` asks for it with `loadModules( [ 'pixijs' ] )` and
-reads `window.PIXI`.
+Lienzo ships no rendering library. OpenStation vendors PixiJS v8 (MIT), and
+`src/engine/pixi-loader.ts` reaches for that one copy three ways, in this order:
 
-That is smaller and safer than carrying a second copy: two Pixi 8 instances on a page share GPU
-resource registries through globals, and tearing one down can invalidate textures belonging to the
-other. There is no version to keep in step and nothing to go stale. For the same reason the renderer
-never calls `app.destroy( true )`, which would release those global registries out from under
-unrelated Pixi apps on the page.
+1. **`window.PIXI`**, if anything has already put it there.
+2. **The module registry** — `loadModules( [ 'pixijs' ] )`, which is idempotent and de-duplicates
+   concurrent callers, so several windows opening at once still load one script.
+3. **OpenStation's own file**, by URL. The registry lives in the shell's desktop bundle, so on a
+   *classic* admin screen there is none to ask — but OpenStation is installed, and its file is right
+   there.
 
-`pixi.js` stays in `devDependencies` for its TypeScript types only, and is never bundled.
+The order is the whole design. Reusing an existing instance is smaller and safer than loading a
+second: two Pixi 8 instances on a page share GPU resource registries through globals, and tearing one
+down can invalidate textures belonging to the other. For the same reason the renderer never calls
+`app.destroy( true )`, which would release those registries out from under unrelated Pixi apps on the
+page. Step three is therefore never reached on a desktop page; it exists so the classic-admin editor
+can open without this plugin carrying a second copy of Pixi to do it.
+
+That URL is built from OpenStation's *own constant* — `OPENSTATION_URL`, falling back to the older
+spelling, exactly as the functions and hooks are resolved — rather than from a hardcoded slug, and
+`file_exists()` is checked before it is advertised. One plugin reaching into another's directory
+should fail loudly and early or not at all: an unresolvable constant or a missing file yields an
+empty string, and the editor then says it cannot find PixiJS instead of loading a 404 and failing
+somewhere stranger. `lienzo_pixi_url` filters the answer.
+
+`pixi.js` stays in `devDependencies` for its TypeScript types only, and is never bundled. No external
+requests are made: OpenStation serves the file from your own site.
 
 ## Layout
 
@@ -347,7 +413,8 @@ it — so `src/editor` is imported as `../editor`, never as `../editor/recipe-st
 lienzo.php               plugin bootstrap, constants
 includes/
   shell-api.php            resolves the shell's renamed functions and hooks
-  requirements.php         the shell capability gate + the plugins-screen notice
+  requirements.php         the shell capability gate
+  admin-page.php           the classic-admin editor page, under Media
   helpers/                 capabilities, source resolution, MIME, render ceilings
   recipe/                  op schema, defaults, migration, validation
                              (contract twin of src/model/recipe)
@@ -379,7 +446,7 @@ src/
   engine/paint-shapes/     gradients, shapes and text -> one bitmap each
   engine/renderer/         Pixi context, layer textures, compositor, camera,
                              adjustment pipeline, histogram probe
-  engine/shaders/adjust.ts the one shader
+  engine/shaders/          the one shader, twice: GLSL and WGSL
   net/                     REST client, image loading with CORS fallback
   ui/panels/               panel registry, host, and every shipped panel
   ui/controls/             the adaptive control kit, one factory per control
@@ -391,6 +458,9 @@ src/
   ui/crop-overlay/         the draggable crop rectangle
   ui/rulers/, ui/swatches.ts, ui/curve-editor.ts, ui/histogram-view.ts, …
   hosts/                   one adapter per surface
+  hosts/open.ts            the one place that picks between window and overlay
+  hosts/admin-page.ts      the classic-admin page, and its picker
+  hosts/overlay.ts         the full-screen overlay, with its focus trap
   hosts/desktop-mode/      the shell integration: window, icon drop, file drop
 ```
 
@@ -468,11 +538,12 @@ exit code. A gate wired to that exit code passes every time and catches nothing.
 | `php` | PHPUnit and PHPCS, via wp-env |
 | `plugin-check` | The same `npm run plugin:check` that runs locally |
 
-`.wp-env.json` mounts the sibling `../alcazaba-plugin` checkout so the QA site has
-Desktop Mode to host Lienzo. That path does not exist on a runner and wp-env treats a
-missing mapping as fatal, so the wp-env jobs write a `.wp-env.override.json` that
-replaces `mappings` with Lienzo alone. Nothing is lost — the PHPUnit bootstrap stubs the
-two Desktop Mode functions Lienzo requires rather than installing the plugin.
+`.wp-env.json` mounts the sibling `../alcazaba-plugin` checkout so the QA site has a
+desktop shell to open Lienzo as a window in. That path does not exist on a runner and
+wp-env treats a missing mapping as fatal, so the wp-env jobs write a
+`.wp-env.override.json` that replaces `mappings` with Lienzo alone. Nothing is lost —
+the PHPUnit bootstrap stubs the two shell functions the desktop integration is gated on,
+and everything else works without one anyway.
 
 `.github/workflows/release.yml` fires on a `vX.Y.Z` tag: it verifies the tag against all
 four places the version is written, builds, **runs Plugin Check as a hard gate**, creates
@@ -521,10 +592,9 @@ contain `lienzo.php`. When no WordPress checkout is present it prints a note and
 than failing the build. Override with `LIENZO_DEPLOY_TARGET`, or skip with `LIENZO_SKIP_DEPLOY=1`.
 
 `npm run env:start` maps both plugins in but activates neither: wp-env's `plugins` list mounts a
-directory under its *own basename* as well, which would put a second copy of Lienzo on the site, and
-it treats a failed activation as fatal — which `Requires Plugins: desktop-mode` guarantees when
-OpenStation is not active yet. The mappings put both at their correct slugs; activate them from the
-Plugins screen.
+directory under its *own basename* as well, which would put a second copy of Lienzo on the site. The
+mappings put both at their correct slugs; activate them from the Plugins screen. Lienzo alone is a
+complete install — it is the desktop window that needs both.
 
 Lint PHP with `vendor/bin/phpcs` inside the container:
 
@@ -551,6 +621,59 @@ preview-matches-save guarantee. Both are stored as a fraction of the image's lon
 converted to pixels against whatever is actually being rendered — which is why a sharpen set on a
 900px preview still looks the same saved at 6000px.
 
+### sRGB, or light
+
+The pass above does its arithmetic on the stored values, which is what core WordPress and most
+browser editors do. A recipe can ask for **linear light** instead — the Light switch at the top of
+the Adjustments panel — and then exposure is applied between the two halves of the sRGB transfer
+curve: undo the curve, multiply, put it back. A stop then means a doubling of light rather than a
+doubling of a number that only stands for light, which is what a camera means by one. One stop down
+from a near-white sky lands at 125 in sRGB and at 184 in linear, and 184 is the physically correct
+answer.
+
+Only exposure moves. Contrast pivots on mid grey, saturation interpolates towards luma and the tone
+curve is a table indexed by the encoded value — all three are *defined* against the encoding, and
+moving them would change what the sliders do rather than make them more correct. So in a linear
+recipe exposure leaves the colour matrix (a 4×5 matrix has nowhere to put a curve) and travels as its
+own uniform, and everything else composes exactly as before.
+
+sRGB is the default and stays the default. The setting is stored per recipe, schema v6, and a recipe
+without one is sRGB — which is what every recipe written before it was rendered in.
+
+### Sixteen bits where it counts
+
+The layer composite is the one texture that is written and then *sampled again*: every layer is
+blended into it, the geometry pass writes it, and the adjustment shader reads it. It is allocated as
+`rgba16float` where the GPU allows it, so a stack of semi-transparent layers does not quantise once
+per layer and the geometry pass does not quantise before the colour maths has run at all. Everything
+downstream is eight bits regardless, because that is what a PNG holds.
+
+Anything that reads pixels *back* — the eyedropper, the wand, the paint bucket, copy — goes through
+`GpuContext.resolve()` first, which blits to an eight-bit target. Half-float samples read back as
+bytes are not the numbers anyone wanted, and the failure looks like an eyedropper picking nonsense.
+The blit costs one full-canvas draw and happens only when something asks, never per frame.
+
+WebGL2 needs `EXT_color_buffer_half_float` to render into one at all — without it the framebuffer is
+merely incomplete, with no exception and nothing drawn — so the extension is checked rather than
+assumed. On WebGPU it is deliberately switched *off*: Pixi 8's pipeline cache is not keyed on the
+target's colour format, so the batcher's pipeline, compiled for the BGRA8 canvas, is reused for a
+pass into an RGBA16F texture and the device rejects the whole command buffer. Eight bits is a real
+cost; a blank canvas is not a trade.
+
+### Two programs, one shader
+
+`engine/shaders/adjust.ts` is GLSL and `engine/shaders/adjust-wgsl.ts` is its WGSL twin, and they
+have to stay twins: Pixi picks a program by backend and silently *skips* a filter that has none for
+the active one, which shows the unedited image with no error anywhere. That is why the renderer used
+to pin itself to WebGL. It no longer has to — `lienzo_renderer_backend` takes `webgl` (the default),
+`webgpu`, or `auto`, which asks for WebGPU and lets Pixi fall back by itself.
+
+Two details in the WGSL are worth knowing before editing it. The `@group(1)` bindings are matched to
+the filter's `resources` map by **variable name** — `adjustUniforms`, `uLut`, `uLutSampler` — not by
+struct name and not by position; getting one wrong produces a bind group with a hole in it and a
+`TypeError` from inside Pixi's WebGPU backend on the first frame. And a `size: 20` float array is
+`array<vec4<f32>, 5>`, because a uniform buffer cannot pack floats tighter than sixteen bytes.
+
 ## Adding an adjustment
 
 Four places, and all four are required or the op silently misbehaves:
@@ -571,6 +694,9 @@ browser implementation gives you a slider that validates and then does nothing.
 | `lienzo_supported_mime_types` | Which images may be opened |
 | `lienzo_max_render_pixels` | Ceiling on a single GPU render |
 | `lienzo_max_upload_bytes` | Ceiling on a saved render |
+| `lienzo_renderer_backend` | `webgl` (default), `webgpu` or `auto` |
+| `lienzo_pixi_url` | Where the classic-admin editor loads PixiJS from |
+| `lienzo_media_screens` | Admin screens the bundle loads on |
 | `lienzo_config` | The blob handed to the browser |
 | `lienzo_rest_media_payload` | The open-image response |
 | `lienzo_post_image_id` | Which image a post is "about" |
@@ -602,17 +728,25 @@ repoint rather than a restore from backup. A gallery swap keeps its position.
 
 Stated plainly, because each is better read here than discovered:
 
-- **The magic wand and the paint bucket are slow on very large images** — a few seconds on a
-  20-megapixel photo, because the flood fill walks every pixel on the CPU. They work; they are not
-  yet instant.
-- **`traceMask()` traces only the outer contour**, so a wand selection of a region with holes selects
-  through them. The right trade against carrying two selection models.
-- **Compositing is sRGB**, matching core WordPress and most browser editors. Physically correct
-  linear-light exposure, 16-bit intermediates and a WGSL program for WebGPU are all real work that
-  has not been done.
-- **There is no classic-admin editor.** Running natively in the desktop shell is what buys the
-  shell's components, the drag bridge and the shared PixiJS; the cost is that switching the shell
-  off leaves nothing but a notice explaining why.
+- **The flood fill is still CPU work.** A span fill over a memoised match test answers a
+  twenty-megapixel photograph in about 200ms rather than a few seconds, which is fast enough to feel
+  like a click — but it is one thread, and a fill that covers the whole frame is closer to 800ms
+  than to nothing. A worker would take it off the main thread; the GPU would not help, because
+  connectivity is not a per-pixel question.
+- **Sixteen-bit intermediates are WebGL-only.** Not for want of a format — WebGPU has one — but
+  because Pixi 8 does not key its pipeline cache on the render target's colour format, so a pass into
+  an `rgba16float` texture reuses a pipeline compiled for the eight-bit canvas and the device rejects
+  it. Fixing that is upstream work.
+- **Linear light moves exposure and nothing else.** Blur and sharpen still run on encoded values,
+  where a physically correct pipeline would filter in linear too; the difference is small and the
+  change is not.
+- **A save from the classic-admin overlay does not put the edit back into the post.** The block
+  editor's image block is repointed, because it can be — but the Media Library row action and the
+  media picker have nowhere to put an answer. Inside the shell that is what the drag bridge is for.
+- **The classic-admin editor reads a path inside OpenStation's directory** to find PixiJS, because
+  the module registry that would otherwise answer is only on the page in desktop mode. The constant
+  is resolved rather than the slug, and the file is checked before it is offered — but it is still
+  one plugin knowing where another keeps something, and `lienzo_pixi_url` exists to repair it.
 - **`big_image_size_threshold`** can silently downscale a saved render. The success toast reports the
   dimensions actually stored rather than the ones requested.
 - **Animated GIFs are not offered for editing**, because a canvas round trip flattens them to one

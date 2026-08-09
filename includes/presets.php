@@ -82,6 +82,10 @@ function lienzo_get_presets( $user_id = 0 ) {
  * silently re-crop and re-position every image it was applied to. Adjustments,
  * curves and levels are the parts that describe a *look*.
  *
+ * The working space travels with them, because it decides what an exposure op *means*:
+ * a look saved in linear light and replayed in sRGB is a different look, and a preset
+ * that does not reproduce is not a preset.
+ *
  * @since 0.1.0
  *
  * @param array $recipe Validated recipe.
@@ -93,6 +97,7 @@ function lienzo_recipe_to_preset( $recipe ) {
 		'ops'     => isset( $recipe['ops'] ) ? $recipe['ops'] : array(),
 		'curves'  => isset( $recipe['curves'] ) ? $recipe['curves'] : array(),
 		'levels'  => isset( $recipe['levels'] ) ? $recipe['levels'] : lienzo_default_levels(),
+		'space'   => lienzo_validate_space( isset( $recipe['space'] ) ? $recipe['space'] : null ),
 	);
 }
 

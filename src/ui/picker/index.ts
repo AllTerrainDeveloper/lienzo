@@ -6,8 +6,9 @@
  * somewhere else and come back.
  *
  * The library is read a page at a time behind a Load more button rather than all at
- * once. A button rather than loading on scroll: the picker renders inside a Desktop
- * Mode window, so which element actually scrolls is not the picker's to know, and a
+ * once. A button rather than loading on scroll: the picker renders inside an
+ * OpenStation window, so which element actually scrolls is not the picker's to know,
+ * and a
  * scroll listener bound to the wrong one silently never fires.
  */
 
@@ -25,7 +26,7 @@ export type { MediaItem } from './types';
  * @param root    Element to fill.
  * @param config  Runtime configuration.
  * @param onPick  Optional. When given, intercepts the click instead of navigating --
- *                needed inside a Desktop Mode window, where following the link would
+ *                needed inside an OpenStation window, where following the link would
  *                navigate the whole shell away from the desktop.
  * @param isStale Optional. Returns true once this render no longer owns the element,
  *                so a fetch that finishes late writes nothing.
@@ -103,7 +104,7 @@ export async function renderPicker(
 		}
 
 		// Removed rather than hidden. `[hidden]` is a UA rule of the lowest possible
-		// specificity, and inside Desktop Mode this button is a shell component the
+		// specificity, and inside OpenStation this button is a shell component the
 		// shell gives an explicit `display` -- which wins, so the button stayed on
 		// screen at the end of the library with nothing left to load.
 		more.destroy();

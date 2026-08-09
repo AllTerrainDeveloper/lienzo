@@ -27,7 +27,7 @@ export interface MountOptions {
 	 * Called once the editor has finished loading, successfully or not.
 	 *
 	 * `mount()` returns immediately and loads in the background, so a host with its
-	 * own loading state -- a Desktop Mode window, which covers its body with a spinner
+	 * own loading state -- an OpenStation window, which covers its body with a spinner
 	 * until it is told otherwise -- has no other way to know when to stop waiting.
 	 * Fired on failure too: a window that failed to open an image is finished loading,
 	 * and leaving the spinner up would claim otherwise.

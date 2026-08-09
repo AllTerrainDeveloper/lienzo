@@ -17,6 +17,7 @@ import type { CanvasSize, Layer, LayerTransform } from '../model/document';
 import {
 	defaultRecipe,
 	isIdentity,
+	normaliseSpace,
 	resetOps,
 	setCurve,
 	setDocument,
@@ -25,7 +26,7 @@ import {
 	setLevels,
 	setOp,
 } from '../model/recipe';
-import type { OpType, Recipe } from '../model/recipe';
+import type { OpType, Recipe, WorkingSpace } from '../model/recipe';
 import type { OpSchema, Preset } from '../types';
 import { UndoableStore } from './undoable-store';
 
@@ -165,11 +166,33 @@ export class RecipeStore extends UndoableStore< Recipe, RecipeScope, PixelPatch 
 	}
 
 	/**
+	 * Switches the working space the adjustments are computed in.
+	 *
+	 * Undoable, unlike the output settings beside it: this one changes the pixels. An
+	 * exposure set in sRGB lands somewhere else in linear light, and a user who does
+	 * not like where it landed should be able to press undo rather than hunt for the
+	 * control again.
+	 *
+	 * @param space New working space.
+	 */
+	setSpace( space: WorkingSpace ): void {
+		if ( this.current.space === space ) {
+			return;
+		}
+
+		this.push( { ...this.current, space }, 'space', 'ops' );
+	}
+
+	/**
 	 * Applies a saved look, keeping this image's own geometry.
 	 *
 	 * Geometry is deliberately untouched. A preset describes a look; the crop
 	 * describes this particular frame, and replacing it would silently re-crop the
 	 * photograph the moment a look was applied.
+	 *
+	 * The working space *is* part of the look, and comes with it: it decides what an
+	 * exposure op means, so a look made in linear light and replayed in sRGB is a
+	 * different look. A preset saved before the field existed was made in sRGB.
 	 *
 	 * @param preset Preset to apply.
 	 */
@@ -182,6 +205,7 @@ export class RecipeStore extends UndoableStore< Recipe, RecipeScope, PixelPatch 
 				ops: preset.recipe.ops ?? [],
 				curves: preset.recipe.curves ?? {},
 				levels: preset.recipe.levels ?? current.levels,
+				space: normaliseSpace( preset.recipe.space ),
 			},
 			'preset',
 			'all'

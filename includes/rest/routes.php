@@ -15,7 +15,7 @@ add_action( 'rest_api_init', 'lienzo_register_rest_routes' );
 /**
  * Registers every Lienzo REST route.
  *
- * Routes are registered unconditionally, whether or not Desktop Mode is present.
+ * Routes are registered unconditionally, whether or not OpenStation is present.
  * The editor is reachable from four standalone admin surfaces and they all speak
  * to these endpoints.
  *

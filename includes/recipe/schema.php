@@ -17,7 +17,25 @@ defined( 'ABSPATH' ) || exit;
  * Bump when the shape changes incompatibly, and add a migration in
  * `lienzo_migrate_recipe()` and its TypeScript counterpart.
  */
-define( 'LIENZO_RECIPE_VERSION', 5 );
+define( 'LIENZO_RECIPE_VERSION', 6 );
+
+/**
+ * Returns the working spaces the adjustments can be computed in.
+ *
+ * `srgb` does the arithmetic on the encoded values, which is what core WordPress and
+ * most browser editors do. `linear` undoes the sRGB transfer curve before applying
+ * exposure and puts it back afterwards, so a stop is a doubling of light rather than
+ * a doubling of a number that only stands for light.
+ *
+ * The contract twin is `WORKING_SPACES` in `src/model/recipe/types.ts`.
+ *
+ * @since 0.1.0
+ *
+ * @return string[] Space identifiers, the first of which is the default.
+ */
+function lienzo_working_spaces() {
+	return array( 'srgb', 'linear' );
+}
 
 /**
  * Returns the table of adjustment operations Lienzo understands.
@@ -131,6 +149,7 @@ function lienzo_default_recipe( $source_id ) {
 			'format'  => 'image/jpeg',
 			'quality' => 0.92,
 		),
+		'space'         => 'srgb',
 	);
 }
 

@@ -2,12 +2,17 @@
 /**
  * Entry points into the editor from the Media Library.
  *
- * A row action in list mode and a button on the attachment edit screen. Neither is a
- * link any more: the editor is a native desktop window, so these carry a
- * `data-lienzo-open` attribute that the bundle turns into a request to open it.
- * Linking to a page would load that page as an *iframe* window inside the shell,
- * which is the one context where the editor cannot reach Pixi or the shell's
- * components.
+ * A row action in list mode and a button on the attachment edit screen. Both are
+ * links, and both carry a `data-lienzo-open` attribute: the bundle intercepts the
+ * click and opens the editor without navigating -- a desktop window inside the shell,
+ * an overlay in classic admin -- and the `href` is what happens when it cannot, which
+ * is the classic editor page.
+ *
+ * A link that JavaScript upgrades, rather than a button that JavaScript is required
+ * for. Linking straight to the page would be wrong inside the shell, where that page
+ * loads as an *iframe* window and the editor can reach neither Pixi nor the shell's
+ * components; a bare button would be wrong everywhere else, because it does nothing
+ * at all if the bundle failed to load.
  *
  * The richer surfaces -- a button inside the grid modal and one on the block editor's
  * image toolbar -- patch Backbone views and register a block filter from JavaScript,
@@ -36,9 +41,7 @@ add_action( 'enqueue_block_editor_assets', 'lienzo_enqueue_for_block_editor' );
  * @return void
  */
 function lienzo_enqueue_on_media_screens( $hook_suffix ) {
-	// Desktop Mode off for this user means classic admin, where there is no shell to
-	// render into. Loading the bundle there would only add weight.
-	if ( ! current_user_can( 'upload_files' ) || ! lienzo_is_desktop_mode_active() ) {
+	if ( ! current_user_can( 'upload_files' ) ) {
 		return;
 	}
 
@@ -71,7 +74,7 @@ function lienzo_enqueue_on_media_screens( $hook_suffix ) {
  * @return void
  */
 function lienzo_enqueue_for_block_editor() {
-	if ( ! current_user_can( 'upload_files' ) || ! lienzo_is_desktop_mode_active() ) {
+	if ( ! current_user_can( 'upload_files' ) ) {
 		return;
 	}
 
@@ -99,12 +102,13 @@ function lienzo_enqueue_for_block_editor() {
  * @return string[] Filtered row actions.
  */
 function lienzo_media_row_action( $actions, $post ) {
-	if ( ! lienzo_is_desktop_mode_active() || ! lienzo_can_edit( $post->ID ) ) {
+	if ( ! lienzo_can_edit( $post->ID ) ) {
 		return $actions;
 	}
 
 	$actions['lienzo'] = sprintf(
-		'<button type="button" class="button-link" data-lienzo-open="%d">%s</button>',
+		'<a href="%1$s" data-lienzo-open="%2$d">%3$s</a>',
+		esc_url( lienzo_editor_page_url( $post->ID ) ),
 		(int) $post->ID,
 		esc_html__( 'Edit with Lienzo', 'lienzo' )
 	);
@@ -124,12 +128,13 @@ function lienzo_media_row_action( $actions, $post ) {
  * @return void
  */
 function lienzo_attachment_edit_button( $post ) {
-	if ( ! lienzo_is_desktop_mode_active() || ! lienzo_can_edit( $post->ID ) ) {
+	if ( ! lienzo_can_edit( $post->ID ) ) {
 		return;
 	}
 
 	printf(
-		'<div class="misc-pub-section misc-pub-lienzo"><button type="button" class="button" data-lienzo-open="%d">%s</button></div>',
+		'<div class="misc-pub-section misc-pub-lienzo"><a class="button" href="%1$s" data-lienzo-open="%2$d">%3$s</a></div>',
+		esc_url( lienzo_editor_page_url( $post->ID ) ),
 		(int) $post->ID,
 		esc_html__( 'Edit with Lienzo', 'lienzo' )
 	);

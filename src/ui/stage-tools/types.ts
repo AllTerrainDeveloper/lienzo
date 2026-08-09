@@ -29,12 +29,14 @@ export interface StageToolsOptions {
 		opacity: number,
 		erase: boolean
 	) => void;
-	/** Draws a full-canvas mask into a layer, for fill. */
+	/** Draws a mask into a layer at a position, for fill. */
 	fillMask: (
 		layerId: string,
 		mask: HTMLCanvasElement,
 		colour: string,
-		opacity: number
+		opacity: number,
+		/** Where the mask's top-left corner sits, in canvas pixels. */
+		origin: { x: number; y: number }
 	) => void;
 	/** Draws a bitmap into a layer, for gradients, shapes, text and retouching. */
 	composite: (

@@ -12,7 +12,8 @@ import type { AdjustUniforms } from '../color-matrix';
 import { buildLut, isIdentityCurves, isIdentityLevels } from '../lut';
 import type { Curves, Levels } from '../lut';
 import { ADJUST_FRAG, ADJUST_VERT } from '../shaders/adjust';
-import type { Op } from '../../model/recipe';
+import { ADJUST_WGSL } from '../shaders/adjust-wgsl';
+import type { Op, WorkingSpace } from '../../model/recipe';
 import type { OpSchema } from '../../types';
 import type { GpuContext, GpuTexture } from './gpu';
 import type { Pixi } from '../pixi-loader';
@@ -48,12 +49,19 @@ export class AdjustPipeline {
 
 	private uniforms: AdjustUniforms = {
 		matrix: [],
+		exposure: 1,
 		vibrance: 0,
 		sharpen: 0,
 		vignette: 0,
 		grain: 0,
 		blur: 0,
 	};
+
+	/** The working space the adjustments are computed in. */
+	private space: WorkingSpace = 'srgb';
+
+	/** The ops last handed over, kept so a change of space can recompose them. */
+	private ops: Op[] = [];
 
 	/** The baked tone table, or null before one has been built. */
 	private lut: GpuTexture | null = null;
@@ -101,6 +109,9 @@ export class AdjustPipeline {
 	 * uniform rather than a scalar.
 	 */
 	build(): AdjustFilter {
+		// Declaration order is load-bearing twice over: it is the order Pixi packs the
+		// uniform buffer in, and the WGSL struct has to list the same fields in the
+		// same order or WebGPU reads each one out of the wrong offset.
 		const uniforms = new this.gpu.pixi.UniformGroup( {
 			uColorMatrix: { value: [ ...IDENTITY_MATRIX ], type: 'f32', size: 20 },
 			uVibrance: { value: 0, type: 'f32' },
@@ -109,6 +120,7 @@ export class AdjustPipeline {
 			uVignette: { value: 0, type: 'f32' },
 			uGrain: { value: 0, type: 'f32' },
 			uSeed: { value: 0, type: 'f32' },
+			uExposure: { value: 1, type: 'f32' },
 		} );
 
 		return new this.gpu.pixi.Filter( {
@@ -117,12 +129,22 @@ export class AdjustPipeline {
 				fragment: ADJUST_FRAG,
 				name: 'lienzo-adjust',
 			} ),
+			// The WebGPU half. Pixi picks a program by backend and *skips* a filter
+			// that has none for the active one, with no error and no visible sign
+			// beyond the image looking unedited -- which is why this shipping is what
+			// lets the renderer stop pinning itself to WebGL.
+			gpuProgram: this.gpu.pixi.GpuProgram.from( {
+				vertex: { source: ADJUST_WGSL, entryPoint: 'mainVertex' },
+				fragment: { source: ADJUST_WGSL, entryPoint: 'mainFragment' },
+			} ),
 			resources: {
 				adjustUniforms: uniforms,
 				// A second texture needs both its source and its sampler style. Binding
 				// only the source leaves the sampler unresolved and the program fails to
 				// link -- which surfaces as "Could not initialize shader" and a blank
 				// canvas, because Pixi silently skips a filter it could not compile.
+				//
+				// Their order here is the order of the `@group(1)` bindings in the WGSL.
 				uLut: this.lutTexture().source,
 				uLutSampler: this.lutTexture().source.style,
 			},
@@ -179,9 +201,30 @@ export class AdjustPipeline {
 	setOps( ops: Op[] ): boolean {
 		const hadBlur = this.hasBlur;
 
-		this.uniforms = composeAdjustments( ops, this.schema );
+		this.ops = ops;
+		this.uniforms = composeAdjustments( ops, this.schema, this.space );
 
 		return hadBlur !== this.hasBlur;
+	}
+
+	/**
+	 * Sets the working space the adjustments are computed in.
+	 *
+	 * The ops are recomposed rather than merely flagged, because the space decides
+	 * whether exposure belongs in the colour matrix or beside it.
+	 *
+	 * @param space Working space.
+	 * @return True when the state changed.
+	 */
+	setSpace( space: WorkingSpace ): boolean {
+		if ( this.space === space ) {
+			return false;
+		}
+
+		this.space = space;
+		this.uniforms = composeAdjustments( this.ops, this.schema, space );
+
+		return true;
 	}
 
 	/**
@@ -231,6 +274,7 @@ export class AdjustPipeline {
 		group.uniforms.uVignette = off ? 0 : this.uniforms.vignette;
 		group.uniforms.uGrain = off ? 0 : this.uniforms.grain;
 		group.uniforms.uSeed = this.seed;
+		group.uniforms.uExposure = off ? 1 : this.uniforms.exposure;
 	}
 
 	/** Frees the tone table. */

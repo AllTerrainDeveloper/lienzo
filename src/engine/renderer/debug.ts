@@ -7,6 +7,7 @@
  */
 
 import type { CanvasSize, Layer } from '../../model/document';
+import type { Viewport } from './camera';
 import type { GpuTexture } from './gpu';
 import type { LayerTextures } from './layer-textures';
 
@@ -19,6 +20,12 @@ export interface DebugSubject {
 	document: GpuTexture | null;
 	zoom: number;
 	spriteScale: number | null;
+	/** Where the picture sits on screen, which is what maps a click to a pixel. */
+	viewport: Viewport | null;
+	/** The backend actually in use, which `auto` makes a question worth asking. */
+	backend: string;
+	/** Whether intermediate render targets are half-float here. */
+	precise: boolean;
 }
 
 /**
@@ -54,6 +61,9 @@ export function rendererDebugState(
 		} ) ),
 		zoom: subject.zoom,
 		spriteScale: subject.spriteScale,
+		viewport: subject.viewport ? { ...subject.viewport } : null,
+		backend: subject.backend,
+		preciseIntermediates: subject.precise,
 		documentScaleMode: scaleModeOf( document ),
 		sourceScaleMode: scaleModeOf( subject.source ),
 		hasDocumentTexture: !! document,

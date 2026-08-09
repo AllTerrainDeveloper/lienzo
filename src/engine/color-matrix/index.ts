@@ -7,6 +7,7 @@ export { IDENTITY, LUMA_B, LUMA_G, LUMA_R, multiply } from './matrix';
 
 export {
 	contrastMatrix,
+	exposureGain,
 	exposureMatrix,
 	saturationMatrix,
 	temperatureMatrix,

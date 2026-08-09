@@ -55,6 +55,7 @@ export function buildPanelContext( deps: PanelContextDeps ): PanelContext {
 		getRecipe: () => store.current,
 		setOp: ( type, value ) => store.setOp( type, value ),
 		setOutput: ( patch ) => store.setOutput( patch ),
+		setSpace: ( space ) => store.setSpace( space ),
 		setLayer: ( layer, label ) => store.setLayerTransform( layer, label ),
 		setDocument: ( canvas, layer, label ) => store.setDocument( canvas, layer, label ),
 		getImageSize: deps.getImageSize,

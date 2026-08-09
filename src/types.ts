@@ -12,6 +12,14 @@ export interface OpSpec {
 /** The adjustment table, keyed by op type. */
 export type OpSchema = Record< string, OpSpec >;
 
+/**
+ * Which rendering backend to ask Pixi for.
+ *
+ * Declared here rather than imported from the engine so the config type stays free of
+ * engine imports -- this file is the contract with PHP and nothing else.
+ */
+export type RendererBackend = 'auto' | 'webgl' | 'webgpu';
+
 /** `window.lienzoConfig`, localized by `lienzo_get_config()`. */
 export interface LienzoConfig {
 	version: string;
@@ -23,13 +31,37 @@ export interface LienzoConfig {
 	maxRenderPixels: number;
 	canUpload: boolean;
 	/**
-	 * Whether Desktop Mode is active *for this user*, not merely installed.
+	 * Whether OpenStation is active *for this user*, not merely installed.
 	 *
-	 * Desktop Mode is a per-user preference, so the plugin being active says nothing
+	 * OpenStation is a per-user preference, so the plugin being active says nothing
 	 * about whether this person is looking at a desktop. The controls use it to decide
 	 * which house style to fall back to when a component is unavailable.
 	 */
 	desktopMode: boolean;
+	/**
+	 * Which rendering backend to ask for.
+	 *
+	 * `webgl` by default. The adjustment shader ships both a GLSL and a WGSL program,
+	 * so `auto` -- WebGPU where the browser has it -- is a supported configuration
+	 * rather than a way of quietly losing every adjustment. Filterable in PHP through
+	 * `lienzo_renderer_backend`.
+	 */
+	renderer: RendererBackend;
+	/**
+	 * The classic-admin editor page.
+	 *
+	 * Where an "Edit with Lienzo" control goes when there is no shell on the page to
+	 * open a window in.
+	 */
+	editorUrl: string;
+	/**
+	 * Where OpenStation's PixiJS lives.
+	 *
+	 * Lienzo ships none of its own. Inside the shell the module registry answers first
+	 * and this is never used; on a classic admin screen there is no registry, and this
+	 * is OpenStation's own file. Empty when it could not be resolved.
+	 */
+	pixiUrl: string;
 	schema: OpSchema;
 }
 
@@ -89,6 +121,14 @@ export interface Preset {
 		ops: import('./model/recipe').Op[];
 		curves: import('./engine/lut').Curves;
 		levels: import('./engine/lut').Levels;
+		/**
+		 * The space the look was made in.
+		 *
+		 * Part of the look, not of the document: it decides what an exposure op means,
+		 * so a preset saved in linear light and replayed in sRGB is a different look.
+		 * Absent on presets saved before the field existed, which were all sRGB.
+		 */
+		space?: import('./model/recipe').WorkingSpace;
 	};
 }
 
