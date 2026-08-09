@@ -158,6 +158,7 @@ Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and serv
 * The tool rail and the sidebar meet the top bar, instead of sitting below a strip of background.
 * The top bar is the same height for every tool, so switching tools no longer shifts the picture.
 * Dragging a curve point and letting go outside the graph now drops it, instead of leaving it stuck to the pointer.
+* Fixed "Edit with Lienzo" in the media modal doing nothing inside the desktop: the shell was not listening for the request.
 * Media → Edit Photos is no longer offered while the desktop is running, where it could only ever lead to a page saying the editor is elsewhere. Open Lienzo from the dock or its desktop icon.
 * Brushes, eraser, paint bucket, gradient, shapes, paths and text typed on the canvas.
 * Retouching: blur, sharpen, smudge, heal and clone stamp.

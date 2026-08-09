@@ -119,14 +119,28 @@ export interface TilePayloadHandler {
 	) => void;
 }
 
-/** Returns the OpenStation API when the shell is actually mounted. */
-export function desktop(): DesktopApi | undefined {
+/**
+ * The OpenStation API object, whether or not the shell reports itself mounted yet.
+ *
+ * Separate from `desktop()` because of the order things load in: this bundle can be
+ * parsed before the shell has finished booting, and `whenReady()` -- the shell's own
+ * answer to exactly that -- lives on an object that is already there while
+ * `isActive()` still says no. Asking through `desktop()` for it would be asking the
+ * not-yet-ready shell whether it is ready.
+ */
+export function shellApi(): DesktopApi | undefined {
 	// `os` is the current name and `desktop` the one it had before the rename. Both
 	// are read, current first, because Lienzo ships to sites running either version.
 	const wp = window.wp as
 		| { os?: DesktopApi; desktop?: DesktopApi }
 		| undefined;
-	const api = wp?.os ?? wp?.desktop;
+
+	return wp?.os ?? wp?.desktop;
+}
+
+/** Returns the OpenStation API when the shell is actually mounted. */
+export function desktop(): DesktopApi | undefined {
+	const api = shellApi();
 
 	return api?.isActive?.() ? api : undefined;
 }

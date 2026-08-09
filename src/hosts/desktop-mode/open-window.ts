@@ -16,6 +16,18 @@ import { desktop, state, WINDOW_ID } from './desktop-api';
 /** The message an iframe sends to ask the shell to open an image. */
 const OPEN_MESSAGE = 'lienzo-open';
 
+/** What the shell sends back to say it heard. */
+const OPEN_ACK = 'lienzo-open-ack';
+
+/**
+ * How long an iframe waits to be told its request was heard.
+ *
+ * Long enough for a same-origin `postMessage` round trip many times over -- it is one
+ * task hop, not a network call -- and short enough that a click which is going to fall
+ * back still feels like it did something.
+ */
+const ACK_TIMEOUT_MS = 600;
+
 /**
  * Opens an image in the desktop window, from anywhere on the page.
  *
@@ -23,14 +35,17 @@ const OPEN_MESSAGE = 'lienzo-open';
  * window manager only exists in the top frame, so a request from an iframe is posted
  * up to the listener installed by `bootDesktopMode()`.
  *
- * @param attachmentId Attachment to edit.
- * @param origin       Optional. The post it came from, so a save can offer to put
- *                     the edit back on it.
+ * @param attachmentId  Attachment to edit.
+ * @param origin        Optional. The post it came from, so a save can offer to put
+ *                      the edit back on it.
+ * @param onUnanswered  Optional. Called when the request had to be posted to a parent
+ *                      frame and nothing there answered it.
  * @return True when the request was handled or forwarded.
  */
 export function openInDesktop(
 	attachmentId: number,
-	origin: PostOrigin | null = null
+	origin: PostOrigin | null = null,
+	onUnanswered?: () => void
 ): boolean {
 	const id = Number( attachmentId ) || 0;
 
@@ -38,7 +53,7 @@ export function openInDesktop(
 		return false;
 	}
 
-	return openDesktopWindow( id, origin );
+	return openDesktopWindow( id, origin, onUnanswered );
 }
 
 /**
@@ -49,13 +64,16 @@ export function openInDesktop(
  * is on: the shell hides the whole admin body behind the desktop, so an editor mounted
  * into that page would be a live WebGL context inside a `display: none` container.
  *
- * @param attachmentId Attachment to edit, or 0 for the picker.
- * @param origin       Optional. The post it came from.
+ * @param attachmentId  Attachment to edit, or 0 for the picker.
+ * @param origin        Optional. The post it came from.
+ * @param onUnanswered  Optional. Called when the request had to be posted to a parent
+ *                      frame and nothing there answered it.
  * @return True when the request was handled or forwarded.
  */
 export function openDesktopWindow(
 	attachmentId = 0,
-	origin: PostOrigin | null = null
+	origin: PostOrigin | null = null,
+	onUnanswered?: () => void
 ): boolean {
 	const id = Number( attachmentId ) || 0;
 
@@ -96,10 +114,54 @@ export function openDesktopWindow(
 			window.location.origin
 		);
 
+		if ( onUnanswered ) {
+			waitForAck( onUnanswered );
+		}
+
 		return true;
 	}
 
 	return false;
+}
+
+/**
+ * Waits to be told the shell heard, and reports it when nothing does.
+ *
+ * Returning true above is a promise that something will open, and the caller skips its
+ * own fallback on the strength of it -- so when the promise turns out to be empty, the
+ * click has done nothing at all and the user is left staring at the button they
+ * pressed. That is not hypothetical: with the listener in the top frame unregistered,
+ * every "Edit with Lienzo" in the media modal behaved exactly that way.
+ *
+ * The cost of the safety net is that a top frame running an older build -- one that
+ * hears the request but does not answer it -- opens the window *and* the fallback
+ * overlay. A stale cached bundle in one frame is the only way to get there, and two
+ * editors is a visible, recoverable annoyance where a dead button is neither.
+ *
+ * @param onUnanswered Called once, when the wait runs out.
+ */
+function waitForAck( onUnanswered: () => void ): void {
+	const stop = () => {
+		window.clearTimeout( timer );
+		window.removeEventListener( 'message', onMessage );
+	};
+
+	const onMessage = ( event: MessageEvent ) => {
+		if ( event.origin !== window.location.origin ) {
+			return;
+		}
+
+		if ( ( event.data as { type?: string } | null )?.type === OPEN_ACK ) {
+			stop();
+		}
+	};
+
+	const timer = window.setTimeout( () => {
+		stop();
+		onUnanswered();
+	}, ACK_TIMEOUT_MS );
+
+	window.addEventListener( 'message', onMessage );
 }
 
 /**
@@ -142,8 +204,31 @@ export function listenForOpenRequests(): void {
 			return;
 		}
 
-		openDesktopWindow( Number( data.attachmentId ) || 0 );
+		const opened = openDesktopWindow( Number( data.attachmentId ) || 0 );
+
+		// Answered whether or not a window came up, because the question the frame is
+		// asking is "did anything hear me" -- it has its own fallback and needs to know
+		// whether to use it. `openDesktopWindow` returning false here means the shell
+		// went away between the click and the message, which is the one case where the
+		// frame *should* fall back.
+		if ( opened ) {
+			acknowledge( event );
+		}
 	} );
+}
+
+/**
+ * Tells a frame its request was heard.
+ *
+ * Posted back to the frame that asked, at the origin it asked from -- both already
+ * checked to be ours.
+ *
+ * @param event The message being answered.
+ */
+function acknowledge( event: MessageEvent ): void {
+	const source = event.source as Window | null;
+
+	source?.postMessage?.( { type: OPEN_ACK }, event.origin );
 }
 
 /**

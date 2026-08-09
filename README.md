@@ -830,6 +830,12 @@ Stated plainly, because each is better read here than discovered:
 - **Linear light moves exposure and nothing else.** Blur and sharpen still run on encoded values,
   where a physically correct pipeline would filter in linear too; the difference is small and the
   change is not.
+- **Asking the desktop from inside a chromeless iframe is a `postMessage`, and it can go unheard.**
+  The window manager only exists in the top frame, so "Edit with Lienzo" in the media modal posts its
+  request up. Being told the message was *forwarded* is not being told a window opened — so the frame
+  now waits 600ms for the top frame to acknowledge, and opens the overlay itself if nothing does. A
+  top frame running a stale cached bundle, one that hears the request but does not answer it, would
+  open both; two editors is a visible annoyance where a dead button is neither.
 - **"Edit Photos" is not in the Media menu while the desktop is running.** The shell hides the whole
   admin body behind the desktop, so an editor mounted on that page would be a live WebGL context and
   a full-resolution texture inside a `display: none` container. The item is registered and then

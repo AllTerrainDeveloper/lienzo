@@ -153,3 +153,49 @@ describe( 'listenForOpenRequests', () => {
 		expect( opened ).toEqual( [ 'lienzo' ] );
 	} );
 } );
+
+describe( 'the acknowledgement a frame waits for', () => {
+	// Rides on the listener the block above registered. Clearing the once-guard here
+	// would register a second one on the same window and every request would be
+	// answered twice.
+	beforeEach( () => {
+		opened = [];
+		fakeShell();
+	} );
+
+	afterEach( () => {
+		delete ( window as unknown as { wp?: unknown } ).wp;
+	} );
+
+	/**
+	 * Delivers a request as a frame would, capturing what is posted back to it.
+	 *
+	 * @param attachmentId Image the frame is asking for.
+	 * @return Everything the listener posted back.
+	 */
+	function ask( attachmentId: number ): unknown[] {
+		const replies: unknown[] = [];
+		const event = new MessageEvent( 'message', {
+			data: { type: 'lienzo-open', attachmentId },
+		} );
+
+		Object.defineProperty( event, 'origin', { value: window.location.origin } );
+		Object.defineProperty( event, 'source', {
+			value: { postMessage: ( data: unknown ) => replies.push( data ) },
+		} );
+
+		window.dispatchEvent( event );
+
+		return replies;
+	}
+
+	it( 'answers a request it opened, so the frame does not fall back', () => {
+		expect( ask( 9 ) ).toEqual( [ { type: 'lienzo-open-ack' } ] );
+	} );
+
+	it( 'stays silent when the shell went away, so the frame does fall back', () => {
+		delete ( window as unknown as { wp?: unknown } ).wp;
+
+		expect( ask( 9 ) ).toEqual( [] );
+	} );
+} );

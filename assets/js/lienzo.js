@@ -6979,9 +6979,12 @@ fn mainFragment(
     }
   }
   const WINDOW_ID = "lienzo";
-  function desktop() {
+  function shellApi() {
     const wp = window.wp;
-    const api = wp?.os ?? wp?.desktop;
+    return wp?.os ?? wp?.desktop;
+  }
+  function desktop() {
+    const api = shellApi();
     return api?.isActive?.() ? api : void 0;
   }
   function takePending() {
@@ -7020,14 +7023,16 @@ fn mainFragment(
     return config;
   }
   const OPEN_MESSAGE = "lienzo-open";
-  function openInDesktop(attachmentId, origin = null) {
+  const OPEN_ACK = "lienzo-open-ack";
+  const ACK_TIMEOUT_MS = 600;
+  function openInDesktop(attachmentId, origin = null, onUnanswered) {
     const id = Number(attachmentId) || 0;
     if (!id) {
       return false;
     }
-    return openDesktopWindow(id, origin);
+    return openDesktopWindow(id, origin, onUnanswered);
   }
-  function openDesktopWindow(attachmentId = 0, origin = null) {
+  function openDesktopWindow(attachmentId = 0, origin = null, onUnanswered) {
     const id = Number(attachmentId) || 0;
     if (desktop()?.openWindow) {
       if (!id) {
@@ -7049,9 +7054,31 @@ fn mainFragment(
         { type: OPEN_MESSAGE, attachmentId: id },
         window.location.origin
       );
+      if (onUnanswered) {
+        waitForAck(onUnanswered);
+      }
       return true;
     }
     return false;
+  }
+  function waitForAck(onUnanswered) {
+    const stop = () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+    };
+    const onMessage = (event) => {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+      if (event.data?.type === OPEN_ACK) {
+        stop();
+      }
+    };
+    const timer = window.setTimeout(() => {
+      stop();
+      onUnanswered();
+    }, ACK_TIMEOUT_MS);
+    window.addEventListener("message", onMessage);
   }
   function isShellPage() {
     return void 0 !== desktop()?.openWindow || isDesktopModeEnabled();
@@ -7069,8 +7096,15 @@ fn mainFragment(
       if (!data || data.type !== OPEN_MESSAGE) {
         return;
       }
-      openDesktopWindow(Number(data.attachmentId) || 0);
+      const opened = openDesktopWindow(Number(data.attachmentId) || 0);
+      if (opened) {
+        acknowledge(event);
+      }
     });
+  }
+  function acknowledge(event) {
+    const source = event.source;
+    source?.postMessage?.({ type: OPEN_ACK }, event.origin);
   }
   async function openPostInDesktop(postId) {
     const id = Number(postId) || 0;
@@ -7658,10 +7692,13 @@ fn mainFragment(
       }
     );
   }
+  const SHELL_WAIT_MS = 4e3;
+  const SHELL_POLL_MS = 100;
   function bootDesktopMode() {
-    if (!desktop()) {
-      return;
-    }
+    listenForOpenRequests();
+    whenShellReady(registerShellIntegrations);
+  }
+  function registerShellIntegrations() {
     registerPeekThumbnail();
     try {
       registerFileOpener();
@@ -7673,7 +7710,33 @@ fn mainFragment(
     } catch (error) {
       console.warn("[lienzo] icon drop unavailable:", error);
     }
-    listenForOpenRequests();
+  }
+  function whenShellReady(run) {
+    if (desktop()) {
+      run();
+      return;
+    }
+    const ready = shellApi()?.whenReady;
+    if (ready) {
+      ready(() => {
+        if (desktop()) {
+          run();
+        }
+      });
+      return;
+    }
+    let waited = 0;
+    const timer = window.setInterval(() => {
+      waited += SHELL_POLL_MS;
+      if (desktop()) {
+        window.clearInterval(timer);
+        run();
+        return;
+      }
+      if (waited >= SHELL_WAIT_MS) {
+        window.clearInterval(timer);
+      }
+    }, SHELL_POLL_MS);
   }
   function announceSave(host, result, onOpen) {
     host.querySelector(".lz-saved")?.remove();
@@ -12864,13 +12927,18 @@ fn mainFragment(
     if (!id) {
       return false;
     }
-    if (openInDesktop(id, options.origin ?? null)) {
+    const overlay = () => {
+      if (window.lienzoConfig) {
+        openEditorOverlay({ attachmentId: id, onSave: options.onSave });
+      }
+    };
+    if (openInDesktop(id, options.origin ?? null, overlay)) {
       return true;
     }
     if (!window.lienzoConfig) {
       return false;
     }
-    openEditorOverlay({ attachmentId: id, onSave: options.onSave });
+    overlay();
     return true;
   }
   function bootBlockEditor() {
