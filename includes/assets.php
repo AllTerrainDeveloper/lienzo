@@ -18,8 +18,10 @@ add_action( 'init', 'lienzo_register_assets' );
  *
  * PixiJS is deliberately *not* registered as a dependency. It is vendored at
  * `assets/vendor/pixi.min.js` and injected at runtime by `src/engine/pixi-loader.ts`
- * only when `window.PIXI` is absent, because Desktop Mode ships its own copy and two
- * Pixi instances on one page corrupt each other's global resources.
+ * only when `window.PIXI` is absent, because the desktop shell ships its own copy and
+ * two Pixi instances on one page corrupt each other's global resources. Enqueuing it
+ * unconditionally would also mean 780KB on every media screen for a button that has
+ * not been clicked.
  *
  * @since 0.1.0
  *
@@ -123,6 +125,9 @@ function lienzo_get_config() {
 		'maxRenderPixels' => lienzo_max_render_pixels(),
 		'canUpload'       => current_user_can( 'upload_files' ),
 		'desktopMode'     => lienzo_is_desktop_mode_active(),
+		'editorUrl'       => esc_url_raw( lienzo_editor_page_url() ),
+		'pixiUrl'         => esc_url_raw( LIENZO_URL . 'assets/vendor/pixi.min.js' ),
+		'renderer'        => lienzo_renderer_backend(),
 		'schema'          => lienzo_op_schema(),
 	);
 
@@ -134,4 +139,32 @@ function lienzo_get_config() {
 	 * @param array $config Configuration handed to the browser.
 	 */
 	return (array) apply_filters( 'lienzo_config', $config );
+}
+
+/**
+ * Returns which rendering backend the browser should ask for.
+ *
+ * WebGL by default. The adjustment shader ships a WGSL program as well as a GLSL one,
+ * so WebGPU renders the whole pipeline correctly -- but WebGL is the path with years
+ * of use behind it, and a site that wants the newer one should say so rather than
+ * being moved onto it by an update.
+ *
+ * `auto` asks for WebGPU and falls back to WebGL by itself where the browser has no
+ * WebGPU at all.
+ *
+ * @since 0.1.0
+ *
+ * @return string One of `auto`, `webgl` or `webgpu`.
+ */
+function lienzo_renderer_backend() {
+	/**
+	 * Filters the rendering backend the editor asks for.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string $backend One of `auto`, `webgl` or `webgpu`.
+	 */
+	$backend = apply_filters( 'lienzo_renderer_backend', 'webgl' );
+
+	return in_array( $backend, array( 'auto', 'webgl', 'webgpu' ), true ) ? $backend : 'webgl';
 }

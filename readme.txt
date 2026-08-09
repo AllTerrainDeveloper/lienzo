@@ -2,7 +2,6 @@
 Contributors: daniellopez
 Tags: image editor, media, photo, layers, filters
 Requires at least: 6.0
-Requires Plugins: desktop-mode
 Tested up to: 7.0
 Requires PHP: 7.4
 Stable tag: 0.1.0
@@ -13,7 +12,7 @@ A small painting studio inside WordPress. Brushes, layers and filters, straight 
 
 == Description ==
 
-WordPress has shipped the same image editor since 2008: rotate, flip, crop, scale. Lienzo adds everything that was missing, and puts it in a window on your desktop rather than on a page you have to navigate away to.
+WordPress has shipped the same image editor since 2008: rotate, flip, crop, scale. Lienzo adds everything that was missing.
 
 It is a real editor. You can adjust exposure and colour while watching a live histogram, paint with brushes that have shape and softness, select an area and paint only inside it, stack layers, drag a photo in from the Media Library, and type text directly onto the canvas.
 
@@ -66,18 +65,22 @@ Saving always writes a new attachment and records the edit as a recipe: the list
 
 Adjustments are composed into a single GPU pass rather than chained one after another. That is not only quicker. It also means the image is quantised once instead of once per adjustment, which is the difference between a clean gradient and visible banding in a sky.
 
-== Requires OpenStation ==
+= Where it opens =
 
-Lienzo runs as a window inside the OpenStation plugin (previously called Desktop Mode), which turns wp-admin into a desktop. That is not decoration. Rendering inside the desktop is what gives Lienzo its window chrome, its interface components and its drag and drop, and it borrows its rendering engine from the desktop rather than shipping a second copy for your browser to download twice.
+In the classic admin, Lienzo opens under Media → Edit Photos, and over the top of whatever you were doing when you choose "Edit with Lienzo" in the Media Library, in the media picker or on an image block. Nothing to install, nothing to navigate away from.
 
-Install and activate OpenStation first, then switch it on for your user. Without it, Lienzo tells you what it needs and otherwise stays out of the way.
+= Better with OpenStation =
+
+With the OpenStation plugin (previously called Desktop Mode), which turns wp-admin into a desktop, Lienzo runs as a real window instead: window chrome you can move and resize, an icon on the wallpaper, and drag and drop between windows. It also borrows its rendering engine from the desktop there rather than loading a second copy, so the page is lighter.
+
+Neither is required. Lienzo simply uses the desktop when there is one.
 
 == Installation ==
 
-1. Install and activate the OpenStation plugin, then switch it on for your user.
-2. Upload the `lienzo` folder to `/wp-content/plugins/`, or install it from the Plugins screen.
-3. Activate Lienzo through the Plugins menu.
-4. Open Lienzo from the dock or the desktop, or choose "Edit with Lienzo" on any image in the Media Library.
+1. Upload the `lienzo` folder to `/wp-content/plugins/`, or install it from the Plugins screen.
+2. Activate Lienzo through the Plugins menu.
+3. Open it from Media → Edit Photos, or choose "Edit with Lienzo" on any image in the Media Library.
+4. Optional: install the OpenStation plugin and Lienzo will open as a desktop window, from the dock or its wallpaper icon.
 
 == Frequently Asked Questions ==
 
@@ -109,7 +112,11 @@ That makes a painted save its own original. Re-open it and you see exactly the p
 
 = Can I use it in the classic admin? =
 
-No. Lienzo renders inside the desktop, so it needs OpenStation switched on.
+Yes. It opens under Media → Edit Photos, and as an overlay when you choose "Edit with Lienzo" from the Media Library, the media picker or an image block. Every tool is the same one; what you do not get without OpenStation is the movable window, the wallpaper icon and dragging photos between windows.
+
+= Does it edit in real colour? =
+
+There is a Light switch at the top of the Adjustments panel. Left on sRGB it behaves like WordPress and like most browser editors: the maths is done on the stored values. Switched to Linear, exposure is applied to *light* instead, so a stop up or down lands where a camera would have put it rather than where the file's encoding does. Existing edits are unaffected; the setting is saved with each one.
 
 == Screenshots ==
 
@@ -120,14 +127,20 @@ No. Lienzo renders inside the desktop, so it needs OpenStation switched on.
 
 == Third-party libraries ==
 
-This plugin bundles no third-party libraries and makes no external or CDN requests.
+Rendering uses PixiJS (MIT). A copy ships with this plugin at `assets/vendor/pixi.min.js`, with its licence beside it, and is served from your own site — no external or CDN requests are made, ever.
 
-Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and loaded from your own server by the desktop. Lienzo asks the desktop for it rather than shipping a second copy: two instances of the same rendering library on one page share GPU resources through globals, and tearing one down can break the other.
+It is loaded only when nothing else has already provided it. On a site running OpenStation, Lienzo uses the desktop's copy instead: two instances of the same rendering library on one page share GPU resources through globals, and tearing one down can break the other.
 
 == Changelog ==
 
 = 0.1.0 =
 * First release.
+* Works in the classic admin as well as in an OpenStation window: an editor page under Media, and an overlay from the Media Library, the media picker and the image block.
+* Magic wand and paint bucket rewritten to walk runs rather than pixels — a twenty-megapixel photo answers in a fifth of a second instead of a few seconds.
+* The wand traces the holes in a region instead of selecting through them.
+* Optional linear-light exposure, where a stop is a doubling of light rather than of a stored value.
+* Sixteen bits per channel through the layer composite where the browser allows it.
+* Renders on WebGPU where a site asks for it, as well as WebGL.
 * Exposure, contrast, temperature, tint, saturation, vibrance and hue, composed into a single GPU pass.
 * Curves and levels, baked into one lookup table.
 * Sharpen, blur, vignette and grain.

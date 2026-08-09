@@ -8,7 +8,7 @@
 
 import { readConfig } from '../../editor/config';
 import { RestClient } from '../../net/rest';
-import { toast } from '../../platform';
+import { isDesktopModeEnabled, toast } from '../../platform';
 import { __ } from '../../i18n';
 import type { PostOrigin } from '../../types';
 import { desktop, state, WINDOW_ID } from './desktop-api';
@@ -55,7 +55,15 @@ export function openInDesktop(
 		return true;
 	}
 
-	if ( window.parent && window.parent !== window ) {
+	// A chromeless iframe: the window manager only exists in the top frame, so the
+	// request is posted up to the listener `bootDesktopMode()` installed there.
+	//
+	// Gated on desktop mode being *on for this user*, not merely on being framed.
+	// Returning true here is a promise that something will open, and the caller's
+	// fallback -- the classic-admin overlay -- is skipped on the strength of it. An
+	// admin page that happens to be embedded in someone else's iframe with no shell
+	// above it would otherwise post into the void and open nothing at all.
+	if ( isDesktopModeEnabled() && window.parent && window.parent !== window ) {
 		window.parent.postMessage(
 			{ type: OPEN_MESSAGE, attachmentId: id },
 			window.location.origin

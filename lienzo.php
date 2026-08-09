@@ -10,21 +10,24 @@
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       lienzo
- * Requires Plugins:  desktop-mode
  *
- * Lienzo is a Desktop Mode application. It runs as a native window inside the
- * desktop shell -- rendering into the shell's own DOM rather than into an iframe --
- * and takes its PixiJS from the shell's module registry instead of shipping a second
- * copy. Two Pixi 8 instances on one page share GPU resource registries through
- * globals, so one is not merely smaller but safer.
+ * Lienzo is at its best as an OpenStation application: it runs as a native window
+ * inside the desktop shell -- rendering into the shell's own DOM rather than into an
+ * iframe -- and takes its PixiJS from the shell's module registry instead of loading a
+ * second copy. Two Pixi 8 instances on one page share GPU resource registries through
+ * globals, so one is not merely smaller but safer. Running natively is also what gives
+ * the editor the shell's components, its drag bridge and its window chrome, none of
+ * which is reachable from inside a chromeless iframe.
  *
- * Running natively is what gives the editor the shell's `<wpd-*>` components, its
- * drag bridge and its window chrome. None of that is reachable from inside a
- * chromeless iframe, where no component is registered at all.
+ * It does not *require* any of that. The editor itself needs a canvas, a mount point
+ * and Pixi, so with no shell on the site it opens on its own admin page under Media
+ * and in an overlay over the media modal and the block editor. `src/platform.ts`
+ * resolves every control to a plain-DOM equivalent component by component, and the
+ * loader falls back to the vendored Pixi -- so what is lost without the shell is the
+ * window, the desktop icon and the drag bridge, and not the editor.
  *
- * Everything therefore sits behind `lienzo_can_run()`: with Desktop Mode absent or
- * switched off for the user, the plugin registers nothing but the notice explaining
- * why.
+ * The desktop integration therefore sits behind a capability check while everything
+ * else loads unconditionally.
  *
  * @package Lienzo
  */
@@ -69,29 +72,26 @@ require_once LIENZO_DIR . 'includes/requirements.php';
 add_action( 'plugins_loaded', 'lienzo_boot', 5 );
 
 /**
- * Loads the plugin, once it is known that Desktop Mode is there to host it.
+ * Loads the plugin.
  *
  * On `plugins_loaded` rather than at file scope, and that is not a detail: plugins are
- * loaded in alphabetical order, so `lienzo` runs *before* `desktop-mode` and none of
- * its functions exist yet when this file is first read. Checking then would fail every
- * time, on every site, and the plugin would silently never load. `Requires Plugins`
- * governs activation, not load order.
+ * loaded in alphabetical order, so `lienzo` runs *before* the shell and none of its
+ * functions exist yet when this file is first read. Asking about the shell then would
+ * answer "absent" on every site, every time.
  *
- * Priority 5 leaves room for the Desktop Mode registrations at 20 to be added by an
- * include loaded here -- WordPress runs callbacks added to a hook that is already
- * firing, as long as they sit at a later priority.
+ * Priority 5 leaves room for the desktop registrations at 20 to be added by an include
+ * loaded here -- WordPress runs callbacks added to a hook that is already firing, as
+ * long as they sit at a later priority.
+ *
+ * Everything here loads whether or not a shell is present. `desktop-mode.php` is the
+ * one file that is about the shell, and every registration inside it is behind its own
+ * capability check, so on a site without one it simply registers nothing.
  *
  * @since 0.1.0
  *
  * @return void
  */
 function lienzo_boot() {
-	if ( ! lienzo_requirements_met() ) {
-		// Nothing else loads. A half-registered plugin whose editor cannot open is
-		// worse than one that says plainly what it needs.
-		return;
-	}
-
 	require_once LIENZO_DIR . 'includes/helpers.php';
 	require_once LIENZO_DIR . 'includes/recipe.php';
 	require_once LIENZO_DIR . 'includes/post-image.php';
@@ -100,6 +100,7 @@ function lienzo_boot() {
 	require_once LIENZO_DIR . 'includes/render.php';
 	require_once LIENZO_DIR . 'includes/rest.php';
 	require_once LIENZO_DIR . 'includes/assets.php';
+	require_once LIENZO_DIR . 'includes/admin-page.php';
 	require_once LIENZO_DIR . 'includes/media-actions.php';
 	require_once LIENZO_DIR . 'includes/desktop-mode.php';
 }

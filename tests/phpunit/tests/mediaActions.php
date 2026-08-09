@@ -34,14 +34,16 @@ class Tests_Lienzo_Media_Actions extends WP_UnitTestCase {
 		$actions = lienzo_media_row_action( array(), get_post( $id ) );
 
 		$this->assertArrayHasKey( 'lienzo', $actions );
-		// A button carrying the id, not a link: the editor is a desktop window, and a
-		// link would open the shell's iframe view of a page that no longer exists.
-		$this->assertStringContainsString( '<button', $actions['lienzo'] );
+		// A link the bundle upgrades in place: the attribute is what the click handler
+		// looks for, and the href is where the click goes if the bundle never ran.
 		$this->assertStringContainsString(
 			'data-lienzo-open="' . $id . '"',
 			$actions['lienzo']
 		);
-		$this->assertStringNotContainsString( 'href', $actions['lienzo'] );
+		$this->assertStringContainsString(
+			esc_url( lienzo_editor_page_url( $id ) ),
+			$actions['lienzo']
+		);
 	}
 
 	/**
@@ -107,7 +109,52 @@ class Tests_Lienzo_Media_Actions extends WP_UnitTestCase {
 		$html = ob_get_clean();
 
 		$this->assertStringContainsString( 'data-lienzo-open="' . $id . '"', $html );
-		$this->assertStringNotContainsString( 'href', $html );
+		$this->assertStringContainsString( esc_url( lienzo_editor_page_url( $id ) ), $html );
+	}
+
+	/**
+	 * The editor page URL carries the image, and stands alone without one.
+	 *
+	 * @covers ::lienzo_editor_page_url
+	 */
+	public function test_editor_page_url() {
+		$this->assertStringContainsString( 'page=lienzo', lienzo_editor_page_url() );
+		$this->assertStringNotContainsString( 'attachment=', lienzo_editor_page_url() );
+		$this->assertStringContainsString( 'attachment=7', lienzo_editor_page_url( 7 ) );
+	}
+
+	/**
+	 * The config tells the browser where the classic editor and PixiJS live.
+	 *
+	 * Both are what makes an editor possible with no desktop shell on the page: one is
+	 * where a control points when there is no window to open, the other is the copy of
+	 * Pixi to load when there is no shell to borrow one from.
+	 *
+	 * @covers ::lienzo_get_config
+	 */
+	public function test_config_carries_the_classic_admin_inputs() {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+
+		$config = lienzo_get_config();
+
+		$this->assertStringContainsString( 'page=lienzo', $config['editorUrl'] );
+		$this->assertStringContainsString( 'assets/vendor/pixi.min.js', $config['pixiUrl'] );
+		$this->assertSame( 'webgl', $config['renderer'] );
+	}
+
+	/**
+	 * A site can move the editor onto WebGPU, and cannot move it onto nonsense.
+	 *
+	 * @covers ::lienzo_renderer_backend
+	 */
+	public function test_renderer_backend_is_filterable_within_bounds() {
+		add_filter( 'lienzo_renderer_backend', static fn() => 'auto' );
+		$this->assertSame( 'auto', lienzo_renderer_backend() );
+		remove_all_filters( 'lienzo_renderer_backend' );
+
+		add_filter( 'lienzo_renderer_backend', static fn() => 'metal' );
+		$this->assertSame( 'webgl', lienzo_renderer_backend() );
+		remove_all_filters( 'lienzo_renderer_backend' );
 	}
 
 	/**

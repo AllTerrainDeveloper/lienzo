@@ -208,11 +208,13 @@ class Tests_Lienzo_Helpers extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The plugin only loads when Desktop Mode can host it.
+	 * The desktop integration is gated on the functions it is about to call.
 	 *
-	 * The bootstrap stubs the two functions, so this asserts the shape of the check
-	 * rather than the absent case -- which cannot be exercised in the same process,
-	 * because a plugin that returned early defines nothing to call.
+	 * By capability rather than by plugin slug, so a fork, a rename or a bundled copy
+	 * all satisfy it. The bootstrap stubs the two functions, which is how a test
+	 * satisfies it honestly.
+	 *
+	 * Nothing else is gated on this any more: the editor itself loads either way.
 	 *
 	 * @covers ::lienzo_requirements_met
 	 */
@@ -220,5 +222,40 @@ class Tests_Lienzo_Helpers extends WP_UnitTestCase {
 		$this->assertTrue( function_exists( 'desktop_mode_register_window' ) );
 		$this->assertTrue( function_exists( 'desktop_mode_is_enabled' ) );
 		$this->assertTrue( lienzo_requirements_met() );
+	}
+
+	/**
+	 * The editor page exists whether or not a desktop shell does.
+	 *
+	 * The classic-admin surface is the point: a site with no shell still has a media
+	 * library, and everything the editor itself needs -- a mount point, a canvas and
+	 * PixiJS -- is reachable without one.
+	 *
+	 * @covers ::lienzo_register_admin_page
+	 * @covers ::lienzo_render_admin_page
+	 */
+	public function test_classic_admin_page_renders_a_mount_point() {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+
+		$_GET['attachment'] = 12;
+
+		ob_start();
+		lienzo_render_admin_page();
+		$html = ob_get_clean();
+
+		unset( $_GET['attachment'] );
+
+		$this->assertStringContainsString( 'data-lienzo-root', $html );
+		$this->assertStringContainsString( 'data-host="page"', $html );
+		$this->assertStringContainsString( 'data-attachment="12"', $html );
+	}
+
+	/**
+	 * The page adds the body class the stylesheet collapses the admin chrome with.
+	 *
+	 * @covers ::lienzo_admin_body_class
+	 */
+	public function test_admin_body_class_added() {
+		$this->assertStringContainsString( 'lienzo-page', lienzo_admin_body_class( 'wp-admin' ) );
 	}
 }

@@ -15,7 +15,7 @@
  */
 
 import { __ } from '../i18n';
-import { openInDesktop } from './desktop-mode';
+import { openEditor } from './open';
 
 import type { BackboneView } from '../globals';
 
@@ -118,7 +118,7 @@ function addButton( view: Record< string, unknown > ): void {
 		event.preventDefault();
 		event.stopPropagation();
 
-		openInDesktop( id );
+		openEditor( id );
 	} );
 
 	host.appendChild( button );

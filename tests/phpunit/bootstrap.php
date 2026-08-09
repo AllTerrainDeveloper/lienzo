@@ -5,11 +5,14 @@
  * Locates a WordPress test library, then loads Lienzo as a must-use plugin so its
  * hooks are registered before the test suite's own `init` runs.
  *
- * Lienzo requires Desktop Mode and refuses to load without it, so the two functions
- * that requirement is tested against are stubbed here. Stubbing rather than installing
- * Desktop Mode is deliberate: these tests are about Lienzo's PHP, and the plugin
- * checks for *capability* -- do the functions I am about to call exist -- rather than
- * for a plugin slug, so satisfying the check honestly means defining them.
+ * The desktop shell's two entry points are stubbed here so the integration behind them
+ * is exercised rather than skipped. Stubbing rather than installing the shell is
+ * deliberate: these tests are about Lienzo's PHP, and the plugin checks for
+ * *capability* -- do the functions I am about to call exist -- rather than for a plugin
+ * slug, so satisfying the check honestly means defining them.
+ *
+ * The rest of the plugin no longer depends on them at all; the editor loads with or
+ * without a shell.
  *
  * Point WP_TESTS_DIR (or WP_PHPUNIT__DIR) at a WordPress develop checkout's
  * tests/phpunit directory before running.
