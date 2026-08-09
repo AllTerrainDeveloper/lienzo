@@ -68,7 +68,7 @@ export function buildStageToolset( editor: Editor ): StageToolset {
 			getBrush: () => state.getBrush(),
 		},
 		body: shell.root.querySelector( '.lz-body' ) ?? shell.root,
-		topbar: shell.topbar,
+		optionsHost: shell.options,
 		rail: {
 			getActive: () => state.getTool(),
 			onSelect: ( tool ) => state.setTool( tool ),
@@ -88,8 +88,16 @@ export function buildStageToolset( editor: Editor ): StageToolset {
 			getSelectionShape: () => editor.selectionShape,
 			setSelectionShape: ( shape ) => {
 				editor.selectionShape = shape;
+
+				// Only the half-placed polygon goes: reaching for the ellipse in order to
+				// add one to a rectangle you already have is the ordinary case now, and
+				// throwing the rectangle away for it would make the boolean modes
+				// unusable across two shapes.
 				toolset.tools.clearPath();
-				selection.set( null );
+			},
+			getSelectionMode: () => editor.selectionMode,
+			setSelectionMode: ( mode ) => {
+				editor.selectionMode = mode;
 			},
 			hasSelection: () => selection.isActive,
 			deselect: () => {
@@ -140,7 +148,9 @@ export function buildStageToolset( editor: Editor ): StageToolset {
 			readDocument: () => renderer.pixels.readPixels(),
 			readPristine: () => renderer.readPristinePixels(),
 			getSelectionShape: () => editor.selectionShape,
-			setSelection: ( next ) => selection.set( next ),
+			getSelectionMode: () => editor.selectionMode,
+			previewSelection: ( next ) => selection.setPending( next ),
+			commitSelection: ( next, mode ) => selection.combine( next, mode ),
 			pan: ( dx, dy ) => renderer.view.pan( dx, dy ),
 			zoomAt: ( factor, x, y ) => renderer.view.zoomAt( factor, x, y ),
 			onToolStateChange: () => toolset.optionsBar.render(),

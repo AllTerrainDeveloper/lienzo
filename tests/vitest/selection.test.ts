@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
 	appendPathPoint,
 	buildSelectionMask,
+	combineSelections,
+	effectiveMode,
 	isEmptySelection,
 	selectionBounds,
 	selectionFromDrag,
@@ -88,6 +90,57 @@ describe( 'selectionBounds', () => {
 			w: 0,
 			h: 0,
 		} );
+	} );
+
+	it( 'measures every contour, not only the first', () => {
+		// Two regions added without touching come back as two loops. Measuring only the
+		// first would crop a copy to whichever of them the tracer reached first.
+		const disjoint: Selection = {
+			shape: 'lasso',
+			points: [
+				{ x: 0.1, y: 0.1 },
+				{ x: 0.2, y: 0.1 },
+				{ x: 0.2, y: 0.2 },
+			],
+			holes: [
+				[
+					{ x: 0.7, y: 0.7 },
+					{ x: 0.9, y: 0.7 },
+					{ x: 0.9, y: 0.9 },
+				],
+			],
+		};
+		const b = selectionBounds( disjoint );
+
+		expect( b.x ).toBeCloseTo( 0.1, 6 );
+		expect( b.y ).toBeCloseTo( 0.1, 6 );
+		expect( b.w ).toBeCloseTo( 0.8, 6 );
+		expect( b.h ).toBeCloseTo( 0.8, 6 );
+	} );
+} );
+
+describe( 'effectiveMode', () => {
+	it( 'uses the chosen mode when no modifier is held', () => {
+		expect( effectiveMode( 'new', { shiftKey: false, altKey: false } ) ).toBe( 'new' );
+		expect( effectiveMode( 'add', { shiftKey: false, altKey: false } ) ).toBe( 'add' );
+	} );
+
+	it( 'reads the modifiers every editor uses', () => {
+		expect( effectiveMode( 'new', { shiftKey: true, altKey: false } ) ).toBe( 'add' );
+		expect( effectiveMode( 'new', { shiftKey: false, altKey: true } ) ).toBe(
+			'subtract'
+		);
+		expect( effectiveMode( 'new', { shiftKey: true, altKey: true } ) ).toBe(
+			'intersect'
+		);
+	} );
+
+	it( 'lets a held modifier override the picker', () => {
+		// The whole point: one quick subtraction costs a keypress, not two trips to the
+		// options bar and back.
+		expect( effectiveMode( 'add', { shiftKey: false, altKey: true } ) ).toBe(
+			'subtract'
+		);
 	} );
 } );
 
@@ -593,5 +646,226 @@ describe( 'clipToSelection', () => {
 		} finally {
 			stub.restore();
 		}
+	} );
+} );
+
+describe( 'combineSelections', () => {
+	const RECT = selectionFromDrag( 'rect', { x: 0.1, y: 0.1 }, { x: 0.6, y: 0.6 } );
+	const OTHER = selectionFromDrag( 'rect', { x: 0.4, y: 0.4 }, { x: 0.9, y: 0.9 } );
+
+	/**
+	 * Builds a mask with one filled rectangle, as the composited surface would read back.
+	 *
+	 * @param width  Mask width.
+	 * @param height Mask height.
+	 * @param rect   Region to fill, or nothing for an empty result.
+	 */
+	function readback(
+		width: number,
+		height: number,
+		rect?: { x: number; y: number; w: number; h: number }
+	) {
+		const data = new Uint8ClampedArray( width * height * 4 );
+
+		if ( ! rect ) {
+			return { data, width, height };
+		}
+
+		for ( let y = rect.y; y < rect.y + rect.h; y++ ) {
+			for ( let x = rect.x; x < rect.x + rect.w; x++ ) {
+				data[ ( y * width + x ) * 4 + 3 ] = 255;
+			}
+		}
+
+		return { data, width, height };
+	}
+
+	/**
+	 * Stands in for a 2D context, recording how each layer was composited.
+	 *
+	 * jsdom ships no canvas backend, so the composite operation, the working size and the
+	 * traced readback are what can be asserted — and the operation is the whole of the
+	 * boolean algebra, so it is the thing worth pinning.
+	 *
+	 * @param mask What the composited surface reads back as.
+	 */
+	function stubCombine( mask: {
+		data: Uint8ClampedArray;
+		width: number;
+		height: number;
+	} ) {
+		const ops: string[] = [];
+		const sizes: Array< { width: number; height: number } > = [];
+		const original = HTMLCanvasElement.prototype.getContext;
+
+		HTMLCanvasElement.prototype.getContext = function ( this: HTMLCanvasElement ) {
+			const canvas = this;
+			const ctx = {
+				globalCompositeOperation: 'source-over',
+				fillStyle: '',
+				save: () => {},
+				restore: () => {},
+				beginPath: () => {},
+				rect: () => {},
+				ellipse: () => {},
+				moveTo: () => {},
+				lineTo: () => {},
+				closePath: () => {},
+				fill: () => {},
+				drawImage: () => {
+					ops.push( ctx.globalCompositeOperation );
+					sizes.push( { width: canvas.width, height: canvas.height } );
+				},
+				getImageData: () => mask,
+			};
+
+			return ctx as unknown as CanvasRenderingContext2D;
+		} as unknown as typeof original;
+
+		return {
+			ops,
+			sizes,
+			restore: () => {
+				HTMLCanvasElement.prototype.getContext = original;
+			},
+		};
+	}
+
+	it( 'replaces outright in new mode, without rasterising anything', () => {
+		const stub = stubCombine( readback( 40, 40, { x: 10, y: 10, w: 20, h: 20 } ) );
+
+		try {
+			expect(
+				combineSelections( RECT, OTHER, 'new', { width: 40, height: 40 } )
+			).toBe( OTHER );
+			// The common case must not pay for the boolean it is not performing.
+			expect( stub.ops ).toEqual( [] );
+		} finally {
+			stub.restore();
+		}
+	} );
+
+	it( 'clears the selection when a new-mode gesture drew nothing', () => {
+		// A click with no drag, which is how everyone deselects.
+		expect(
+			combineSelections( RECT, null, 'new', { width: 40, height: 40 } )
+		).toBeNull();
+	} );
+
+	it( 'treats adding to nothing as drawing', () => {
+		expect( combineSelections( null, OTHER, 'add', { width: 40, height: 40 } ) ).toBe(
+			OTHER
+		);
+	} );
+
+	it( 'leaves nothing when there was nothing to take a share of', () => {
+		for ( const mode of [ 'subtract', 'intersect' ] as const ) {
+			expect(
+				combineSelections( null, OTHER, mode, { width: 40, height: 40 } )
+			).toBeNull();
+		}
+	} );
+
+	it( 'keeps the selection when the gesture produced nothing', () => {
+		// Including an intersection: a stray click is not an instruction to deselect.
+		for ( const mode of [ 'add', 'subtract', 'intersect' ] as const ) {
+			expect( combineSelections( RECT, null, mode, { width: 40, height: 40 } ) ).toBe(
+				RECT
+			);
+		}
+	} );
+
+	it( 'composites each boolean with the operation that performs it', () => {
+		const expected = {
+			add: 'source-over',
+			subtract: 'destination-out',
+			intersect: 'source-in',
+		} as const;
+
+		for ( const [ mode, operation ] of Object.entries( expected ) ) {
+			const stub = stubCombine( readback( 40, 40, { x: 10, y: 10, w: 20, h: 20 } ) );
+
+			try {
+				combineSelections( RECT, OTHER, mode as 'add', { width: 40, height: 40 } );
+
+				// The base goes down first, untouched; the new region is what carries the
+				// operation.
+				expect( stub.ops ).toEqual( [ 'source-over', operation ] );
+			} finally {
+				stub.restore();
+			}
+		}
+	} );
+
+	it( 'hands back a path, whatever the two inputs were', () => {
+		const stub = stubCombine( readback( 40, 40, { x: 10, y: 10, w: 20, h: 20 } ) );
+
+		try {
+			const combined = combineSelections( RECT, OTHER, 'add', {
+				width: 40,
+				height: 40,
+			} );
+
+			// The union of two rectangles is not a rectangle. Storing it as one would put
+			// the corners it does not have back.
+			expect( combined?.shape ).toBe( 'lasso' );
+			expect( combined?.points ).toEqual( [
+				{ x: 0.25, y: 0.25 },
+				{ x: 0.75, y: 0.25 },
+				{ x: 0.75, y: 0.75 },
+				{ x: 0.25, y: 0.75 },
+			] );
+		} finally {
+			stub.restore();
+		}
+	} );
+
+	it( 'returns nothing when the boolean left nothing behind', () => {
+		const stub = stubCombine( readback( 40, 40 ) );
+
+		try {
+			expect(
+				combineSelections( RECT, OTHER, 'intersect', { width: 40, height: 40 } )
+			).toBeNull();
+		} finally {
+			stub.restore();
+		}
+	} );
+
+	it( 'caps the working raster, however large the document is', () => {
+		const stub = stubCombine( readback( 40, 40, { x: 10, y: 10, w: 20, h: 20 } ) );
+
+		try {
+			combineSelections( RECT, OTHER, 'add', { width: 10000, height: 10000 } );
+
+			// Four megapixels: far more than the traced outline can carry, and a readback
+			// that finishes inside a frame. Uncapped this would be 400 megabytes.
+			expect( stub.sizes[ 0 ] ).toEqual( { width: 2000, height: 2000 } );
+		} finally {
+			stub.restore();
+		}
+	} );
+
+	it( 'keeps the aspect ratio when it scales the working raster down', () => {
+		const stub = stubCombine( readback( 40, 40, { x: 10, y: 10, w: 20, h: 20 } ) );
+
+		try {
+			combineSelections( RECT, OTHER, 'add', { width: 8000, height: 2000 } );
+
+			const size = stub.sizes[ 0 ];
+
+			expect( size.width / size.height ).toBeCloseTo( 4, 2 );
+			expect( size.width * size.height ).toBeLessThanOrEqual( 4_000_000 );
+		} finally {
+			stub.restore();
+		}
+	} );
+
+	it( 'leaves the selection alone when no canvas backend will answer', () => {
+		// jsdom, or a browser that refused a context. Falling back to the base is the
+		// only answer here that cannot lose the user's work.
+		expect(
+			combineSelections( RECT, OTHER, 'subtract', { width: 40, height: 40 } )
+		).toBe( RECT );
 	} );
 } );

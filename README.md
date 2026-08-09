@@ -11,9 +11,10 @@ action hooks inside, so it cannot be extended, only replaced. Lienzo replaces it
 ## What it does
 
 Colour and tone with a live per-frame histogram; crop, straighten, rotate and flip; curves and
-levels; sharpen, blur, vignette and grain; saved presets. Then a layer stack, four selection shapes,
-brushes, a magic wand, retouching and toning brushes, a clone stamp, gradients, shapes, paths, and
-text typed directly on the canvas. Undo and redo reach painted pixels, not only settings.
+levels; sharpen, blur, vignette and grain; saved presets. Then a layer stack, four selection shapes
+that add, subtract and intersect, brushes, a magic wand, retouching and toning brushes, a clone
+stamp, gradients, shapes, paths, and text typed directly on the canvas. Undo and redo reach painted
+pixels, not only settings.
 
 Adjustments stay non-destructive: a save always writes a *new* attachment and stores the edit as a
 re-openable recipe, so the original file is never rewritten and repeated edits never compound.
@@ -105,6 +106,47 @@ Accordion rather than tabs, deliberately: a histogram is something you watch *wh
 slider, so putting it behind a tab switch would break the one workflow it exists for. Anything you
 would rather not see gets switched off in the picker instead.
 
+## One bar across the top
+
+The name of the file, the options for the current tool and the document's actions used to be a
+labelled toolbar stacked on top of a labelled options bar: two rows, about ninety pixels, spent above
+a photograph on saying what the photograph is called and then, underneath, what the current tool
+does. It is **one 31-pixel row** now.
+
+Half of that came from merging the rows; the other half came from the row admitting it was mostly
+air. Every control in the bar is exactly `--lz-bar-control` tall — one custom property, declared on
+`.lz-topbar` and applied to buttons, glyphs, segments and form controls alike — because a 29px button
+beside a 26px glyph beside a 27px segment is how a row needs forty-seven pixels to hold twenty-four
+pixels of content.
+
+The height is **fixed, not a minimum**. The bar's contents change with the active tool, and letting
+the tallest of them decide meant one height for the marquee and another for the brush — so every tool
+change nudged the canvas and the picture jumped under the pointer. Three declarations make that
+stick, and all three are load-bearing: `box-sizing: border-box`, because WordPress's admin sets it
+globally and a page outside the admin does not, so anything counting the padding is a different
+number in the two places; `block-size` rather than `min-block-size`; and `min-block-size: 0`, because
+a flex item's minimum defaults to its content and a stated height is otherwise only ever a floor.
+Capping the controls is what keeps the fixed height from clipping anything, and `overflow-y: hidden`
+on the options is the backstop for a control nobody anticipated.
+
+The labels went too, where the control already said what it was. "Selection mode" in front of four
+symbols and "Shape" in front of the word "Rectangle" are a hundred pixels each of a one-row bar spent
+naming the obvious; both are clipped rather than removed, so the group keeps its `aria-label` and a
+screen reader loses nothing.
+
+Four actions are glyphs now (recentre, undo, redo, compare), the two used rarely are behind a `⋯`
+overflow (export, reset, and close where the host wants one), and only **Save a copy** keeps its
+words. The overflow's items are built on every open rather than captured once, and a command that
+would do nothing is left out rather than greyed — a disabled control in a row is a placeholder
+holding its position, but a disabled row in a menu of three is a shorter menu with a gap in it.
+
+The row never wraps. Wrapping is what a flex bar does instead of overflowing, and it would silently
+undo the whole point the first time a tool had one control too many for the window; the options
+scroll sideways within their own slot instead, the hint truncates first with the whole of it in its
+tooltip, and the title drops out entirely below a `@container` width of 620px. A container query
+rather than a media query because the editor is as often an OpenStation window as a whole page, so
+how much room the bar has is a fact about the window and not about the screen it is on.
+
 ## Eighteen tools, four mechanisms
 
 The rail on the leading edge holds the tools, two columns wide and grouped by what they do to the
@@ -114,7 +156,7 @@ selection rectangle cannot disagree about where the pointer is.
 
 | Group | Tools | Keys |
 |---|---|---|
-| Select | Move & transform, Select (rectangle / ellipse / freeform / polygon), Magic wand, Crop | `V` `M` `W` `C` |
+| Select | Move & transform, Select (rectangle / ellipse / freeform / polygon, in new / add / subtract / intersect), Magic wand, Crop | `V` `M` `W` `C` |
 | Retouch | Eyedropper, Retouch (blur / sharpen / smudge / heal), Clone stamp, Dodge & burn (dodge / burn / desaturate / saturate) | `I` `R` `S` `O` |
 | Paint | Brush, History brush, Eraser, Fill | `B` `Y` `E` `G` |
 | Draw | Gradient, Shape (rectangle / rounded / ellipse / line / triangle / star), Path, Text | `N` `U` `P` `T` |
@@ -133,6 +175,45 @@ Two Photoshop slots are deliberately absent: the frame tool, which places an emp
 placeholder and has nothing to do in a library editor, and the separate lasso slot — freeform and
 polygon are shapes of the one Select tool, chosen in its options bar, which is where every other
 selection setting already lives.
+
+### A selection is built, not drawn
+
+The shapes anyone actually wants are almost never one rectangle. A subject is a wand click plus two
+lasso corrections; a vignette mask is an ellipse minus a smaller one. So both selection tools lead
+with the same four-way picker — **New**, **Add**, **Subtract**, **Intersect** — and both read the
+modifiers everyone already has in their fingers: **Shift** adds, **Alt** subtracts, **Shift+Alt**
+intersects, for one gesture, without disturbing what the picker says.
+
+The mode is fixed when the gesture *starts*, not when it ends. Modifier keys are usually let go of
+before the mouse button is, and a subtraction that turned into a replacement on release would be the
+most destructive bug this tool could have.
+
+Adding, subtracting and intersecting are set operations on regions, and the editor stores regions as
+closed paths — so the honest implementation is a path clipper, several hundred lines of numerically
+delicate geometry that has to agree with the rasteriser about every edge case it gets wrong. There is
+already a round trip that does not: `buildSelectionMask()` turns a path into pixels and `traceMask()`
+turns pixels back into paths, exactly, because the tracer walks pixel *corners*. Compositing two
+masks is then the whole of the boolean algebra — `source-over`, `destination-out`, `source-in`, three
+keywords the browser has implemented for twenty years — and the result arrives in the one format the
+outline renderer, the mask rasteriser and the brush clipper already speak.
+
+It runs once per completed gesture, never per pointer move, and the working raster is capped at four
+megapixels: nobody can see a boundary at a finer resolution than the six hundred vertices the tracer
+keeps anyway, and uncapped, one intersection on a fifty-megapixel scan would allocate two hundred
+megabytes to answer a question four hundred points long.
+
+That split is also why the marquee got cheaper rather than dearer. A drag now paints a **pending
+outline** — a path attribute, in the accent colour, beside the ants of the selection it is about to
+change — where it used to replace the selection on every pointer move, rasterising a canvas-sized
+mask and handing it to the GPU sixty times a second. Seeing both outlines at once is the only way to
+aim a subtraction, and it costs less than not seeing them did.
+
+Two consequences worth knowing. A boolean result is always a path, whatever went in: the union of two
+rectangles is not a rectangle, and storing it as one would put its corners back. And disjoint results
+survive — `traceMask` calls every contour after the first a hole, but both rasterisers fill
+**even-odd**, so a loop lying outside the first is filled rather than punched, which is exactly right
+for two regions added without touching. `selectionBounds()` measures every contour for the same
+reason: measuring only the first would crop a copy to whichever region the tracer reached first.
 
 Eighteen tools, but only four gestures, and each one is a single method:
 
@@ -415,6 +496,7 @@ includes/
   shell-api.php            resolves the shell's renamed functions and hooks
   requirements.php         the shell capability gate
   admin-page.php           the classic-admin editor page, under Media
+                             (registered always, in the menu only without the desktop)
   helpers/                 capabilities, source resolution, MIME, render ceilings
   recipe/                  op schema, defaults, migration, validation
                              (contract twin of src/model/recipe)
@@ -435,7 +517,8 @@ src/
                              `os-*` / `wpd-*` components and events
   model/recipe/            types, schema, mutations, migration, validation
   model/document/          canvas, layer transforms, the layer stack
-  model/selection/         marquee geometry, mask rasterising, contour tracing
+  model/selection/         marquee geometry, mask rasterising, contour tracing,
+                             and the booleans built on the round trip between them
   model/history.ts         undo stack with drag coalescing
   model/pixel-history/     the tiles a paint stroke overwrote, for undo
   engine/color-matrix/     PURE: ops -> one 4x5 matrix
@@ -728,6 +811,13 @@ repoint rather than a restore from backup. A gallery swap keeps its position.
 
 Stated plainly, because each is better read here than discovered:
 
+- **A resize repaints the picture inside the ResizeObserver callback.** Resizing the drawing buffer
+  clears it, and a ResizeObserver runs *after* the frame's animation callbacks — so the ticker has
+  already drawn by the time the surface is replaced, and the browser paints the empty one. That was
+  one blank frame per resize step, which during a window drag is every frame: the picture flickered,
+  or seemed to vanish and come back. `ViewController.fit()` now draws synchronously whenever the
+  surface actually changed, which is still before paint. The cost is one extra render per resize step
+  and no extra render on a pan or a zoom, where the buffer is untouched.
 - **The flood fill is still CPU work.** A span fill over a memoised match test answers a
   twenty-megapixel photograph in about 200ms rather than a few seconds, which is fast enough to feel
   like a click — but it is one thread, and a fill that covers the whole frame is closer to 800ms
@@ -740,6 +830,19 @@ Stated plainly, because each is better read here than discovered:
 - **Linear light moves exposure and nothing else.** Blur and sharpen still run on encoded values,
   where a physically correct pipeline would filter in linear too; the difference is small and the
   change is not.
+- **Asking the desktop from inside a chromeless iframe is a `postMessage`, and it can go unheard.**
+  The window manager only exists in the top frame, so "Edit with Lienzo" in the media modal posts its
+  request up. Being told the message was *forwarded* is not being told a window opened — so the frame
+  now waits 600ms for the top frame to acknowledge, and opens the overlay itself if nothing does. A
+  top frame running a stale cached bundle, one that hears the request but does not answer it, would
+  open both; two editors is a visible annoyance where a dead button is neither.
+- **"Edit Photos" is not in the Media menu while the desktop is running.** The shell hides the whole
+  admin body behind the desktop, so an editor mounted on that page would be a live WebGL context and
+  a full-resolution texture inside a `display: none` container. The item is registered and then
+  removed from the menu, so the URL still answers — a bookmark, or the `editorUrl` in the config
+  blob — and what it answers with is a sentence saying where the editor is and a button that opens
+  it. Lienzo lives in the dock and on the wallpaper there; `lienzo_desktop_owns_the_editor` is the
+  one filter that decides.
 - **A save from the classic-admin overlay does not put the edit back into the post.** The block
   editor's image block is repointed, because it can be — but the Media Library row action and the
   media picker have nowhere to put an answer. Inside the shell that is what the drag bridge is for.
@@ -752,6 +855,14 @@ Stated plainly, because each is better read here than discovered:
 - **Animated GIFs are not offered for editing**, because a canvas round trip flattens them to one
   frame, and quietly destroying an animation is worse than declining. They are also skipped by the
   picker, so a library of them can read as smaller than it is.
+- **Boolean selections are exact to the working raster, not to the path.** Adding, subtracting and
+  intersecting go through a mask round trip rather than a path clipper, and that raster is capped at
+  four megapixels — so on a document larger than that, the combined outline is traced at a reduced
+  scale. It is invisible against the tracer's own six-hundred-vertex budget, which costs more
+  precision than the scaling does, but it does mean the result is a fresh path and not the two paths
+  that went in. Selections are not part of the undo stack either — they describe how someone is
+  working rather than what the picture should look like — so an addition you did not mean has to be
+  redrawn rather than stepped back.
 - **The picker reads the library a page at a time** behind a Load more button rather than loading on
   scroll: it renders inside a desktop window, so which element actually scrolls is not the picker's
   to know, and a scroll listener bound to the wrong one silently never fires.

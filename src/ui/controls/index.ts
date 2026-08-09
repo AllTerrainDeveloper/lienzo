@@ -44,6 +44,9 @@ export type { ColourFieldOptions } from './colour-field';
 
 export { floatingHost, positionFloating } from './floating';
 
+export { createMenuButton } from './menu';
+export type { MenuButtonHandle, MenuButtonOptions, MenuItem } from './menu';
+
 export { createNumberField } from './number-field';
 export type { NumberFieldOptions } from './number-field';
 

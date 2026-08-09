@@ -43,6 +43,14 @@ function onToolChange( editor: Editor, previous: string ): void {
 		editor.stage?.text.commit();
 	}
 
+	// A polygon marquee and a pen path are both placed click by click and both finished
+	// with Enter -- which only means anything while their own tool holds the stage. So
+	// leaving abandons whatever is half-placed, rather than stranding an outline on the
+	// canvas that nothing on screen can now close or clear.
+	if ( 'select' === previous || 'path' === previous ) {
+		editor.stage?.tools.clearPath();
+	}
+
 	const tool = editor.state.getTool();
 
 	editor.stage?.rail.sync( tool );

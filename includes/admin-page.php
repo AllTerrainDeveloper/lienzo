@@ -35,6 +35,15 @@ add_action( 'admin_menu', 'lienzo_register_admin_page' );
  * the media library, and a top-level entry for a tool most sites use occasionally is
  * how admin menus become unusable.
  *
+ * With the desktop running the item is registered and then taken straight back out of
+ * the menu. Registering it keeps the URL working, for a bookmark or for the `editorUrl`
+ * the config blob hands to JavaScript; removing it from the menu is what stops the
+ * shell offering "Edit Photos" as a tab inside its Media window. That tab could only
+ * ever lead to a page that says the editor is somewhere else, because with the desktop
+ * up the whole admin body is hidden behind it -- an editor mounted there would be a
+ * live WebGL context inside a `display: none` container. A menu item whose only
+ * possible destination is an apology should not be in the menu.
+ *
  * @since 0.1.0
  *
  * @return void
@@ -49,9 +58,42 @@ function lienzo_register_admin_page() {
 		'lienzo_render_admin_page'
 	);
 
-	if ( $hook ) {
-		add_action( 'load-' . $hook, 'lienzo_load_admin_page' );
+	if ( ! $hook ) {
+		return;
 	}
+
+	add_action( 'load-' . $hook, 'lienzo_load_admin_page' );
+
+	if ( lienzo_desktop_owns_the_editor() ) {
+		remove_submenu_page( 'upload.php', LIENZO_PAGE_SLUG );
+	}
+}
+
+/**
+ * Whether the desktop is where this user's editor lives.
+ *
+ * True only when the shell is installed *and* this user has switched it on -- the
+ * preference is per-user, so the same site serves the classic page to one person and
+ * the desktop window to the next.
+ *
+ * @since 0.2.0
+ *
+ * @return bool True when the editor belongs to the desktop for the current user.
+ */
+function lienzo_desktop_owns_the_editor() {
+	$owns = true === lienzo_shell_call( 'is_enabled' );
+
+	/**
+	 * Filters whether the desktop is where this user's editor lives.
+	 *
+	 * The one place that decides, so a site that wants the classic page kept in the
+	 * menu alongside the desktop window can say so without unpicking the integration.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param bool $owns Whether the editor belongs to the desktop for this user.
+	 */
+	return (bool) apply_filters( 'lienzo_desktop_owns_the_editor', $owns );
 }
 
 /**

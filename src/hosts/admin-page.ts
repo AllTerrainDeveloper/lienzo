@@ -22,6 +22,7 @@ import { mount } from '../editor';
 import type { EditorInstance } from '../editor';
 import { isShellPage, openDesktopWindow } from './desktop-mode';
 import { __ } from '../i18n';
+import { createButton } from '../ui/controls';
 import { renderPicker } from '../ui/picker';
 
 /** The live instance, so a re-boot cannot leak a second Pixi context. */
@@ -102,26 +103,43 @@ function open( root: HTMLElement, attachmentId: number ): void {
 }
 
 /**
- * Asks the desktop for a window, and says so on the page behind it.
+ * Asks the desktop for a window, and leaves something usable on the page behind it.
  *
- * The message is written even though the desktop covers it: this page is also what a
- * chromeless iframe loads, and there the shell shows exactly this body inside a window
- * frame while the *parent* opens the native one. Someone who gets here with the shell
- * half-loaded should read a sentence rather than stare at an empty screen.
+ * The page is written even though the desktop covers it, because this body is also
+ * what a chromeless iframe loads: reaching Media -> Edit Photos inside the shell opens
+ * an admin window showing exactly this, while the *parent* frame opens the native one.
+ * That window then stays on screen, so whatever it says has to still make sense a
+ * minute later.
+ *
+ * It used to say "Opening Lienzo on your desktop…", and an ellipsis that never resolves
+ * is a promise the page cannot keep -- the editor is in a different window, so nothing
+ * is ever going to happen here. It now says where the editor went and carries the
+ * button that takes you back to it, which is also the answer when the window was
+ * opened and then closed.
  *
  * @param root         Mount point.
  * @param attachmentId Image to open, or 0 for the window's own picker.
  */
 function handOverToDesktop( root: HTMLElement, attachmentId: number ): void {
 	const opened = openDesktopWindow( attachmentId );
-	const message = document.createElement( 'p' );
 
-	message.className = 'lz-page-notice';
+	const notice = document.createElement( 'div' );
+	notice.className = 'lz-page-notice';
+
+	const message = document.createElement( 'p' );
+	message.className = 'lz-page-notice__text';
 	message.textContent = opened
-		? __( 'Opening Lienzo on your desktop…' )
+		? __( 'Lienzo opened in a window of its own on your desktop.' )
 		: __( 'Lienzo opens as a window on your desktop. Open it from the dock or its icon.' );
 
-	root.replaceChildren( message );
+	const button = createButton( {
+		label: opened ? __( 'Bring Lienzo to the front' ) : __( 'Open Lienzo' ),
+		variant: 'primary',
+		onClick: () => openDesktopWindow( attachmentId ),
+	} );
+
+	notice.append( message, button.el );
+	root.replaceChildren( notice );
 }
 
 /**

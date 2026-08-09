@@ -7,7 +7,7 @@
  */
 
 import { __ } from '../i18n';
-import { createButton } from '../ui/controls';
+import { createIconButton } from '../ui/controls';
 import type { ButtonHandle } from '../ui/controls';
 import { onEditorKey } from './keys';
 
@@ -21,10 +21,12 @@ export function createCompareControl( setBypass: ( on: boolean ) => void ): {
 	handle: ButtonHandle;
 	detach: () => void;
 } {
-	const handle = createButton( {
-		label: __( 'Compare' ),
-		title: __( 'Hold to see the original' ),
-		variant: 'ghost',
+	// A half-filled circle: the picture, half of it as it was. The name and the key are
+	// in the tooltip, which is where a control nobody clicks by accident can keep them.
+	const handle = createIconButton( {
+		glyph: '◑',
+		label: __( 'Compare: hold to see the original (\\)' ),
+		className: 'lz-topbar__icon',
 		onClick: () => {},
 	} );
 

@@ -22,6 +22,12 @@ export function isEmptySelection( selection: Selection | null ): boolean {
 /**
  * The axis-aligned bounding box, in normalised coordinates.
  *
+ * Every contour counts, not only the outer one. On a hand-drawn selection that changes
+ * nothing -- a hole is inside the outline that contains it, by definition. On one the
+ * boolean combiner produced it is the whole answer: two regions added without touching
+ * come back as two separate loops, and measuring only the first would crop the copy to
+ * whichever of them the tracer happened to reach first.
+ *
  * @param selection Selection to measure.
  */
 export function selectionBounds( selection: Selection ): {
@@ -35,11 +41,13 @@ export function selectionBounds( selection: Selection ): {
 	let maxX = -Infinity;
 	let maxY = -Infinity;
 
-	for ( const point of selection.points ) {
-		minX = Math.min( minX, point.x );
-		minY = Math.min( minY, point.y );
-		maxX = Math.max( maxX, point.x );
-		maxY = Math.max( maxY, point.y );
+	for ( const contour of [ selection.points, ...( selection.holes ?? [] ) ] ) {
+		for ( const point of contour ) {
+			minX = Math.min( minX, point.x );
+			minY = Math.min( minY, point.y );
+			maxX = Math.max( maxX, point.x );
+			maxY = Math.max( maxY, point.y );
+		}
 	}
 
 	if ( ! Number.isFinite( minX ) ) {

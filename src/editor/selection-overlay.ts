@@ -8,10 +8,11 @@
 
 import {
 	buildSelectionMask,
+	combineSelections,
 	isEmptySelection,
 	selectionToPath,
 } from '../model/selection';
-import type { Selection } from '../model/selection';
+import type { Selection, SelectionMode } from '../model/selection';
 import type { CanvasSize } from '../model/document';
 import type { Viewport } from '../ui/panels';
 
@@ -44,6 +45,18 @@ export class SelectionOverlay {
 	/** The current marquee, or null when nothing is selected. */
 	private selection: Selection | null = null;
 
+	/**
+	 * The region being drawn right now, drawn but not yet folded in.
+	 *
+	 * Separate from the selection proper for two reasons. It is what makes the boolean
+	 * modes legible -- you can see the shape you are dragging *and* the selection it is
+	 * about to be added to or cut out of, which is the only way to aim a subtraction.
+	 * And it costs nothing: a pending outline is a path attribute, where replacing the
+	 * selection on every pointer move rasterised a canvas-sized mask and handed it to
+	 * the GPU sixty times a second.
+	 */
+	private pending: Selection | null = null;
+
 	private svg: SVGSVGElement;
 
 	private options: SelectionOverlayOptions;
@@ -60,9 +73,15 @@ export class SelectionOverlay {
 		this.svg.setAttribute( 'class', 'lz-selection' );
 		this.svg.setAttribute( 'aria-hidden', 'true' );
 
-		// Two paths, opposite colours, one dashed and animated: marching ants that
-		// stay visible over both light and dark pixels.
-		for ( const cls of [ 'lz-selection__under', 'lz-selection__over' ] ) {
+		// Two paths per outline, opposite colours, one dashed and animated: marching
+		// ants that stay visible over both light and dark pixels. Two outlines, because
+		// a gesture in progress is shown beside the selection it will change.
+		for ( const cls of [
+			'lz-selection__under',
+			'lz-selection__over',
+			'lz-selection__pending-under',
+			'lz-selection__pending-over',
+		] ) {
 			const path = document.createElementNS( 'http://www.w3.org/2000/svg', 'path' );
 			path.setAttribute( 'class', cls );
 			this.svg.appendChild( path );
@@ -89,6 +108,7 @@ export class SelectionOverlay {
 	 */
 	set( selection: Selection | null ): void {
 		this.selection = isEmptySelection( selection ) ? null : selection;
+		this.pending = null;
 
 		const canvas = this.options.getCanvas();
 
@@ -98,6 +118,31 @@ export class SelectionOverlay {
 
 		this.sync();
 		this.options.onChange();
+	}
+
+	/**
+	 * Shows a region being drawn, without committing it.
+	 *
+	 * No mask is built and no listener is told: this is an outline following a pointer,
+	 * and nothing downstream of the selection has changed yet.
+	 *
+	 * @param selection Region in progress, or null to take the outline down.
+	 */
+	setPending( selection: Selection | null ): void {
+		this.pending = selection;
+		this.sync();
+	}
+
+	/**
+	 * Folds a finished region into the selection.
+	 *
+	 * @param selection Region just drawn, or null when the gesture produced nothing.
+	 * @param mode      What that region does to the selection already in place.
+	 */
+	combine( selection: Selection | null, mode: SelectionMode ): void {
+		this.set(
+			combineSelections( this.selection, selection, mode, this.options.getCanvas() )
+		);
 	}
 
 	/** Selects the whole canvas. */
@@ -119,9 +164,10 @@ export class SelectionOverlay {
 	readonly sync = (): void => {
 		const viewport = this.options.getViewport();
 
-		if ( ! this.selection || ! viewport ) {
+		if ( ( ! this.selection && ! this.pending ) || ! viewport ) {
 			this.svg.style.display = 'none';
-			this.paint( '' );
+			this.paint( 'lz-selection__', '' );
+			this.paint( 'lz-selection__pending-', '' );
 
 			return;
 		}
@@ -132,17 +178,36 @@ export class SelectionOverlay {
 		this.svg.setAttribute( 'width', String( viewport.width ) );
 		this.svg.setAttribute( 'height', String( viewport.height ) );
 
-		this.paint( selectionToPath( this.selection, viewport.width, viewport.height ) );
+		this.paint( 'lz-selection__', this.outline( this.selection, viewport ) );
+		this.paint( 'lz-selection__pending-', this.outline( this.pending, viewport ) );
 	};
 
 	/**
-	 * Writes one path into both outline strokes.
+	 * One selection as path data, or nothing when there is none.
 	 *
-	 * @param d Path data.
+	 * @param selection Selection to draw, or null.
+	 * @param viewport  Where the canvas sits.
 	 */
-	private paint( d: string ): void {
-		for ( const node of this.svg.querySelectorAll( 'path' ) ) {
-			node.setAttribute( 'd', d );
+	private outline(
+		selection: Selection | null,
+		viewport: { width: number; height: number }
+	): string {
+		return selection
+			? selectionToPath( selection, viewport.width, viewport.height )
+			: '';
+	}
+
+	/**
+	 * Writes one path into both strokes of an outline.
+	 *
+	 * @param prefix Class prefix identifying which outline.
+	 * @param d      Path data.
+	 */
+	private paint( prefix: string, d: string ): void {
+		for ( const suffix of [ 'under', 'over' ] ) {
+			this.svg
+				.querySelector( `.${ prefix }${ suffix }` )
+				?.setAttribute( 'd', d );
 		}
 	}
 

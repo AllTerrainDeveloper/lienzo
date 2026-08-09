@@ -45,21 +45,31 @@ export function openEditor(
 		return false;
 	}
 
-	if ( openInDesktop( id, options.origin ?? null ) ) {
-		return true;
-	}
-
 	// The overlay needs the configuration -- the REST root, the nonce, the op schema --
 	// and this bundle can be on a page that never ran `lienzo_enqueue_editor()`: the
 	// shell enqueues the handle it was registered with, and a screen outside the ones
 	// the plugin enqueues on gets the script and no config. Mounting there would throw
 	// where doing nothing lets the caller's own `href` navigate to the editor page,
 	// which is exactly what that href is for.
+	const overlay = () => {
+		if ( window.lienzoConfig ) {
+			openEditorOverlay( { attachmentId: id, onSave: options.onSave } );
+		}
+	};
+
+	// Asking the desktop from inside a chromeless iframe means posting a message to the
+	// top frame, and being told "yes, forwarded" is not the same as being told a window
+	// opened. When nothing up there answers, this is what stops the click from having
+	// been a click on nothing.
+	if ( openInDesktop( id, options.origin ?? null, overlay ) ) {
+		return true;
+	}
+
 	if ( ! window.lienzoConfig ) {
 		return false;
 	}
 
-	openEditorOverlay( { attachmentId: id, onSave: options.onSave } );
+	overlay();
 
 	return true;
 }

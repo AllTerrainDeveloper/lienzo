@@ -36,8 +36,8 @@ export interface StageToolsetOptions {
 	frame: StageFrame;
 	/** Where the tool rail is prepended. */
 	body: HTMLElement;
-	/** The element the options bar is inserted after. */
-	topbar: HTMLElement;
+	/** The slot in the top bar the options bar fills. */
+	optionsHost: HTMLElement;
 	rail: ToolRailOptions;
 	optionsBar: Omit< OptionsBarOptions, 'getTool' >;
 	tools: Omit<
@@ -83,7 +83,7 @@ export class StageToolset {
 			...options.optionsBar,
 			getTool: frame.getTool,
 		} );
-		options.topbar.after( this.optionsBar.el );
+		options.optionsHost.appendChild( this.optionsBar.el );
 
 		this.tools = new StageTools( {
 			...options.tools,

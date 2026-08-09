@@ -15,7 +15,7 @@
 import type { EditorRenderer } from '../engine/renderer';
 import type { CanvasSize } from '../model/document';
 import type { Recipe } from '../model/recipe';
-import type { SelectionShape } from '../model/selection';
+import type { SelectionMode, SelectionShape } from '../model/selection';
 import type { LoadedImage } from '../net/image-loader';
 import { RestClient } from '../net/rest';
 import type { LienzoConfig, MediaPayload } from '../types';
@@ -62,6 +62,15 @@ export class Editor implements EditorInstance {
 
 	/** Which shape the marquee tool draws. */
 	selectionShape: SelectionShape = 'rect';
+
+	/**
+	 * What a newly drawn region does to the selection already in place.
+	 *
+	 * Sticky, as it is in every editor that has it: a mode chosen in the options bar
+	 * stays chosen until it is changed, and the modifier keys override it for the length
+	 * of one gesture without disturbing it.
+	 */
+	selectionMode: SelectionMode = 'new';
 
 	payload: MediaPayload | null = null;
 

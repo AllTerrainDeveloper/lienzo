@@ -9,6 +9,7 @@
 
 import { __ } from '../i18n';
 import { isDesktopModeEnabled } from '../platform';
+import { PICKER_CLASS } from '../ui/picker';
 import { createSidebarToggle } from './sidebar-tab';
 import type { SidebarToggle } from './sidebar-tab';
 
@@ -27,8 +28,20 @@ export interface ShellOptions {
 export class EditorShell {
 	readonly root: HTMLElement;
 
-	/** The toolbar row. The options bar is inserted after it. */
+	/** The one bar across the top. */
 	readonly topbar: HTMLElement;
+
+	/**
+	 * Where the contextual options bar goes.
+	 *
+	 * In the middle of the top bar rather than in a row of its own. Two rows cost
+	 * something like a tenth of the height of a laptop screen to say the file's name and
+	 * then, underneath, what the current tool does -- on a screen whose entire purpose is
+	 * to show a photograph as large as it can. One row holds all of it, because the two
+	 * things that were competing for width, the title and the tool options, are both
+	 * happy to be truncated and neither needed a full row to itself.
+	 */
+	readonly options: HTMLElement;
 
 	/** The canvas area. Overlays attach here. */
 	readonly stage: HTMLElement;
@@ -38,6 +51,9 @@ export class EditorShell {
 
 	/** The sidebar the panel host fills. */
 	readonly sidebar: HTMLElement;
+
+	/** Which surface is hosting the editor, so teardown can undo its class. */
+	private host: ShellOptions[ 'host' ];
 
 	/** Where toolbar buttons go. */
 	readonly actions: HTMLElement;
@@ -54,8 +70,17 @@ export class EditorShell {
 	 */
 	constructor( options: ShellOptions ) {
 		this.root = options.root;
+		this.host = options.host;
 
 		this.root.replaceChildren();
+
+		// Both hosts show the picker in *this* element before a photo is chosen, and the
+		// picker styles the element it is given rather than a wrapper inside it. Emptying
+		// it is therefore not enough: the class stays, and with it a 16px flex gap and
+		// 24px of padding that then apply to the editor -- which is a strip of background
+		// between the top bar and the tool rail, and a margin around the whole editor
+		// that nothing in its own stylesheet asks for.
+		this.root.classList.remove( PICKER_CLASS );
 		this.root.classList.add( 'lz-editor' );
 		this.root.classList.add( `lz-editor--${ options.host }` );
 
@@ -74,10 +99,13 @@ export class EditorShell {
 		this.title.className = 'lz-topbar__title';
 		this.title.textContent = __( 'Loading image…' );
 
+		this.options = document.createElement( 'div' );
+		this.options.className = 'lz-topbar__options';
+
 		this.actions = document.createElement( 'div' );
 		this.actions.className = 'lz-topbar__actions';
 
-		this.topbar.append( this.title, this.actions );
+		this.topbar.append( this.title, this.options, this.actions );
 
 		const body = document.createElement( 'div' );
 		body.className = 'lz-body';
@@ -182,9 +210,16 @@ export class EditorShell {
 		this.backdrop.style.blockSize = `${ viewport.height }px`;
 	}
 
-	/** Empties the root and gives back its classes. */
+	/**
+	 * Empties the root and gives back its classes.
+	 *
+	 * The host modifier goes too, not just `lz-editor`. The same element is handed back
+	 * to the picker when a window is emptied, and `lz-editor--window` left behind takes
+	 * `block-size: 100%` and `overflow: hidden` with it -- which is a picker that cannot
+	 * scroll to the photo you were looking for.
+	 */
 	destroy(): void {
 		this.root.replaceChildren();
-		this.root.classList.remove( 'lz-editor' );
+		this.root.classList.remove( 'lz-editor', `lz-editor--${ this.host }` );
 	}
 }

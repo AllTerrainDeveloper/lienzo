@@ -60,9 +60,11 @@ export function shortcutTarget( editor: Editor ): ShortcutTarget {
 			editor.selection?.set( null );
 		},
 		hasSelection: () => true === editor.selection?.isActive,
+		hasPendingPath: () => true === editor.stage?.tools.hasPath,
 		getTool: () => editor.state.getTool(),
 		getSelectionShape: () => editor.selectionShape,
 		commitPath: () => true === editor.stage?.tools.commitPath(),
+		closePolygon: () => void editor.stage?.tools.closePolygon(),
 		clearPath: () => editor.stage?.tools.clearPath(),
 		resetView: () => editor.renderer?.view.reset(),
 	};

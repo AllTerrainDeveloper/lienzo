@@ -39,4 +39,12 @@ export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
 export interface ControlOption {
 	value: string;
 	label: string;
+	/**
+	 * Tooltip and accessible name, where the label is a glyph.
+	 *
+	 * A segmented picker showing `⊞` needs somewhere to say "Add to selection (Shift)";
+	 * one showing "Rectangle" does not, so this is optional rather than a second label
+	 * every caller has to write out twice.
+	 */
+	title?: string;
 }

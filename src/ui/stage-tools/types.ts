@@ -3,7 +3,11 @@
  */
 
 import type { CanvasSize } from '../../model/document';
-import type { Selection, SelectionShape } from '../../model/selection';
+import type {
+	Selection,
+	SelectionMode,
+	SelectionShape,
+} from '../../model/selection';
 import type { PixelOp } from '../../engine/pixel-tools';
 import type { ActiveTool } from '../panels';
 import type { BrushSettings } from './brush-settings';
@@ -52,8 +56,22 @@ export interface StageToolsOptions {
 	readPristine: () => { pixels: Uint8ClampedArray; width: number; height: number } | null;
 	/** Which shape the marquee draws. */
 	getSelectionShape: () => SelectionShape;
-	/** Replaces the selection. Null clears it. */
-	setSelection: ( selection: Selection | null ) => void;
+	/** What a newly drawn region does to the selection already in place. */
+	getSelectionMode: () => SelectionMode;
+	/**
+	 * Shows a region being drawn, without committing it.
+	 *
+	 * The marquee following the pointer, and the vertices of a polygon or a pen path
+	 * placed so far. Null takes the outline down.
+	 */
+	previewSelection: ( selection: Selection | null ) => void;
+	/**
+	 * Folds a finished region into the selection.
+	 *
+	 * @param selection Region drawn, or null when the gesture produced nothing.
+	 * @param mode      What that region does to the selection already in place.
+	 */
+	commitSelection: ( selection: Selection | null, mode: SelectionMode ) => void;
 	/** Moves the view, in CSS pixels. */
 	pan: ( dx: number, dy: number ) => void;
 	/** Zooms about a point given in stage-relative CSS pixels. */

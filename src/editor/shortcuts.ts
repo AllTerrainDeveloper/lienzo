@@ -20,12 +20,16 @@ export interface ShortcutTarget {
 	deselect: () => void;
 	/** Whether anything is selected. */
 	hasSelection: () => boolean;
+	/** Whether a polygon or a pen path is half-placed on the canvas. */
+	hasPendingPath: () => boolean;
 	/** Which tool owns the stage. */
 	getTool: () => string;
 	/** Which shape the marquee tool is drawing. */
 	getSelectionShape: () => string;
 	/** Closes an in-progress path. True when one was closed. */
 	commitPath: () => boolean;
+	/** Closes an in-progress polygon marquee into the selection. */
+	closePolygon: () => void;
 	/** Abandons an in-progress path without drawing it. */
 	clearPath: () => void;
 	/** Fits the whole picture back on screen. */
@@ -95,7 +99,11 @@ function handleCommand( event: KeyboardEvent, target: ShortcutTarget ): void {
  * @param target What the shortcuts act on.
  */
 function handlePlain( event: KeyboardEvent, target: ShortcutTarget ): void {
-	if ( 'Escape' === event.key && target.hasSelection() ) {
+	// Escape abandons a half-placed polygon as readily as it drops a finished selection.
+	// Those vertices are not selected yet -- they are an outline waiting for Enter --
+	// and leaving the only way out of them undocumented would strand anyone who
+	// misclicked the first one.
+	if ( 'Escape' === event.key && ( target.hasSelection() || target.hasPendingPath() ) ) {
 		event.preventDefault();
 		target.deselect();
 
@@ -115,9 +123,11 @@ function handlePlain( event: KeyboardEvent, target: ShortcutTarget ): void {
 			return;
 		}
 
+		// A polygon has no release to finish it, so Enter is what folds it into the
+		// selection -- in whatever mode its first click was made in.
 		if ( 'polygon' === target.getSelectionShape() ) {
 			event.preventDefault();
-			target.clearPath();
+			target.closePolygon();
 		}
 
 		return;
