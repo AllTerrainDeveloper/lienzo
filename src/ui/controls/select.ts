@@ -43,12 +43,15 @@ export function createSelect( options: SelectOptions ): SelectHandle {
 	select.className = 'lz-field__control';
 
 	if ( useWpd ) {
-		// A custom element is not a form control, so it needs the id for the label but
-		// not a name -- setting one would be a claim it does not honour.
-		const id = fieldId( 'select' );
+		// A custom element is not a labelable element, so `for` cannot reach it. Chrome
+		// says so out loud -- "Incorrect use of <label for=FORM_ELEMENT>" -- and it is
+		// right: the attribute is ignored, so the control ends up with no accessible name
+		// at all while looking, in the markup, as though it has one. `aria-labelledby`
+		// points the other way and works on anything.
+		const id = fieldId( 'select-label' );
 
-		select.id = id;
-		label.htmlFor = id;
+		label.id = id;
+		select.setAttribute( 'aria-labelledby', id );
 	} else {
 		nameControl( select as HTMLSelectElement, label, 'select' );
 	}

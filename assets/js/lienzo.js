@@ -4035,7 +4035,7 @@ fn mainFragment(
       if (!Number.isFinite(next)) {
         return;
       }
-      options.onChange(numeric ? next : clamp(next, options));
+      options.onChange(numeric ? next : clamp$2(next, options));
     };
     const offs = [
       onShellEvent(field, "input-change", onChange),
@@ -4078,7 +4078,7 @@ fn mainFragment(
     const onInput = () => {
       const next = Number(input.value);
       if (Number.isFinite(next)) {
-        options.onChange(clamp(next, options));
+        options.onChange(clamp$2(next, options));
       }
     };
     input.addEventListener("input", onInput);
@@ -4091,7 +4091,7 @@ fn mainFragment(
       destroy: () => input.removeEventListener("input", onInput)
     };
   }
-  function clamp(value, bounds) {
+  function clamp$2(value, bounds) {
     return Math.min(bounds.max, Math.max(bounds.min, value));
   }
   function createSection(heading) {
@@ -4202,9 +4202,9 @@ fn mainFragment(
     const select = document.createElement(tag ?? "select");
     select.className = "lz-field__control";
     if (useWpd) {
-      const id = fieldId("select");
-      select.id = id;
-      label.htmlFor = id;
+      const id = fieldId("select-label");
+      label.id = id;
+      select.setAttribute("aria-labelledby", id);
     } else {
       nameControl(select, label, "select");
     }
@@ -7991,7 +7991,8 @@ fn mainFragment(
       getTool: () => editor.state.getTool(),
       getSelectionShape: () => editor.selectionShape,
       commitPath: () => true === editor.stage?.tools.commitPath(),
-      closePolygon: () => void editor.stage?.tools.closePolygon(),
+      closeShape: () => void editor.stage?.tools.closeShape(),
+      undoAnchor: () => true === editor.stage?.tools.undoAnchor(),
       clearPath: () => editor.stage?.tools.clearPath(),
       resetView: () => editor.renderer?.view.reset()
     };
@@ -8063,6 +8064,425 @@ fn mainFragment(
     }
     renderer.retainLayers(reachable);
   }
+  const SELECTION_SHAPES = [
+    { value: "rect", label: "Rectangle" },
+    { value: "ellipse", label: "Ellipse" },
+    { value: "lasso", label: "Freeform" },
+    { value: "polygon", label: "Polygon" },
+    { value: "magnetic", label: "Magnetic" }
+  ];
+  function isPlacedShape(shape) {
+    return "polygon" === shape || "magnetic" === shape;
+  }
+  const SELECTION_MODES = [
+    { value: "new", label: "New selection", glyph: "◻", title: "New selection" },
+    { value: "add", label: "Add", glyph: "⊞", title: "Add to selection (Shift)" },
+    {
+      value: "subtract",
+      label: "Subtract",
+      glyph: "⊟",
+      title: "Subtract from selection (Alt)"
+    },
+    {
+      value: "intersect",
+      label: "Intersect",
+      glyph: "▣",
+      title: "Intersect with selection (Shift+Alt)"
+    }
+  ];
+  function effectiveMode(mode, modifiers) {
+    if (modifiers.shiftKey && modifiers.altKey) {
+      return "intersect";
+    }
+    if (modifiers.shiftKey) {
+      return "add";
+    }
+    if (modifiers.altKey) {
+      return "subtract";
+    }
+    return mode;
+  }
+  const MAX_LASSO_POINTS = 600;
+  function isEmptySelection(selection) {
+    if (!selection || selection.points.length < 2) {
+      return true;
+    }
+    const bounds = selectionBounds(selection);
+    return bounds.w < 2e-3 || bounds.h < 2e-3;
+  }
+  function selectionBounds(selection) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const contour of [selection.points, ...selection.holes ?? []]) {
+      for (const point of contour) {
+        minX = Math.min(minX, point.x);
+        minY = Math.min(minY, point.y);
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
+      }
+    }
+    if (!Number.isFinite(minX)) {
+      return { x: 0, y: 0, w: 0, h: 0 };
+    }
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  }
+  function buildSelectionMask(selection, width, height) {
+    if (!selection || isEmptySelection(selection) || width < 1 || height < 1) {
+      return null;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(width);
+    canvas.height = Math.round(height);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return null;
+    }
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    const bounds = selectionBounds(selection);
+    if (selection.shape === "ellipse") {
+      ctx.ellipse(
+        (bounds.x + bounds.w / 2) * canvas.width,
+        (bounds.y + bounds.h / 2) * canvas.height,
+        bounds.w / 2 * canvas.width,
+        bounds.h / 2 * canvas.height,
+        0,
+        0,
+        Math.PI * 2
+      );
+    } else if (selection.shape === "rect") {
+      ctx.rect(
+        bounds.x * canvas.width,
+        bounds.y * canvas.height,
+        bounds.w * canvas.width,
+        bounds.h * canvas.height
+      );
+    } else {
+      addContour(ctx, selection.points, canvas);
+      for (const hole of selection.holes ?? []) {
+        addContour(ctx, hole, canvas);
+      }
+    }
+    ctx.fill("evenodd");
+    return canvas;
+  }
+  function addContour(ctx, points, canvas) {
+    points.forEach((point, index) => {
+      const x = point.x * canvas.width;
+      const y = point.y * canvas.height;
+      if (index === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+    ctx.closePath();
+  }
+  function clipToSelection(region, selection, canvas, origin) {
+    const mask = buildSelectionMask(selection, canvas.width, canvas.height);
+    const ctx = region.getContext("2d");
+    if (!mask || !ctx) {
+      return false;
+    }
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-in";
+    ctx.drawImage(mask, -Math.round(origin.x), -Math.round(origin.y));
+    ctx.restore();
+    return true;
+  }
+  function selectionToPath(selection, width, height) {
+    const at = (point) => `${point.x * width} ${point.y * height}`;
+    if (selection.shape === "rect" || selection.shape === "ellipse") {
+      const b = selectionBounds(selection);
+      const x = b.x * width;
+      const y = b.y * height;
+      const w = b.w * width;
+      const h = b.h * height;
+      if (selection.shape === "rect") {
+        return `M ${x} ${y} H ${x + w} V ${y + h} H ${x} Z`;
+      }
+      const rx = w / 2;
+      const ry = h / 2;
+      return `M ${x} ${y + ry} a ${rx} ${ry} 0 1 0 ${w} 0 a ${rx} ${ry} 0 1 0 ${-w} 0 Z`;
+    }
+    if (selection.points.length < 2) {
+      return "";
+    }
+    const contour = (points) => `M ${at(points[0])} ` + points.slice(1).map((point) => `L ${at(point)}`).join(" ") + " Z";
+    return [selection.points, ...selection.holes ?? []].filter((points) => points.length > 1).map(contour).join(" ");
+  }
+  function thinPath(contour, maxPoints, width, height) {
+    const stride = Math.max(1, Math.ceil(contour.length / Math.max(3, maxPoints)));
+    const out = [];
+    for (let i = 0; i < contour.length; i += stride) {
+      out.push({
+        x: contour[i].x / width,
+        y: contour[i].y / height
+      });
+    }
+    return out;
+  }
+  function anchorMarks(anchors, width, height, size) {
+    const half = size / 2;
+    return anchors.map((anchor) => {
+      const x = anchor.point.x * width - half;
+      const y = anchor.point.y * height - half;
+      return `M ${x} ${y} h ${size} v ${size} h ${-size} Z`;
+    }).join(" ");
+  }
+  function simplifyPath(points, tolerance) {
+    if (points.length < 3 || tolerance <= 0) {
+      return points;
+    }
+    const keep = new Uint8Array(points.length);
+    const stack = [[0, points.length - 1]];
+    const limit = tolerance * tolerance;
+    keep[0] = 1;
+    keep[points.length - 1] = 1;
+    while (stack.length > 0) {
+      const [first, last] = stack.pop();
+      let worst = -1;
+      let at = -1;
+      for (let i = first + 1; i < last; i++) {
+        const distance = squaredDistanceToSegment(
+          points[i],
+          points[first],
+          points[last]
+        );
+        if (distance > worst) {
+          worst = distance;
+          at = i;
+        }
+      }
+      if (at < 0 || worst <= limit) {
+        continue;
+      }
+      keep[at] = 1;
+      stack.push([first, at], [at, last]);
+    }
+    return points.filter((_, i) => 1 === keep[i]);
+  }
+  function squaredDistanceToSegment(point, from, to) {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = dx * dx + dy * dy;
+    const t = 0 === length ? 0 : Math.max(
+      0,
+      Math.min(
+        1,
+        ((point.x - from.x) * dx + (point.y - from.y) * dy) / length
+      )
+    );
+    const ox = point.x - (from.x + t * dx);
+    const oy = point.y - (from.y + t * dy);
+    return ox * ox + oy * oy;
+  }
+  function selectionFromDrag(shape, from, to) {
+    return {
+      shape,
+      points: [
+        { x: clamp01(Math.min(from.x, to.x)), y: clamp01(Math.min(from.y, to.y)) },
+        { x: clamp01(Math.max(from.x, to.x)), y: clamp01(Math.max(from.y, to.y)) }
+      ]
+    };
+  }
+  function appendPathPoint(points, point, minStep = 4e-3) {
+    const last = points[points.length - 1];
+    if (last && Math.abs(last.x - point.x) < minStep && Math.abs(last.y - point.y) < minStep) {
+      return points;
+    }
+    const next = [...points, { x: clamp01(point.x), y: clamp01(point.y) }];
+    return next.length > MAX_LASSO_POINTS ? next.slice(next.length - MAX_LASSO_POINTS) : next;
+  }
+  function clamp01(value) {
+    return Math.min(1, Math.max(0, value));
+  }
+  const MAX_HOLES = 63;
+  const MIN_HOLE_AREA = 4;
+  const MAX_LOOPS = 4096;
+  const STEP = [
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+    [0, -1]
+  ];
+  function traceMask(mask, maxPoints = 400) {
+    const { width, height, data } = mask;
+    if (width < 1 || height < 1) {
+      return { outer: [], holes: [] };
+    }
+    const stride = data.length >= width * height * 4 ? 4 : 1;
+    const last = stride - 1;
+    const filled = (x, y) => x >= 0 && y >= 0 && x < width && y < height && data[(y * width + x) * stride + last] > 127;
+    const contours = walkContours(filled, width, height, mask.bounds);
+    if (contours.length === 0) {
+      return { outer: [], holes: [] };
+    }
+    const budgets = shareBudget(contours, maxPoints);
+    const paths = contours.map(
+      (contour, index) => thinPath(contour, budgets[index], width, height)
+    );
+    return { outer: paths[0], holes: paths.slice(1) };
+  }
+  function walkContours(filled, width, height, bounds) {
+    const cols = width + 1;
+    const visited = new Uint8Array(cols * (height + 1));
+    const contours = [];
+    const fromX = Math.max(0, bounds ? bounds.x : 0);
+    const fromY = Math.max(0, bounds ? bounds.y : 0);
+    const toX = Math.min(width, bounds ? bounds.x + bounds.width : width);
+    const toY = Math.min(height, bounds ? bounds.y + bounds.height : height);
+    const leaves = (x, y, direction) => {
+      switch (direction) {
+        case 0:
+          return filled(x, y) && !filled(x, y - 1);
+        case 1:
+          return filled(x - 1, y) && !filled(x, y);
+        case 2:
+          return filled(x - 1, y - 1) && !filled(x - 1, y);
+        default:
+          return filled(x, y - 1) && !filled(x - 1, y - 1);
+      }
+    };
+    for (let y = fromY; y <= toY && contours.length < MAX_LOOPS; y++) {
+      for (let x = fromX; x <= toX && contours.length < MAX_LOOPS; x++) {
+        const corner = y * cols + x;
+        for (let d = 0; d < 4; d++) {
+          if (visited[corner] & 1 << d || !leaves(x, y, d)) {
+            continue;
+          }
+          contours.push(walkLoop(x, y, d, leaves, visited, cols, width, height));
+        }
+      }
+    }
+    return rank(contours);
+  }
+  function rank(contours) {
+    if (contours.length < 2) {
+      return contours;
+    }
+    const holes = contours.slice(1).map((contour) => ({ contour, area: contourArea(contour) })).filter((hole) => hole.area >= MIN_HOLE_AREA).sort((a, b) => b.area - a.area).slice(0, MAX_HOLES).map((hole) => hole.contour);
+    return [contours[0], ...holes];
+  }
+  function contourArea(contour) {
+    let sum = 0;
+    for (let i = 0; i < contour.length; i++) {
+      const a = contour[i];
+      const b = contour[(i + 1) % contour.length];
+      sum += a.x * b.y - b.x * a.y;
+    }
+    return Math.abs(sum) / 2;
+  }
+  function walkLoop(startX, startY, startD, leaves, visited, cols, width, height) {
+    const points = [];
+    const limit = (width + 1) * (height + 1) * 4;
+    let x = startX;
+    let y = startY;
+    let d = startD;
+    let lastD = -1;
+    for (let step = 0; step < limit; step++) {
+      visited[y * cols + x] |= 1 << d;
+      if (d !== lastD) {
+        points.push({ x, y });
+        lastD = d;
+      }
+      x += STEP[d][0];
+      y += STEP[d][1];
+      let next = -1;
+      for (const candidate of [(d + 1) % 4, d, (d + 3) % 4]) {
+        if (leaves(x, y, candidate)) {
+          next = candidate;
+          break;
+        }
+      }
+      if (next < 0) {
+        break;
+      }
+      d = next;
+      if (x === startX && y === startY && d === startD) {
+        break;
+      }
+    }
+    if (points.length > 2 && lastD === startD) {
+      points.shift();
+    }
+    return points;
+  }
+  function shareBudget(contours, maxPoints) {
+    const budget = Math.max(3, maxPoints);
+    if (contours.length === 1) {
+      return [budget];
+    }
+    const outer = Math.max(4, Math.round(budget / 2));
+    const holes = contours.slice(1);
+    const total = holes.reduce((sum, hole) => sum + hole.length, 0) || 1;
+    const spare = budget - outer;
+    return [
+      outer,
+      ...holes.map(
+        (hole) => Math.max(4, Math.round(spare * hole.length / total))
+      )
+    ];
+  }
+  const MAX_COMBINE_PIXELS = 4e6;
+  const MAX_COMBINE_POINTS = 600;
+  const OPERATIONS = {
+    add: "source-over",
+    subtract: "destination-out",
+    intersect: "source-in"
+  };
+  function combineSelections(base, incoming, mode, canvas) {
+    const from = isEmptySelection(base) ? null : base;
+    const next = isEmptySelection(incoming) ? null : incoming;
+    if ("new" === mode) {
+      return next;
+    }
+    if (!from) {
+      return "add" === mode ? next : null;
+    }
+    if (!next) {
+      return from;
+    }
+    return traceCombined(from, next, mode, canvas);
+  }
+  function traceCombined(base, incoming, mode, canvas) {
+    const size = workingSize(canvas);
+    const baseMask = buildSelectionMask(base, size.width, size.height);
+    const nextMask = buildSelectionMask(incoming, size.width, size.height);
+    const surface = document.createElement("canvas");
+    surface.width = size.width;
+    surface.height = size.height;
+    const ctx = surface.getContext("2d", { willReadFrequently: true });
+    if (!baseMask || !nextMask || !ctx) {
+      return base;
+    }
+    ctx.drawImage(baseMask, 0, 0);
+    ctx.globalCompositeOperation = OPERATIONS[mode];
+    ctx.drawImage(nextMask, 0, 0);
+    const pixels = ctx.getImageData(0, 0, size.width, size.height);
+    const traced = traceMask(
+      { data: pixels.data, width: size.width, height: size.height },
+      MAX_COMBINE_POINTS
+    );
+    if (traced.outer.length < 3) {
+      return null;
+    }
+    return { shape: "lasso", points: traced.outer, holes: traced.holes };
+  }
+  function workingSize(canvas) {
+    const width = Math.max(1, Math.round(canvas.width));
+    const height = Math.max(1, Math.round(canvas.height));
+    const scale = Math.sqrt(MAX_COMBINE_PIXELS / (width * height));
+    if (scale >= 1) {
+      return { width, height };
+    }
+    return {
+      width: Math.max(1, Math.round(width * scale)),
+      height: Math.max(1, Math.round(height * scale))
+    };
+  }
   function isTypingTarget(target) {
     if (!(target instanceof HTMLElement)) {
       return false;
@@ -8133,10 +8553,14 @@ fn mainFragment(
         }
         return;
       }
-      if ("polygon" === target.getSelectionShape()) {
+      if (isPlacedShape(target.getSelectionShape())) {
         event.preventDefault();
-        target.closePolygon();
+        target.closeShape();
       }
+      return;
+    }
+    if (("Backspace" === event.key || "Delete" === event.key) && target.undoAnchor()) {
+      event.preventDefault();
       return;
     }
     if ("0" === event.key) {
@@ -8319,7 +8743,7 @@ fn mainFragment(
     "clone",
     "history"
   ];
-  const MIN_RADIUS = 2;
+  const MIN_RADIUS$1 = 2;
   class BrushCursor {
     constructor(options) {
       this.at = null;
@@ -8342,7 +8766,7 @@ fn mainFragment(
         }
         const brush = this.options.getBrush();
         const scale = viewport.width / canvas.width;
-        const size = Math.max(MIN_RADIUS * 2, brush.size * scale);
+        const size = Math.max(MIN_RADIUS$1 * 2, brush.size * scale);
         this.el.style.display = "";
         this.el.style.inlineSize = `${size}px`;
         this.el.style.blockSize = `${size}px`;
@@ -8936,366 +9360,6 @@ fn mainFragment(
     eyedropper: "Click or drag to sample a colour into the foreground swatch.",
     hand: "Drag to move the view. Scrolling does the same thing from any tool."
   };
-  const SELECTION_SHAPES = [
-    { value: "rect", label: "Rectangle" },
-    { value: "ellipse", label: "Ellipse" },
-    { value: "lasso", label: "Freeform" },
-    { value: "polygon", label: "Polygon" }
-  ];
-  const SELECTION_MODES = [
-    { value: "new", label: "New selection", glyph: "◻", title: "New selection" },
-    { value: "add", label: "Add", glyph: "⊞", title: "Add to selection (Shift)" },
-    {
-      value: "subtract",
-      label: "Subtract",
-      glyph: "⊟",
-      title: "Subtract from selection (Alt)"
-    },
-    {
-      value: "intersect",
-      label: "Intersect",
-      glyph: "▣",
-      title: "Intersect with selection (Shift+Alt)"
-    }
-  ];
-  function effectiveMode(mode, modifiers) {
-    if (modifiers.shiftKey && modifiers.altKey) {
-      return "intersect";
-    }
-    if (modifiers.shiftKey) {
-      return "add";
-    }
-    if (modifiers.altKey) {
-      return "subtract";
-    }
-    return mode;
-  }
-  const MAX_LASSO_POINTS = 600;
-  function isEmptySelection(selection) {
-    if (!selection || selection.points.length < 2) {
-      return true;
-    }
-    const bounds = selectionBounds(selection);
-    return bounds.w < 2e-3 || bounds.h < 2e-3;
-  }
-  function selectionBounds(selection) {
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const contour of [selection.points, ...selection.holes ?? []]) {
-      for (const point of contour) {
-        minX = Math.min(minX, point.x);
-        minY = Math.min(minY, point.y);
-        maxX = Math.max(maxX, point.x);
-        maxY = Math.max(maxY, point.y);
-      }
-    }
-    if (!Number.isFinite(minX)) {
-      return { x: 0, y: 0, w: 0, h: 0 };
-    }
-    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
-  }
-  function buildSelectionMask(selection, width, height) {
-    if (!selection || isEmptySelection(selection) || width < 1 || height < 1) {
-      return null;
-    }
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(width);
-    canvas.height = Math.round(height);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      return null;
-    }
-    ctx.fillStyle = "#fff";
-    ctx.beginPath();
-    const bounds = selectionBounds(selection);
-    if (selection.shape === "ellipse") {
-      ctx.ellipse(
-        (bounds.x + bounds.w / 2) * canvas.width,
-        (bounds.y + bounds.h / 2) * canvas.height,
-        bounds.w / 2 * canvas.width,
-        bounds.h / 2 * canvas.height,
-        0,
-        0,
-        Math.PI * 2
-      );
-    } else if (selection.shape === "rect") {
-      ctx.rect(
-        bounds.x * canvas.width,
-        bounds.y * canvas.height,
-        bounds.w * canvas.width,
-        bounds.h * canvas.height
-      );
-    } else {
-      addContour(ctx, selection.points, canvas);
-      for (const hole of selection.holes ?? []) {
-        addContour(ctx, hole, canvas);
-      }
-    }
-    ctx.fill("evenodd");
-    return canvas;
-  }
-  function addContour(ctx, points, canvas) {
-    points.forEach((point, index) => {
-      const x = point.x * canvas.width;
-      const y = point.y * canvas.height;
-      if (index === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    });
-    ctx.closePath();
-  }
-  function clipToSelection(region, selection, canvas, origin) {
-    const mask = buildSelectionMask(selection, canvas.width, canvas.height);
-    const ctx = region.getContext("2d");
-    if (!mask || !ctx) {
-      return false;
-    }
-    ctx.save();
-    ctx.globalCompositeOperation = "destination-in";
-    ctx.drawImage(mask, -Math.round(origin.x), -Math.round(origin.y));
-    ctx.restore();
-    return true;
-  }
-  function selectionToPath(selection, width, height) {
-    const at = (point) => `${point.x * width} ${point.y * height}`;
-    if (selection.shape === "rect" || selection.shape === "ellipse") {
-      const b = selectionBounds(selection);
-      const x = b.x * width;
-      const y = b.y * height;
-      const w = b.w * width;
-      const h = b.h * height;
-      if (selection.shape === "rect") {
-        return `M ${x} ${y} H ${x + w} V ${y + h} H ${x} Z`;
-      }
-      const rx = w / 2;
-      const ry = h / 2;
-      return `M ${x} ${y + ry} a ${rx} ${ry} 0 1 0 ${w} 0 a ${rx} ${ry} 0 1 0 ${-w} 0 Z`;
-    }
-    if (selection.points.length < 2) {
-      return "";
-    }
-    const contour = (points) => `M ${at(points[0])} ` + points.slice(1).map((point) => `L ${at(point)}`).join(" ") + " Z";
-    return [selection.points, ...selection.holes ?? []].filter((points) => points.length > 1).map(contour).join(" ");
-  }
-  function thinPath(contour, maxPoints, width, height) {
-    const stride = Math.max(1, Math.ceil(contour.length / Math.max(3, maxPoints)));
-    const out = [];
-    for (let i = 0; i < contour.length; i += stride) {
-      out.push({
-        x: contour[i].x / width,
-        y: contour[i].y / height
-      });
-    }
-    return out;
-  }
-  function selectionFromDrag(shape, from, to) {
-    return {
-      shape,
-      points: [
-        { x: clamp01(Math.min(from.x, to.x)), y: clamp01(Math.min(from.y, to.y)) },
-        { x: clamp01(Math.max(from.x, to.x)), y: clamp01(Math.max(from.y, to.y)) }
-      ]
-    };
-  }
-  function appendPathPoint(points, point, minStep = 4e-3) {
-    const last = points[points.length - 1];
-    if (last && Math.abs(last.x - point.x) < minStep && Math.abs(last.y - point.y) < minStep) {
-      return points;
-    }
-    const next = [...points, { x: clamp01(point.x), y: clamp01(point.y) }];
-    return next.length > MAX_LASSO_POINTS ? next.slice(next.length - MAX_LASSO_POINTS) : next;
-  }
-  function clamp01(value) {
-    return Math.min(1, Math.max(0, value));
-  }
-  const MAX_HOLES = 63;
-  const MIN_HOLE_AREA = 4;
-  const MAX_LOOPS = 4096;
-  const STEP = [
-    [1, 0],
-    [0, 1],
-    [-1, 0],
-    [0, -1]
-  ];
-  function traceMask(mask, maxPoints = 400) {
-    const { width, height, data } = mask;
-    if (width < 1 || height < 1) {
-      return { outer: [], holes: [] };
-    }
-    const stride = data.length >= width * height * 4 ? 4 : 1;
-    const last = stride - 1;
-    const filled = (x, y) => x >= 0 && y >= 0 && x < width && y < height && data[(y * width + x) * stride + last] > 127;
-    const contours = walkContours(filled, width, height, mask.bounds);
-    if (contours.length === 0) {
-      return { outer: [], holes: [] };
-    }
-    const budgets = shareBudget(contours, maxPoints);
-    const paths = contours.map(
-      (contour, index) => thinPath(contour, budgets[index], width, height)
-    );
-    return { outer: paths[0], holes: paths.slice(1) };
-  }
-  function walkContours(filled, width, height, bounds) {
-    const cols = width + 1;
-    const visited = new Uint8Array(cols * (height + 1));
-    const contours = [];
-    const fromX = Math.max(0, bounds ? bounds.x : 0);
-    const fromY = Math.max(0, bounds ? bounds.y : 0);
-    const toX = Math.min(width, bounds ? bounds.x + bounds.width : width);
-    const toY = Math.min(height, bounds ? bounds.y + bounds.height : height);
-    const leaves = (x, y, direction) => {
-      switch (direction) {
-        case 0:
-          return filled(x, y) && !filled(x, y - 1);
-        case 1:
-          return filled(x - 1, y) && !filled(x, y);
-        case 2:
-          return filled(x - 1, y - 1) && !filled(x - 1, y);
-        default:
-          return filled(x, y - 1) && !filled(x - 1, y - 1);
-      }
-    };
-    for (let y = fromY; y <= toY && contours.length < MAX_LOOPS; y++) {
-      for (let x = fromX; x <= toX && contours.length < MAX_LOOPS; x++) {
-        const corner = y * cols + x;
-        for (let d = 0; d < 4; d++) {
-          if (visited[corner] & 1 << d || !leaves(x, y, d)) {
-            continue;
-          }
-          contours.push(walkLoop(x, y, d, leaves, visited, cols, width, height));
-        }
-      }
-    }
-    return rank(contours);
-  }
-  function rank(contours) {
-    if (contours.length < 2) {
-      return contours;
-    }
-    const holes = contours.slice(1).map((contour) => ({ contour, area: contourArea(contour) })).filter((hole) => hole.area >= MIN_HOLE_AREA).sort((a, b) => b.area - a.area).slice(0, MAX_HOLES).map((hole) => hole.contour);
-    return [contours[0], ...holes];
-  }
-  function contourArea(contour) {
-    let sum = 0;
-    for (let i = 0; i < contour.length; i++) {
-      const a = contour[i];
-      const b = contour[(i + 1) % contour.length];
-      sum += a.x * b.y - b.x * a.y;
-    }
-    return Math.abs(sum) / 2;
-  }
-  function walkLoop(startX, startY, startD, leaves, visited, cols, width, height) {
-    const points = [];
-    const limit = (width + 1) * (height + 1) * 4;
-    let x = startX;
-    let y = startY;
-    let d = startD;
-    let lastD = -1;
-    for (let step = 0; step < limit; step++) {
-      visited[y * cols + x] |= 1 << d;
-      if (d !== lastD) {
-        points.push({ x, y });
-        lastD = d;
-      }
-      x += STEP[d][0];
-      y += STEP[d][1];
-      let next = -1;
-      for (const candidate of [(d + 1) % 4, d, (d + 3) % 4]) {
-        if (leaves(x, y, candidate)) {
-          next = candidate;
-          break;
-        }
-      }
-      if (next < 0) {
-        break;
-      }
-      d = next;
-      if (x === startX && y === startY && d === startD) {
-        break;
-      }
-    }
-    if (points.length > 2 && lastD === startD) {
-      points.shift();
-    }
-    return points;
-  }
-  function shareBudget(contours, maxPoints) {
-    const budget = Math.max(3, maxPoints);
-    if (contours.length === 1) {
-      return [budget];
-    }
-    const outer = Math.max(4, Math.round(budget / 2));
-    const holes = contours.slice(1);
-    const total = holes.reduce((sum, hole) => sum + hole.length, 0) || 1;
-    const spare = budget - outer;
-    return [
-      outer,
-      ...holes.map(
-        (hole) => Math.max(4, Math.round(spare * hole.length / total))
-      )
-    ];
-  }
-  const MAX_COMBINE_PIXELS = 4e6;
-  const MAX_COMBINE_POINTS = 600;
-  const OPERATIONS = {
-    add: "source-over",
-    subtract: "destination-out",
-    intersect: "source-in"
-  };
-  function combineSelections(base, incoming, mode, canvas) {
-    const from = isEmptySelection(base) ? null : base;
-    const next = isEmptySelection(incoming) ? null : incoming;
-    if ("new" === mode) {
-      return next;
-    }
-    if (!from) {
-      return "add" === mode ? next : null;
-    }
-    if (!next) {
-      return from;
-    }
-    return traceCombined(from, next, mode, canvas);
-  }
-  function traceCombined(base, incoming, mode, canvas) {
-    const size = workingSize(canvas);
-    const baseMask = buildSelectionMask(base, size.width, size.height);
-    const nextMask = buildSelectionMask(incoming, size.width, size.height);
-    const surface = document.createElement("canvas");
-    surface.width = size.width;
-    surface.height = size.height;
-    const ctx = surface.getContext("2d", { willReadFrequently: true });
-    if (!baseMask || !nextMask || !ctx) {
-      return base;
-    }
-    ctx.drawImage(baseMask, 0, 0);
-    ctx.globalCompositeOperation = OPERATIONS[mode];
-    ctx.drawImage(nextMask, 0, 0);
-    const pixels = ctx.getImageData(0, 0, size.width, size.height);
-    const traced = traceMask(
-      { data: pixels.data, width: size.width, height: size.height },
-      MAX_COMBINE_POINTS
-    );
-    if (traced.outer.length < 3) {
-      return null;
-    }
-    return { shape: "lasso", points: traced.outer, holes: traced.holes };
-  }
-  function workingSize(canvas) {
-    const width = Math.max(1, Math.round(canvas.width));
-    const height = Math.max(1, Math.round(canvas.height));
-    const scale = Math.sqrt(MAX_COMBINE_PIXELS / (width * height));
-    if (scale >= 1) {
-      return { width, height };
-    }
-    return {
-      width: Math.max(1, Math.round(width * scale)),
-      height: Math.max(1, Math.round(height * scale))
-    };
-  }
   const MODIFIER_HINT = "Shift adds, Alt subtracts, Shift+Alt intersects.";
   function modePicker(bar) {
     const field = createSegmented({
@@ -9310,6 +9374,48 @@ fn mainFragment(
       onChange: (value) => bar.options.setSelectionMode(value)
     });
     bar.add(field, () => field.setValue(bar.options.getSelectionMode()));
+  }
+  function magneticFields(bar) {
+    const width = createNumberField({
+      compact: true,
+      label: __("Width"),
+      value: bar.brush.magneticWidth,
+      min: 4,
+      max: 80,
+      suffix: "px",
+      onChange: (value) => bar.setBrush({ magneticWidth: value })
+    });
+    bar.add(width, () => width.setValue(bar.brush.magneticWidth));
+    const contrast = createNumberField({
+      compact: true,
+      label: __("Contrast"),
+      value: bar.brush.magneticContrast,
+      min: 0,
+      max: 95,
+      suffix: "%",
+      onChange: (value) => bar.setBrush({ magneticContrast: value })
+    });
+    bar.add(contrast, () => contrast.setValue(bar.brush.magneticContrast));
+    const frequency = createNumberField({
+      compact: true,
+      label: __("Frequency"),
+      value: bar.brush.magneticFrequency,
+      min: 0,
+      max: 100,
+      onChange: (value) => bar.setBrush({ magneticFrequency: value })
+    });
+    bar.add(frequency, () => frequency.setValue(bar.brush.magneticFrequency));
+  }
+  function shapeHint(shape) {
+    if ("polygon" === shape) {
+      return __("Click to add points, Enter to close, Escape to abandon.");
+    }
+    if ("magnetic" === shape) {
+      return __(
+        "Trace an edge and it follows it. Click to pin a point, Backspace undoes one, click the start or press Enter to close. Lower Frequency pins fewer points for you."
+      );
+    }
+    return __(MODIFIER_HINT);
   }
   function renderSelectOptions(bar) {
     modePicker(bar);
@@ -9329,11 +9435,13 @@ fn mainFragment(
         }
       })
     );
+    if ("magnetic" === bar.options.getSelectionShape()) {
+      bar.divider();
+      magneticFields(bar);
+    }
     bar.divider();
     selectionButtons(bar);
-    bar.hint(
-      "polygon" === bar.options.getSelectionShape() ? __("Click to add points, Enter to close, Escape to abandon.") : __(MODIFIER_HINT)
-    );
+    bar.hint(shapeHint(bar.options.getSelectionShape()));
   }
   function renderWandOptions(bar) {
     modePicker(bar);
@@ -9650,7 +9758,7 @@ fn mainFragment(
       y: y / viewport.height * canvas.height
     };
   }
-  function normalise(canvas, point) {
+  function normalise$1(canvas, point) {
     return { x: point.x / canvas.width, y: point.y / canvas.height };
   }
   function toStage(stage, event) {
@@ -9738,6 +9846,685 @@ fn mainFragment(
       return `M ${box.x} ${box.y + ry} a ${rx} ${ry} 0 1 0 ${box.width} 0 a ${rx} ${ry} 0 1 0 ${-box.width} 0 Z`;
     }
     return `M ${box.x} ${box.y} h ${box.width} v ${box.height} h ${-box.width} Z`;
+  }
+  const MAX_FIELD_PIXELS = 2e6;
+  const HISTOGRAM_BINS = 256;
+  const MAX_SOBEL = 1443;
+  const PERCENTILE = 0.99;
+  function buildEdgeField(pixels, width, height, contrast = 0) {
+    if (width < 3 || height < 3) {
+      return null;
+    }
+    const step = Math.max(
+      1,
+      Math.ceil(Math.sqrt(width * height / MAX_FIELD_PIXELS))
+    );
+    const fw = Math.floor(width / step);
+    const fh = Math.floor(height / step);
+    if (fw < 3 || fh < 3) {
+      return null;
+    }
+    const count = fw * fh;
+    const magnitude = new Uint16Array(count);
+    const tangentX = new Int8Array(count);
+    const tangentY = new Int8Array(count);
+    const histogram = new Uint32Array(HISTOGRAM_BINS);
+    const row = width * 4;
+    const col = step * 4;
+    const band = step * row;
+    const shift = Math.ceil(Math.log2(MAX_SOBEL / HISTOGRAM_BINS));
+    for (let y = 0; y < fh; y++) {
+      const sy = Math.min(height - 1 - step, Math.max(step, y * step));
+      for (let x = 0; x < fw; x++) {
+        const sx = Math.min(width - 1 - step, Math.max(step, x * step));
+        const centre = (sy * width + sx) * 4;
+        let best = -1;
+        let bestX = 0;
+        let bestY = 0;
+        for (let channel = 0; channel < 3; channel++) {
+          const i = centre + channel;
+          const tl = pixels[i - band - col];
+          const tc = pixels[i - band];
+          const tr = pixels[i - band + col];
+          const ml = pixels[i - col];
+          const mr = pixels[i + col];
+          const bl = pixels[i + band - col];
+          const bc = pixels[i + band];
+          const br = pixels[i + band + col];
+          const gx = tr + 2 * mr + br - tl - 2 * ml - bl;
+          const gy = bl + 2 * bc + br - tl - 2 * tc - tr;
+          const squared = gx * gx + gy * gy;
+          if (squared > best) {
+            best = squared;
+            bestX = gx;
+            bestY = gy;
+          }
+        }
+        const mag = Math.round(Math.sqrt(best));
+        const index = y * fw + x;
+        magnitude[index] = mag;
+        histogram[Math.min(HISTOGRAM_BINS - 1, mag >> shift)]++;
+        if (mag > 0) {
+          tangentX[index] = Math.round(bestY / mag * 127);
+          tangentY[index] = Math.round(-bestX / mag * 127);
+        }
+      }
+    }
+    return {
+      width: fw,
+      height: fh,
+      step,
+      strength: normalise(magnitude, histogram, shift, count, contrast),
+      tangentX,
+      tangentY
+    };
+  }
+  function normalise(magnitude, histogram, shift, count, contrast) {
+    const target = count * PERCENTILE;
+    let seen = 0;
+    let bin = 0;
+    for (; bin < HISTOGRAM_BINS - 1; bin++) {
+      seen += histogram[bin];
+      if (seen >= target) {
+        break;
+      }
+    }
+    const peak = Math.max(1, bin + 1 << shift);
+    const floor = Math.min(0.95, Math.max(0, contrast));
+    const strength = new Uint8Array(count);
+    for (let i = 0; i < count; i++) {
+      const scaled = magnitude[i] / peak;
+      strength[i] = scaled <= floor ? 0 : Math.min(255, Math.round((scaled - floor) / (1 - floor) * 255));
+    }
+    return strength;
+  }
+  const EDGE_WEIGHT = 0.82;
+  const DIRECTION_WEIGHT = 1 - EDGE_WEIGHT;
+  const COST_SCALE = 256;
+  const MAX_LINK = 1 + Math.ceil(Math.SQRT2 * COST_SCALE);
+  const BUCKETS = MAX_LINK + 1;
+  const NEIGHBOUR_X = [1, -1, 0, 0, 1, 1, -1, -1];
+  const NEIGHBOUR_Y = [0, 0, 1, -1, 1, -1, 1, -1];
+  const UNIT = NEIGHBOUR_X.map((dx, i) => Math.hypot(dx, NEIGHBOUR_Y[i]));
+  const UNIT_X = NEIGHBOUR_X.map((dx, i) => dx / UNIT[i]);
+  const UNIT_Y = NEIGHBOUR_Y.map((dy, i) => dy / UNIT[i]);
+  const ACOS_STEPS = 512;
+  const ACOS = (() => {
+    const table = new Float32Array(ACOS_STEPS + 1);
+    for (let i = 0; i <= ACOS_STEPS; i++) {
+      table[i] = Math.acos(i / ACOS_STEPS * 2 - 1);
+    }
+    return table;
+  })();
+  function acos(value) {
+    const clamped = value < -1 ? -1 : value > 1 ? 1 : value;
+    return ACOS[Math.round((clamped + 1) * 0.5 * ACOS_STEPS)];
+  }
+  class LiveWire {
+    /**
+     * @param field The edge field to search.
+     */
+    constructor(field) {
+      this.buckets = [];
+      this.generation = 0;
+      this.queued = 0;
+      this.sweep = 0;
+      this.seedIndex = -1;
+      this.minX = 0;
+      this.minY = 0;
+      this.maxX = 0;
+      this.maxY = 0;
+      const count = field.width * field.height;
+      this.field = field;
+      this.cost = new Int32Array(count);
+      this.parent = new Int32Array(count);
+      this.stamp = new Int32Array(count);
+      this.settled = new Int32Array(count);
+      for (let i = 0; i < BUCKETS; i++) {
+        this.buckets.push([]);
+      }
+    }
+    /**
+     * Anchors the wire at a point, and bounds how far from it the search may go.
+     *
+     * The bound is the tool's Width setting, and it is what makes the wire predictable:
+     * inside it the pointer is a suggestion and the boundary decides, outside it there
+     * is no boundary on offer and the caller draws a straight line instead. A search
+     * with no bound would eventually find *some* route to anywhere, and the further away
+     * the pointer got the less that route would resemble anything the user pointed at.
+     *
+     * @param x      Field coordinates.
+     * @param y      Field coordinates.
+     * @param radius How far the search may travel, in field pixels.
+     */
+    seed(x, y, radius) {
+      const { width, height } = this.field;
+      const sx = clamp$1(Math.round(x), 0, width - 1);
+      const sy = clamp$1(Math.round(y), 0, height - 1);
+      for (const bucket of this.buckets) {
+        bucket.length = 0;
+      }
+      this.generation++;
+      this.queued = 0;
+      this.sweep = 0;
+      this.minX = Math.max(0, sx - radius);
+      this.minY = Math.max(0, sy - radius);
+      this.maxX = Math.min(width - 1, sx + radius);
+      this.maxY = Math.min(height - 1, sy + radius);
+      this.seedIndex = sy * width + sx;
+      this.cost[this.seedIndex] = 0;
+      this.parent[this.seedIndex] = -1;
+      this.stamp[this.seedIndex] = this.generation;
+      this.buckets[0].push(this.seedIndex);
+      this.queued++;
+    }
+    /** Where the wire is currently anchored, in field pixels. */
+    get anchor() {
+      if (this.seedIndex < 0) {
+        return null;
+      }
+      return {
+        x: this.seedIndex % this.field.width,
+        y: Math.floor(this.seedIndex / this.field.width)
+      };
+    }
+    /**
+     * The cheapest route from the anchor to a point.
+     *
+     * @param x Field coordinates.
+     * @param y Field coordinates.
+     * @return The route, anchor first, or null when the point is out of reach.
+     */
+    pathTo(x, y) {
+      const px = Math.round(x);
+      const py = Math.round(y);
+      if (this.seedIndex < 0 || px < this.minX || px > this.maxX || py < this.minY || py > this.maxY) {
+        return null;
+      }
+      const target = py * this.field.width + px;
+      if (!this.expandTo(target)) {
+        return null;
+      }
+      const route = [];
+      for (let i = target; i >= 0; i = this.parent[i]) {
+        route.push({
+          x: i % this.field.width,
+          y: Math.floor(i / this.field.width)
+        });
+        if (i === this.seedIndex) {
+          break;
+        }
+      }
+      return route.reverse();
+    }
+    /**
+     * Settles nodes in cost order until the target is one of them.
+     *
+     * @param target Node to reach.
+     * @return Whether it was reached.
+     */
+    expandTo(target) {
+      if (this.settled[target] === this.generation) {
+        return true;
+      }
+      while (this.queued > 0) {
+        const bucket = this.buckets[this.sweep % BUCKETS];
+        if (0 === bucket.length) {
+          this.sweep++;
+          continue;
+        }
+        const index = bucket.pop();
+        this.queued--;
+        if (this.stamp[index] !== this.generation || this.cost[index] !== this.sweep || this.settled[index] === this.generation) {
+          continue;
+        }
+        this.settled[index] = this.generation;
+        if (index === target) {
+          return true;
+        }
+        this.relax(index);
+      }
+      return this.settled[target] === this.generation;
+    }
+    /**
+     * Offers a cheaper route to each of a settled node's eight neighbours.
+     *
+     * @param index Node to expand from.
+     */
+    relax(index) {
+      const { width, strength, tangentX, tangentY } = this.field;
+      const x = index % width;
+      const y = (index - x) / width;
+      const base = this.cost[index];
+      const fromX = tangentX[index] / 127;
+      const fromY = tangentY[index] / 127;
+      for (let n = 0; n < 8; n++) {
+        const nx = x + NEIGHBOUR_X[n];
+        const ny = y + NEIGHBOUR_Y[n];
+        if (nx < this.minX || nx > this.maxX || ny < this.minY || ny > this.maxY) {
+          continue;
+        }
+        const next = ny * width + nx;
+        if (this.settled[next] === this.generation) {
+          continue;
+        }
+        let stepX = UNIT_X[n];
+        let stepY = UNIT_Y[n];
+        if (fromX * stepX + fromY * stepY < 0) {
+          stepX = -stepX;
+          stepY = -stepY;
+        }
+        const turn = acos(fromX * stepX + fromY * stepY) + acos(stepX * (tangentX[next] / 127) + stepY * (tangentY[next] / 127));
+        const local = EDGE_WEIGHT * (1 - strength[next] / 255) + DIRECTION_WEIGHT * turn * (2 / (3 * Math.PI));
+        const link = 1 + Math.round(local * UNIT[n] * COST_SCALE);
+        const total = base + link;
+        if (this.stamp[next] === this.generation && this.cost[next] <= total) {
+          continue;
+        }
+        this.stamp[next] = this.generation;
+        this.cost[next] = total;
+        this.parent[next] = index;
+        this.buckets[total % BUCKETS].push(next);
+        this.queued++;
+      }
+    }
+  }
+  function clamp$1(value, min, max) {
+    return value < min ? min : value > max ? max : value;
+  }
+  const CLOSE_DISTANCE = 12;
+  const MIN_RADIUS = 6;
+  const MAX_RADIUS = 120;
+  const MAX_SPACING = 200;
+  const MAX_REACH = 220;
+  const SIMPLIFY_TOLERANCE = 0.7;
+  const SNAP_WINDOW = 6;
+  const MIN_EDGE = 32;
+  class MagneticTrace {
+    /**
+     * @param options Tool wiring.
+     */
+    constructor(options) {
+      this.field = null;
+      this.wire = null;
+      this.document = { width: 0, height: 0 };
+      this.traced = [];
+      this.anchors = [];
+      this.live = [];
+      this.radius = MIN_RADIUS;
+      this.spacing = 20;
+      this.reach = MIN_RADIUS;
+      this.closeWithin = CLOSE_DISTANCE;
+      this.options = options;
+    }
+    /** Whether a trace is in progress. */
+    get isTracing() {
+      return null !== this.field;
+    }
+    /** How many anchors are pinned. */
+    get anchorCount() {
+      return this.anchors.length;
+    }
+    /**
+     * Reads the document, finds its edges, and drops the first anchor.
+     *
+     * The edge field is built once here and kept for the whole trace. It is the one
+     * expensive thing this tool does -- a Sobel over the composed document, plus the
+     * read-back from the GPU that feeds it -- and rebuilding it per anchor would put
+     * that cost on every click instead of on the first.
+     *
+     * @param point Canvas coordinates.
+     * @return Whether a trace could be started. False when there are no pixels to follow,
+     *         and the caller should fall back to an ordinary freeform lasso.
+     */
+    begin(point) {
+      const source = this.options.readDocument();
+      if (!source) {
+        return false;
+      }
+      const brush = this.options.getBrush();
+      const field = buildEdgeField(
+        source.pixels,
+        source.width,
+        source.height,
+        brush.magneticContrast / 100
+      );
+      if (!field) {
+        return false;
+      }
+      const zoom = this.documentPerScreenPixel() / field.step;
+      this.field = field;
+      this.wire = new LiveWire(field);
+      this.document = { width: source.width, height: source.height };
+      this.radius = clamp(
+        Math.round(brush.magneticWidth * zoom),
+        MIN_RADIUS,
+        MAX_RADIUS
+      );
+      this.spacing = clamp(
+        Math.round(anchorSpacing(brush.magneticFrequency) * zoom),
+        3,
+        MAX_SPACING
+      );
+      this.closeWithin = Math.max(3, CLOSE_DISTANCE * zoom);
+      const start = this.toField(point);
+      this.traced = [start];
+      this.anchors = [{ at: 0, manual: true }];
+      this.live = [start];
+      this.reach = Math.min(MAX_REACH, this.radius + this.spacing);
+      this.wire.seed(start.x, start.y, this.reach);
+      return true;
+    }
+    /**
+     * Follows the pointer, pinning boundary behind it as it goes.
+     *
+     * Anchors are dropped inside this loop rather than on a timer, and they are dropped
+     * at a point *on the traced boundary* rather than under the pointer. That difference
+     * is most of why this feels magnetic: the pointer is allowed to be sloppy, and every
+     * anchor it leaves behind still lands on the edge.
+     *
+     * @param point Canvas coordinates.
+     */
+    moveTo(point) {
+      if (!this.wire || !this.field) {
+        return;
+      }
+      const target = this.toField(point);
+      for (let pass = 0; pass < 8; pass++) {
+        const route = this.wire.pathTo(target.x, target.y);
+        if (!route) {
+          if (this.advance(target)) {
+            continue;
+          }
+          return;
+        }
+        const cut = cutAt(route, this.spacing);
+        if (cut < 0) {
+          this.live = route;
+          return;
+        }
+        this.pin(route.slice(0, this.pinIndex(route, cut) + 1), false);
+      }
+    }
+    /**
+     * Walks one straight step towards a pointer the wire cannot reach.
+     *
+     * Someone moving faster than the search can follow, or deliberately cutting across
+     * open sky, leaves the anchor behind -- and an anchor that can no longer see the
+     * pointer can never find the boundary near it again, so without this the trace would
+     * stall the first time anyone flicked their wrist and rubber-band forever after.
+     * Stepping the anchor towards the pointer keeps the search where the pointer is, and
+     * the straight line it lays down is the honest record of a stretch where the tool
+     * was following the hand rather than the picture.
+     *
+     * @param target Field coordinates of the pointer.
+     * @return Whether an anchor was moved, and the caller should search again.
+     */
+    advance(target) {
+      const from = this.traced[this.traced.length - 1];
+      const gap = Math.hypot(target.x - from.x, target.y - from.y);
+      if (gap <= this.spacing) {
+        this.live = [from, target];
+        return false;
+      }
+      const reach = this.spacing / gap;
+      this.pin(
+        [
+          from,
+          {
+            x: Math.round(from.x + (target.x - from.x) * reach),
+            y: Math.round(from.y + (target.y - from.y) * reach)
+          }
+        ],
+        false
+      );
+      return true;
+    }
+    /**
+     * Pins an anchor where the pointer is.
+     *
+     * @param point Canvas coordinates.
+     */
+    anchorAt(point) {
+      if (!this.wire) {
+        return;
+      }
+      this.moveTo(point);
+      this.pinLive(true);
+    }
+    /**
+     * Takes back the last anchor.
+     *
+     * @return Whether the trace is still alive. False once the first anchor has gone,
+     *         and the caller should abandon it.
+     */
+    undoAnchor() {
+      if (!this.wire || this.anchors.length < 2) {
+        return false;
+      }
+      this.anchors.pop();
+      const { at } = this.anchors[this.anchors.length - 1];
+      const anchor = this.traced[at];
+      this.traced.length = at + 1;
+      this.live = [anchor];
+      this.wire.seed(anchor.x, anchor.y, this.reach);
+      return true;
+    }
+    /**
+     * Closes the loop and hands back what was traced.
+     *
+     * Whatever the wire is showing is included first, because what is on screen when
+     * someone presses Enter is what they think they are selecting. The segment from
+     * there back to the first anchor is traced too where the wire can reach it, which is
+     * exactly the case that matters: closing by clicking near where you started should
+     * follow the boundary round the last few pixels rather than cutting the corner.
+     *
+     * @return The region, or null when too little was traced to enclose anything.
+     */
+    close() {
+      if (!this.field || this.anchors.length < 1) {
+        return null;
+      }
+      this.pinLive(true);
+      const start = this.traced[0];
+      const closing = this.wire?.pathTo(start.x, start.y);
+      if (closing && closing.length > 2) {
+        this.traced.push(...closing.slice(1, -1));
+      }
+      const points = this.normalise(this.traced);
+      return points.length > 2 ? { shape: "lasso", points } : null;
+    }
+    /**
+     * The anchors to mark right now.
+     *
+     * Shown because an anchor is the only irreversible thing this tool does while it is
+     * running: everything behind one is fixed for the rest of the trace, and only the
+     * stretch in front of it still moves with the hand. Somebody deciding whether to
+     * click needs to know where the last one landed, and somebody deciding whether to
+     * press Backspace needs to know what it would take back.
+     *
+     * @return Anchors in normalised coordinates, or an empty list when nothing is traced.
+     */
+    anchorPoints() {
+      if (!this.field) {
+        return [];
+      }
+      return this.anchors.map((anchor) => ({
+        point: this.toNormalised(this.traced[anchor.at]),
+        manual: anchor.manual
+      }));
+    }
+    /**
+     * The outline to draw right now: everything pinned, plus the live wire.
+     *
+     * @return The outline, or null when there is not enough of it to draw.
+     */
+    outline() {
+      if (!this.field) {
+        return null;
+      }
+      const points = this.normalise([...this.traced, ...this.live.slice(1)]);
+      return points.length > 1 ? { shape: "lasso", points } : null;
+    }
+    /**
+     * Whether a press at a point should be read as "close the loop".
+     *
+     * @param point Canvas coordinates.
+     */
+    nearStart(point) {
+      if (!this.field || this.anchors.length < 2) {
+        return false;
+      }
+      const at = this.toField(point);
+      const start = this.traced[0];
+      return Math.hypot(at.x - start.x, at.y - start.y) <= this.closeWithin;
+    }
+    /** Abandons the trace and releases the edge field. */
+    clear() {
+      this.field = null;
+      this.wire = null;
+      this.traced = [];
+      this.anchors = [];
+      this.live = [];
+    }
+    /**
+     * Pins whatever the wire is currently showing, ending it on the boundary.
+     *
+     * @param manual Whether a click asked for this.
+     */
+    pinLive(manual) {
+      if (this.live.length < 2) {
+        return;
+      }
+      this.pin(
+        this.live.slice(0, this.pinIndex(this.live, this.live.length - 1) + 1),
+        manual
+      );
+    }
+    /**
+     * Where along a wire an anchor may safely be pinned.
+     *
+     * The last stretch of any wire is the hop out to wherever the pointer actually is,
+     * which is off the boundary by however sloppily the user is pointing. Pinning there
+     * is the single most visible way this tool can go wrong: the slop is baked in
+     * permanently, and because the next wire starts from the anchor and has to climb
+     * back onto the boundary, what the user gets is a *spike* out to where their hand
+     * happened to be and straight back again.
+     *
+     * So the anchor goes to the last point that is genuinely on an edge -- the moment
+     * before the wire let go of it -- measured against the strongest edge this particular
+     * wire found rather than against a fixed number, because "strong" on a foggy morning
+     * and "strong" on a studio cut-out are two different quantities. A wire that found no
+     * edge at all is pinned exactly where the spacing rule asked, since there is nothing
+     * better on offer and moving it would only be guessing.
+     *
+     * @param route Wire path.
+     * @param cut   Where the spacing rule wants the anchor.
+     */
+    pinIndex(route, cut) {
+      const field = this.field;
+      const last = Math.min(route.length - 1, cut + SNAP_WINDOW);
+      const strength = (i) => field.strength[route[i].y * field.width + route[i].x];
+      let peak = 0;
+      for (let i = 1; i <= last; i++) {
+        peak = Math.max(peak, strength(i));
+      }
+      if (peak < MIN_EDGE) {
+        return cut;
+      }
+      for (let i = last; i >= 1; i--) {
+        if (strength(i) * 2 >= peak) {
+          return i;
+        }
+      }
+      return cut;
+    }
+    /**
+     * Adds a stretch of traced boundary and reseeds the wire at the end of it.
+     *
+     * @param route  Wire path, starting at the current anchor.
+     * @param manual Whether a click asked for this, rather than the Frequency setting.
+     */
+    pin(route, manual) {
+      const end = route[route.length - 1];
+      this.traced.push(...route.slice(1));
+      this.anchors.push({ at: this.traced.length - 1, manual });
+      this.live = [end];
+      this.wire?.seed(end.x, end.y, this.reach);
+    }
+    /**
+     * Field coordinates for a point on the canvas.
+     *
+     * @param point Canvas coordinates.
+     */
+    toField(point) {
+      const field = this.field;
+      return {
+        x: clamp(Math.round(point.x / field.step), 0, field.width - 1),
+        y: clamp(Math.round(point.y / field.step), 0, field.height - 1)
+      };
+    }
+    /**
+     * A traced path as normalised vertices, simplified to fit a `Selection`.
+     *
+     * The tolerance is loosened until the path fits rather than the path being
+     * decimated to length: dropping every third vertex of a boundary would spend the
+     * budget evenly over straights and corners, and the corners are the only part of a
+     * traced outline anyone can see.
+     *
+     * @param route Field coordinates.
+     */
+    normalise(route) {
+      let simplified = simplifyPath(route, SIMPLIFY_TOLERANCE);
+      for (let tolerance = SIMPLIFY_TOLERANCE * 2; simplified.length > MAX_LASSO_POINTS && tolerance < 64; tolerance *= 2) {
+        simplified = simplifyPath(route, tolerance);
+      }
+      return simplified.map((at) => this.toNormalised(at));
+    }
+    /**
+     * One field point as a normalised canvas coordinate.
+     *
+     * Half a field pixel is added, so a vertex sits in the middle of the pixel it names
+     * rather than on its leading corner -- which matters at a stride of four, where the
+     * difference is two document pixels of consistent bias.
+     *
+     * @param at Field coordinates.
+     */
+    toNormalised(at) {
+      const { step } = this.field;
+      return {
+        x: clamp((at.x * step + step / 2) / this.document.width, 0, 1),
+        y: clamp((at.y * step + step / 2) / this.document.height, 0, 1)
+      };
+    }
+    /** How many document pixels one screen pixel currently covers. */
+    documentPerScreenPixel() {
+      const viewport = this.options.getViewport();
+      const canvas = this.options.getCanvas();
+      if (!viewport || viewport.width < 1 || canvas.width < 1) {
+        return 1;
+      }
+      return canvas.width / viewport.width;
+    }
+  }
+  function anchorSpacing(frequency) {
+    return 4 + (100 - clamp(frequency, 0, 100)) * 0.9;
+  }
+  function cutAt(route, spacing) {
+    let travelled = 0;
+    for (let i = 1; i < route.length; i++) {
+      travelled += Math.hypot(
+        route[i].x - route[i - 1].x,
+        route[i].y - route[i - 1].y
+      );
+      if (travelled >= spacing) {
+        return i;
+      }
+    }
+    return -1;
+  }
+  function clamp(value, min, max) {
+    return value < min ? min : value > max ? max : value;
   }
   function cutPatch(buffer, rect) {
     const patch = document.createElement("canvas");
@@ -9897,12 +10684,25 @@ fn mainFragment(
      * @return The selection to show, or null to clear it.
      */
     begin(point, shape) {
-      if ("polygon" === shape) {
+      if ("polygon" === this.drawn(shape)) {
         return this.addVertex(point);
       }
       this.from = point;
       this.points = [point];
       return null;
+    }
+    /**
+     * The shape a gesture actually draws.
+     *
+     * Only ever different for the magnetic lasso, which reaches this class at all when
+     * it could not read the document to find an edge in. What it falls back to is a
+     * freeform drag -- the same tool with the magnetism switched off -- so that is what
+     * gets drawn.
+     *
+     * @param shape Shape the marquee tool is set to.
+     */
+    drawn(shape) {
+      return "magnetic" === shape ? "lasso" : shape;
     }
     /**
      * Extends a marquee.
@@ -9915,11 +10715,12 @@ fn mainFragment(
       if (!this.from) {
         return null;
       }
-      if ("lasso" === shape) {
+      const drawn = this.drawn(shape);
+      if ("lasso" === drawn) {
         this.points = appendPathPoint(this.points, point);
         return { shape: "lasso", points: this.points };
       }
-      return selectionFromDrag(shape, this.from, point);
+      return selectionFromDrag(drawn, this.from, point);
     }
     /** Ends a drag, leaving whatever it produced in place. */
     endDrag() {
@@ -9934,6 +10735,7 @@ fn mainFragment(
   function newGesture(options) {
     return {
       selection: new SelectionGesture(),
+      magnetic: new MagneticTrace(options),
       preview: new DragPreview(options.stage),
       stroke: new PixelStroke(options),
       drawing: false,
@@ -9958,6 +10760,58 @@ fn mainFragment(
       shapeKind: options.getBrush().shapeKind,
       square: event.shiftKey
     };
+  }
+  function pressMagnetic(options, gesture, point, event) {
+    const trace = gesture.magnetic;
+    if (trace.isTracing) {
+      if (trace.nearStart(point)) {
+        closeMagnetic(options, gesture);
+      } else {
+        trace.anchorAt(point);
+        show(options, gesture);
+      }
+      return true;
+    }
+    gesture.selectionMode = effectiveMode(options.getSelectionMode(), event);
+    if (!trace.begin(point)) {
+      return false;
+    }
+    show(options, gesture);
+    return true;
+  }
+  function show(options, gesture) {
+    options.previewSelection(gesture.magnetic.outline());
+    options.previewAnchors(gesture.magnetic.anchorPoints());
+  }
+  function moveMagnetic(options, gesture, point) {
+    if (!gesture.magnetic.isTracing) {
+      return;
+    }
+    gesture.magnetic.moveTo(point);
+    show(options, gesture);
+  }
+  function closeMagnetic(options, gesture) {
+    if (!gesture.magnetic.isTracing) {
+      return false;
+    }
+    const selection = gesture.magnetic.close();
+    gesture.magnetic.clear();
+    options.previewSelection(null);
+    options.previewAnchors([]);
+    if (selection) {
+      options.commitSelection(selection, gesture.selectionMode);
+    }
+    return true;
+  }
+  function undoMagneticAnchor(options, gesture) {
+    if (!gesture.magnetic.isTracing) {
+      return false;
+    }
+    if (!gesture.magnetic.undoAnchor()) {
+      gesture.magnetic.clear();
+    }
+    show(options, gesture);
+    return true;
   }
   function paintPath(options, points) {
     const canvas = options.getCanvas();
@@ -10076,7 +10930,7 @@ fn mainFragment(
     );
   }
   function routePress(options, gesture, tool, point, event) {
-    const norm = () => normalise(options.getCanvas(), point);
+    const norm = () => normalise$1(options.getCanvas(), point);
     switch (tool) {
       case "zoom":
         zoomAtPointer(options, event);
@@ -10098,7 +10952,7 @@ fn mainFragment(
         gesture.last = point;
         return "drag";
       case "select":
-        return beginSelection(options, gesture, norm(), event);
+        return beginSelection(options, gesture, point, norm(), event);
       case "gradient":
       case "shape":
         gesture.dragFrom = point;
@@ -10110,8 +10964,11 @@ fn mainFragment(
         return "stroke";
     }
   }
-  function beginSelection(options, gesture, point, event) {
+  function beginSelection(options, gesture, at, point, event) {
     const shape = options.getSelectionShape();
+    if ("magnetic" === shape && pressMagnetic(options, gesture, at, event)) {
+      return "done";
+    }
     const starting = "polygon" !== shape || 0 === gesture.selection.vertices.length;
     if (starting) {
       gesture.selectionMode = effectiveMode(options.getSelectionMode(), event);
@@ -10215,6 +11072,13 @@ fn mainFragment(
       colour: "#000000",
       background: "#ffffff",
       tolerance: 32,
+      magneticWidth: 20,
+      magneticContrast: 10,
+      // Below Photoshop's 57, deliberately. An anchor is permanent, and the stretch
+      // between the last one and the pointer is the part still being reconsidered --
+      // so the default errs towards leaving more of the trace live and letting a click
+      // be what commits it.
+      magneticFrequency: 40,
       retouch: "blur",
       tone: "dodge",
       strength: 0.5,
@@ -10234,6 +11098,7 @@ fn mainFragment(
      * @param options Tool wiring.
      */
     constructor(options) {
+      this.tracking = false;
       this.onPointerDown = (event) => {
         const tool = this.options.getTool();
         if ("transform" === tool || "crop" === tool) {
@@ -10251,6 +11116,7 @@ fn mainFragment(
         }
         event.preventDefault();
         const outcome = routePress(this.options, this.gesture, tool, point, event);
+        this.syncMagnetic();
         if ("done" === outcome) {
           return;
         }
@@ -10261,6 +11127,19 @@ fn mainFragment(
           strokeDab(this.options, this.gesture, point, tool);
         }
         this.listen();
+      };
+      this.onTraceMove = (event) => {
+        const stage = this.options.stage.getBoundingClientRect();
+        if (event.clientX < stage.left || event.clientX > stage.right || event.clientY < stage.top || event.clientY > stage.bottom) {
+          return;
+        }
+        const point = toCanvas(this.options, event);
+        if (point) {
+          moveMagnetic(this.options, this.gesture, point);
+        }
+      };
+      this.onTraceDoubleClick = () => {
+        this.closeShape();
       };
       this.onPointerMove = (event) => {
         const tool = this.options.getTool();
@@ -10282,7 +11161,7 @@ fn mainFragment(
         }
         if (this.gesture.selection.isDragging) {
           this.gesture.pendingSelection = this.gesture.selection.extend(
-            normalise(this.options.getCanvas(), point),
+            normalise$1(this.options.getCanvas(), point),
             this.options.getSelectionShape()
           );
           this.options.previewSelection(this.gesture.pendingSelection);
@@ -10317,6 +11196,31 @@ fn mainFragment(
       this.gesture = newGesture(options);
       options.stage.addEventListener("pointerdown", this.onPointerDown);
     }
+    /**
+     * Follows the pointer while a magnetic trace is open, and stops when it closes.
+     *
+     * Called after anything that could have started or finished one. Idempotent, so
+     * every caller can simply say "make this match" rather than knowing which of the two
+     * just happened.
+     *
+     * The listener is on `window` rather than on the stage, because a trace is not a
+     * drag: there is no button held, nothing has pointer capture, and a pointer crossing
+     * the marquee overlay or a ruler would otherwise be lost mid-gesture.
+     */
+    syncMagnetic() {
+      const wanted = this.gesture.magnetic.isTracing;
+      if (wanted === this.tracking) {
+        return;
+      }
+      this.tracking = wanted;
+      if (wanted) {
+        window.addEventListener("pointermove", this.onTraceMove);
+        this.options.stage.addEventListener("dblclick", this.onTraceDoubleClick);
+        return;
+      }
+      window.removeEventListener("pointermove", this.onTraceMove);
+      this.options.stage.removeEventListener("dblclick", this.onTraceDoubleClick);
+    }
     /** Starts tracking a drag on the window, so a release anywhere ends it. */
     listen() {
       window.addEventListener("pointermove", this.onPointerMove);
@@ -10324,9 +11228,9 @@ fn mainFragment(
       window.addEventListener("pointercancel", this.onPointerUp);
       window.addEventListener("blur", this.onPointerUp);
     }
-    /** Whether a polygon or a pen path is half-placed on the canvas. */
+    /** Whether a polygon, a pen path or a magnetic trace is half-placed on the canvas. */
     get hasPath() {
-      return this.gesture.selection.vertices.length > 0;
+      return this.gesture.selection.vertices.length > 0 || this.gesture.magnetic.isTracing;
     }
     /** Where the clone stamp is currently sampling from, if anywhere. */
     getCloneSource() {
@@ -10351,11 +11255,20 @@ fn mainFragment(
       return true;
     }
     /**
-     * Closes a polygon marquee and folds it into the selection.
+     * Closes whatever is being placed click by click, and folds it into the selection.
      *
-     * @return Whether there was a polygon worth closing.
+     * A polygon marquee or a magnetic trace. Both are finished by an explicit "done"
+     * rather than by a pointer release, and one method answers for both because the
+     * keyboard, the options bar and a double-click all mean the same thing by it.
+     *
+     * @return Whether there was a shape worth closing.
      */
-    closePolygon() {
+    closeShape() {
+      if (this.gesture.magnetic.isTracing) {
+        const closed = closeMagnetic(this.options, this.gesture);
+        this.syncMagnetic();
+        return closed;
+      }
       const points = this.gesture.selection.vertices;
       if (points.length < 3) {
         this.clearPath();
@@ -10368,15 +11281,34 @@ fn mainFragment(
       this.clearPath();
       return true;
     }
-    /** Abandons a half-placed polygon or pen path, and takes its outline down. */
+    /**
+     * Takes back the last anchor of a magnetic trace.
+     *
+     * The trace's own undo, and deliberately not the editor's: nothing has been folded
+     * into the selection yet, so there is no history entry to step back through, and
+     * Backspace here has to mean "that anchor was in the wrong place" rather than "undo
+     * whatever I did before I picked up this tool".
+     *
+     * @return Whether there was a trace to act on.
+     */
+    undoAnchor() {
+      const acted = undoMagneticAnchor(this.options, this.gesture);
+      this.syncMagnetic();
+      return acted;
+    }
+    /** Abandons a half-placed polygon, pen path or magnetic trace, and takes it down. */
     clearPath() {
       this.gesture.selection.clear();
+      this.gesture.magnetic.clear();
       this.gesture.pendingSelection = null;
       this.options.previewSelection(null);
+      this.syncMagnetic();
     }
     /** Removes the listeners. */
     destroy() {
       this.onPointerUp();
+      this.gesture.magnetic.clear();
+      this.syncMagnetic();
       this.gesture.preview.destroy();
       this.options.stage.removeEventListener("pointerdown", this.onPointerDown);
     }
@@ -11001,12 +11933,15 @@ fn mainFragment(
     constructor(options) {
       this.selection = null;
       this.pending = null;
+      this.anchors = [];
       this.sync = () => {
         const viewport = this.options.getViewport();
         if (!this.selection && !this.pending || !viewport) {
           this.svg.style.display = "none";
           this.paint("lz-selection__", "");
           this.paint("lz-selection__pending-", "");
+          this.mark("auto", "");
+          this.mark("manual", "");
           return;
         }
         this.svg.style.display = "";
@@ -11016,6 +11951,20 @@ fn mainFragment(
         this.svg.setAttribute("height", String(viewport.height));
         this.paint("lz-selection__", this.outline(this.selection, viewport));
         this.paint("lz-selection__pending-", this.outline(this.pending, viewport));
+        for (const kind of ["auto", "manual"]) {
+          const of = this.anchors.filter(
+            (anchor) => anchor.manual === ("manual" === kind)
+          );
+          this.mark(
+            kind,
+            anchorMarks(
+              of,
+              viewport.width,
+              viewport.height,
+              "manual" === kind ? 9 : 6
+            )
+          );
+        }
       };
       this.options = options;
       this.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -11025,7 +11974,9 @@ fn mainFragment(
         "lz-selection__under",
         "lz-selection__over",
         "lz-selection__pending-under",
-        "lz-selection__pending-over"
+        "lz-selection__pending-over",
+        "lz-selection__anchor-auto",
+        "lz-selection__anchor-manual"
       ]) {
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute("class", cls);
@@ -11050,6 +12001,7 @@ fn mainFragment(
     set(selection) {
       this.selection = isEmptySelection(selection) ? null : selection;
       this.pending = null;
+      this.anchors = [];
       const canvas = this.options.getCanvas();
       this.options.setMask(
         buildSelectionMask(this.selection, canvas.width, canvas.height)
@@ -11070,6 +12022,18 @@ fn mainFragment(
       this.sync();
     }
     /**
+     * Marks the points a magnetic trace has committed to.
+     *
+     * @param anchors Anchors to mark. Empty takes the marks down.
+     */
+    setAnchors(anchors) {
+      if (0 === anchors.length && 0 === this.anchors.length) {
+        return;
+      }
+      this.anchors = anchors;
+      this.sync();
+    }
+    /**
      * Folds a finished region into the selection.
      *
      * @param selection Region just drawn, or null when the gesture produced nothing.
@@ -11083,6 +12047,15 @@ fn mainFragment(
     /** Selects the whole canvas. */
     selectAll() {
       this.set({ ...SELECT_ALL });
+    }
+    /**
+     * Writes the anchor marks of one kind.
+     *
+     * @param kind Which set.
+     * @param d    Path data.
+     */
+    mark(kind, d) {
+      this.svg.querySelector(`.lz-selection__anchor-${kind}`)?.setAttribute("d", d);
     }
     /**
      * One selection as path data, or nothing when there is none.
@@ -11249,6 +12222,7 @@ fn mainFragment(
         getSelectionShape: () => editor.selectionShape,
         setSelectionShape: (shape) => {
           editor.selectionShape = shape;
+          shell2.stage.dataset.shape = shape;
           toolset.tools.clearPath();
         },
         getSelectionMode: () => editor.selectionMode,
@@ -11302,6 +12276,7 @@ fn mainFragment(
         getSelectionShape: () => editor.selectionShape,
         getSelectionMode: () => editor.selectionMode,
         previewSelection: (next) => selection.setPending(next),
+        previewAnchors: (anchors) => selection.setAnchors(anchors),
         commitSelection: (next, mode) => selection.combine(next, mode),
         pan: (dx, dy) => renderer.view.pan(dx, dy),
         zoomAt: (factor, x, y) => renderer.view.zoomAt(factor, x, y),
@@ -11336,6 +12311,7 @@ fn mainFragment(
     });
     toolset.setRulersVisible(state2.getView().rulers);
     shell2.stage.classList.toggle("has-rulers", state2.getView().rulers);
+    shell2.stage.dataset.shape = editor.selectionShape;
     editor.onTeardown(
       renderer.view.onChange(toolset.redraw),
       renderer.view.onChange(selection.sync),

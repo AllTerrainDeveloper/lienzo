@@ -15,7 +15,12 @@ export interface Point {
 }
 
 /** How a selection was drawn. */
-export type SelectionShape = 'rect' | 'ellipse' | 'lasso' | 'polygon';
+export type SelectionShape =
+	| 'rect'
+	| 'ellipse'
+	| 'lasso'
+	| 'polygon'
+	| 'magnetic';
 
 /** The shapes on offer, in picker order. */
 export const SELECTION_SHAPES: Array< { value: SelectionShape; label: string } > = [
@@ -23,7 +28,22 @@ export const SELECTION_SHAPES: Array< { value: SelectionShape; label: string } >
 	{ value: 'ellipse', label: 'Ellipse' },
 	{ value: 'lasso', label: 'Freeform' },
 	{ value: 'polygon', label: 'Polygon' },
+	{ value: 'magnetic', label: 'Magnetic' },
 ];
+
+/**
+ * The shapes that are placed and closed rather than dragged out.
+ *
+ * A polygon is finished with Enter or by clicking its first vertex; so is a magnetic
+ * trace. Neither has a pointer release that means "done", which is what separates them
+ * from every other shape -- so the shortcut table, the options bar hint and the press
+ * router all need the same answer, and get it from here.
+ *
+ * @param shape Shape the marquee tool is drawing.
+ */
+export function isPlacedShape( shape: SelectionShape ): boolean {
+	return 'polygon' === shape || 'magnetic' === shape;
+}
 
 /**
  * What a newly drawn region does to the selection that is already there.
@@ -98,6 +118,21 @@ export function effectiveMode(
 	}
 
 	return mode;
+}
+
+/**
+ * A point the magnetic lasso has committed to.
+ *
+ * Worth showing, and worth distinguishing, because the two kinds mean different things.
+ * Everything behind an anchor is fixed for the rest of the trace; only the stretch
+ * between the last one and the pointer is still being reconsidered. So an anchor is not
+ * decoration -- it is the boundary between the part you can still change by moving your
+ * hand and the part you can only change with Backspace.
+ */
+export interface SelectionAnchor {
+	point: Point;
+	/** Whether a click put it there, rather than the Frequency setting. */
+	manual: boolean;
 }
 
 /** A selected region. */

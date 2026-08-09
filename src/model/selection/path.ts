@@ -7,7 +7,7 @@
 
 import { selectionBounds } from './bounds';
 import { MAX_LASSO_POINTS } from './types';
-import type { Point, Selection } from './types';
+import type { Point, Selection, SelectionAnchor } from './types';
 
 /**
  * Builds the selection's outline as an SVG path.
@@ -100,6 +100,133 @@ export function thinPath(
 	}
 
 	return out;
+}
+
+/**
+ * Builds the anchor marks of a trace as one SVG path.
+ *
+ * One path holding every square rather than an element each, for the same reason the
+ * outline is one path: the count changes on almost every pointer move, and a renderer
+ * that has to add and remove twenty nodes a second is a renderer that will eventually
+ * leave one behind. Setting a `d` attribute cannot.
+ *
+ * @param anchors Anchors to mark.
+ * @param width   Viewport width in CSS pixels.
+ * @param height  Viewport height in CSS pixels.
+ * @param size    Length of each square's side, in CSS pixels.
+ */
+export function anchorMarks(
+	anchors: SelectionAnchor[],
+	width: number,
+	height: number,
+	size: number
+): string {
+	const half = size / 2;
+
+	return anchors
+		.map( ( anchor ) => {
+			const x = anchor.point.x * width - half;
+			const y = anchor.point.y * height - half;
+
+			return `M ${ x } ${ y } h ${ size } v ${ size } h ${ -size } Z`;
+		} )
+		.join( ' ' );
+}
+
+/**
+ * Drops the vertices of a path that were already implied by its neighbours.
+ *
+ * Ramer, Douglas and Peucker: keep the two ends, keep whichever point in between lies
+ * furthest from the line joining them, and recur on the two halves -- but only where
+ * that furthest point is further out than the tolerance allows.
+ *
+ * A traced path needs this in a way a hand-drawn one does not. A lasso is thinned as it
+ * is drawn, by distance, because a pointer emits far more samples than an outline needs.
+ * A path that came off a *pixel grid* has the opposite problem: every vertex is exactly
+ * one pixel from the last, so a straight run of two hundred pixels arrives as two
+ * hundred vertices, and dropping every third one to fit a budget would take the corners
+ * with it. Simplifying by distance-from-the-line keeps the corners -- which are the only
+ * part anyone can see -- and spends nothing on the straights.
+ *
+ * Iterative rather than recursive: these paths are thousands of points long, and the
+ * worst case for the recursion is one frame per vertex.
+ *
+ * @param points    Path.
+ * @param tolerance How far a dropped vertex may lie from the line that replaces it.
+ */
+export function simplifyPath( points: Point[], tolerance: number ): Point[] {
+	if ( points.length < 3 || tolerance <= 0 ) {
+		return points;
+	}
+
+	const keep = new Uint8Array( points.length );
+	const stack: Array< [ number, number ] > = [ [ 0, points.length - 1 ] ];
+	const limit = tolerance * tolerance;
+
+	keep[ 0 ] = 1;
+	keep[ points.length - 1 ] = 1;
+
+	while ( stack.length > 0 ) {
+		const [ first, last ] = stack.pop() as [ number, number ];
+
+		let worst = -1;
+		let at = -1;
+
+		for ( let i = first + 1; i < last; i++ ) {
+			const distance = squaredDistanceToSegment(
+				points[ i ],
+				points[ first ],
+				points[ last ]
+			);
+
+			if ( distance > worst ) {
+				worst = distance;
+				at = i;
+			}
+		}
+
+		if ( at < 0 || worst <= limit ) {
+			continue;
+		}
+
+		keep[ at ] = 1;
+		stack.push( [ first, at ], [ at, last ] );
+	}
+
+	return points.filter( ( _, i ) => 1 === keep[ i ] );
+}
+
+/**
+ * How far a point lies from a segment, squared.
+ *
+ * Squared throughout, so the whole simplification runs without a square root.
+ *
+ * @param point Point to measure.
+ * @param from  Start of the segment.
+ * @param to    End of the segment.
+ */
+function squaredDistanceToSegment( point: Point, from: Point, to: Point ): number {
+	const dx = to.x - from.x;
+	const dy = to.y - from.y;
+	const length = dx * dx + dy * dy;
+
+	// A zero-length segment is a point, and the distance to it is the distance to either
+	// end. This happens whenever a closed path is simplified in one call.
+	const t =
+		0 === length
+			? 0
+			: Math.max(
+					0,
+					Math.min(
+						1,
+						( ( point.x - from.x ) * dx + ( point.y - from.y ) * dy ) / length
+					)
+			  );
+
+	const ox = point.x - ( from.x + t * dx );
+	const oy = point.y - ( from.y + t * dy );
+
+	return ox * ox + oy * oy;
 }
 
 /**

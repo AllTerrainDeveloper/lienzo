@@ -7,6 +7,8 @@
  * to lose. Those decisions are easier to get right -- and to read -- side by side.
  */
 
+import { isPlacedShape } from '../model/selection';
+import type { SelectionShape } from '../model/selection';
 import { hasCommandKey, onEditorKey } from './keys';
 
 /** What the shortcuts act on. */
@@ -20,16 +22,18 @@ export interface ShortcutTarget {
 	deselect: () => void;
 	/** Whether anything is selected. */
 	hasSelection: () => boolean;
-	/** Whether a polygon or a pen path is half-placed on the canvas. */
+	/** Whether a polygon, a pen path or a magnetic trace is half-placed on the canvas. */
 	hasPendingPath: () => boolean;
 	/** Which tool owns the stage. */
 	getTool: () => string;
 	/** Which shape the marquee tool is drawing. */
-	getSelectionShape: () => string;
+	getSelectionShape: () => SelectionShape;
 	/** Closes an in-progress path. True when one was closed. */
 	commitPath: () => boolean;
-	/** Closes an in-progress polygon marquee into the selection. */
-	closePolygon: () => void;
+	/** Closes an in-progress polygon marquee or magnetic trace into the selection. */
+	closeShape: () => void;
+	/** Takes back the last magnetic anchor. True when there was a trace to act on. */
+	undoAnchor: () => boolean;
 	/** Abandons an in-progress path without drawing it. */
 	clearPath: () => void;
 	/** Fits the whole picture back on screen. */
@@ -110,8 +114,8 @@ function handlePlain( event: KeyboardEvent, target: ShortcutTarget ): void {
 		return;
 	}
 
-	// Enter closes whatever is being placed click by click: a polygon selection, or a
-	// path, which is drawn rather than selected.
+	// Enter closes whatever is being placed click by click: a polygon selection, a
+	// magnetic trace, or a path, which is drawn rather than selected.
 	if ( 'Enter' === event.key ) {
 		if ( 'path' === target.getTool() ) {
 			event.preventDefault();
@@ -123,12 +127,26 @@ function handlePlain( event: KeyboardEvent, target: ShortcutTarget ): void {
 			return;
 		}
 
-		// A polygon has no release to finish it, so Enter is what folds it into the
-		// selection -- in whatever mode its first click was made in.
-		if ( 'polygon' === target.getSelectionShape() ) {
+		// Neither a polygon nor a magnetic trace has a release that finishes it, so
+		// Enter is what folds one into the selection -- in whatever mode its first click
+		// was made in.
+		if ( isPlacedShape( target.getSelectionShape() ) ) {
 			event.preventDefault();
-			target.closePolygon();
+			target.closeShape();
 		}
+
+		return;
+	}
+
+	// Backspace takes back the last magnetic anchor. It is claimed only while a trace is
+	// actually open -- `undoAnchor()` says so -- because outside one the key belongs to
+	// the browser, and a selection tool that swallowed Backspace on an admin screen
+	// would break the back gesture on every trackpad that has one.
+	if (
+		( 'Backspace' === event.key || 'Delete' === event.key ) &&
+		target.undoAnchor()
+	) {
+		event.preventDefault();
 
 		return;
 	}

@@ -88,6 +88,7 @@ export function buildStageToolset( editor: Editor ): StageToolset {
 			getSelectionShape: () => editor.selectionShape,
 			setSelectionShape: ( shape ) => {
 				editor.selectionShape = shape;
+				shell.stage.dataset.shape = shape;
 
 				// Only the half-placed polygon goes: reaching for the ellipse in order to
 				// add one to a rectangle you already have is the ordinary case now, and
@@ -150,6 +151,7 @@ export function buildStageToolset( editor: Editor ): StageToolset {
 			getSelectionShape: () => editor.selectionShape,
 			getSelectionMode: () => editor.selectionMode,
 			previewSelection: ( next ) => selection.setPending( next ),
+			previewAnchors: ( anchors ) => selection.setAnchors( anchors ),
 			commitSelection: ( next, mode ) => selection.combine( next, mode ),
 			pan: ( dx, dy ) => renderer.view.pan( dx, dy ),
 			zoomAt: ( factor, x, y ) => renderer.view.zoomAt( factor, x, y ),
@@ -189,6 +191,10 @@ export function buildStageToolset( editor: Editor ): StageToolset {
 
 	toolset.setRulersVisible( state.getView().rulers );
 	shell.stage.classList.toggle( 'has-rulers', state.getView().rulers );
+
+	// The marquee's five shapes share one tool, so the cursor is the only thing on screen
+	// that can say which of them a press would start. It reads this.
+	shell.stage.dataset.shape = editor.selectionShape;
 
 	// Redrawn on zoom and on any brush change, so the ring resizes under a stationary
 	// pointer rather than waiting for the next movement.

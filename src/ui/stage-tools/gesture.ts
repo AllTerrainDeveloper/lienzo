@@ -10,6 +10,7 @@
 
 import type { Point, Selection, SelectionMode } from '../../model/selection';
 import { DragPreview } from './drag-preview';
+import { MagneticTrace } from './magnetic-trace';
 import { PixelStroke } from './pixel-stroke';
 import { SelectionGesture } from './selection-gesture';
 import type { StageToolsOptions } from './types';
@@ -18,6 +19,15 @@ import type { StageToolsOptions } from './types';
 export interface Gesture {
 	/** The marquee being drawn, and the vertices placed so far. */
 	selection: SelectionGesture;
+	/**
+	 * The magnetic lasso being traced.
+	 *
+	 * Its own object rather than a shape of `SelectionGesture`, because it is the one
+	 * marquee that is not a list of points the pointer visited: it holds an edge field
+	 * read off the document and a search over it, and outlives the drag lifecycle the
+	 * way a half-placed polygon does.
+	 */
+	magnetic: MagneticTrace;
 	/** The dashed outline shown while dragging a region out. */
 	preview: DragPreview;
 	/** The retouching stroke in progress. */
@@ -51,6 +61,7 @@ export interface Gesture {
 export function newGesture( options: StageToolsOptions ): Gesture {
 	return {
 		selection: new SelectionGesture(),
+		magnetic: new MagneticTrace( options ),
 		preview: new DragPreview( options.stage ),
 		stroke: new PixelStroke( options ),
 		drawing: false,
