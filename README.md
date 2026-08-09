@@ -496,6 +496,7 @@ includes/
   shell-api.php            resolves the shell's renamed functions and hooks
   requirements.php         the shell capability gate
   admin-page.php           the classic-admin editor page, under Media
+                             (registered always, in the menu only without the desktop)
   helpers/                 capabilities, source resolution, MIME, render ceilings
   recipe/                  op schema, defaults, migration, validation
                              (contract twin of src/model/recipe)
@@ -829,6 +830,13 @@ Stated plainly, because each is better read here than discovered:
 - **Linear light moves exposure and nothing else.** Blur and sharpen still run on encoded values,
   where a physically correct pipeline would filter in linear too; the difference is small and the
   change is not.
+- **"Edit Photos" is not in the Media menu while the desktop is running.** The shell hides the whole
+  admin body behind the desktop, so an editor mounted on that page would be a live WebGL context and
+  a full-resolution texture inside a `display: none` container. The item is registered and then
+  removed from the menu, so the URL still answers — a bookmark, or the `editorUrl` in the config
+  blob — and what it answers with is a sentence saying where the editor is and a button that opens
+  it. Lienzo lives in the dock and on the wallpaper there; `lienzo_desktop_owns_the_editor` is the
+  one filter that decides.
 - **A save from the classic-admin overlay does not put the edit back into the post.** The block
   editor's image block is repointed, because it can be — but the Media Library row action and the
   media picker have nowhere to put an answer. Inside the shell that is what the drag bridge is for.
