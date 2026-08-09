@@ -118,6 +118,11 @@ export function isShellPage(): boolean {
  * Same-origin only, and the payload is one integer -- an iframe on this page is our
  * own admin, but the check costs nothing and the alternative is trusting whatever
  * else might be embedded.
+ *
+ * Zero is a request, not a missing one: "open the window on its own picker", which is
+ * what Media -> Edit Photos asks for. Routing it through `openInDesktop()` -- which
+ * requires an image and refuses without one -- meant that page posted a message the
+ * shell dropped on the floor, having already told the user it was opening something.
  */
 export function listenForOpenRequests(): void {
 	if ( state().listenerRegistered ) {
@@ -137,7 +142,7 @@ export function listenForOpenRequests(): void {
 			return;
 		}
 
-		openInDesktop( Number( data.attachmentId ) || 0 );
+		openDesktopWindow( Number( data.attachmentId ) || 0 );
 	} );
 }
 

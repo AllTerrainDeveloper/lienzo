@@ -7069,7 +7069,7 @@ fn mainFragment(
       if (!data || data.type !== OPEN_MESSAGE) {
         return;
       }
-      openInDesktop(Number(data.attachmentId) || 0);
+      openDesktopWindow(Number(data.attachmentId) || 0);
     });
   }
   async function openPostInDesktop(postId) {
@@ -12758,10 +12758,18 @@ fn mainFragment(
   }
   function handOverToDesktop(root, attachmentId) {
     const opened = openDesktopWindow(attachmentId);
+    const notice = document.createElement("div");
+    notice.className = "lz-page-notice";
     const message = document.createElement("p");
-    message.className = "lz-page-notice";
-    message.textContent = opened ? __("Opening Lienzo on your desktop…") : __("Lienzo opens as a window on your desktop. Open it from the dock or its icon.");
-    root.replaceChildren(message);
+    message.className = "lz-page-notice__text";
+    message.textContent = opened ? __("Lienzo opened in a window of its own on your desktop.") : __("Lienzo opens as a window on your desktop. Open it from the dock or its icon.");
+    const button = createButton({
+      label: opened ? __("Bring Lienzo to the front") : __("Open Lienzo"),
+      variant: "primary",
+      onClick: () => openDesktopWindow(attachmentId)
+    });
+    notice.append(message, button.el);
+    root.replaceChildren(notice);
   }
   function showPicker(root) {
     const config = window.lienzoConfig;

@@ -157,6 +157,8 @@ Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and serv
 * The picture no longer flickers while a window is being resized.
 * The tool rail and the sidebar meet the top bar, instead of sitting below a strip of background.
 * The top bar is the same height for every tool, so switching tools no longer shifts the picture.
+* Dragging a curve point and letting go outside the graph now drops it, instead of leaving it stuck to the pointer.
+* Media → Edit Photos inside the desktop now actually opens the Lienzo window, and says where the editor went.
 * Brushes, eraser, paint bucket, gradient, shapes, paths and text typed on the canvas.
 * Retouching: blur, sharpen, smudge, heal and clone stamp.
 * Dodge, burn, desaturate and saturate.
