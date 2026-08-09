@@ -25,7 +25,7 @@ export function pushToRenderer(
 	const all = 'all' === scope;
 
 	if ( all || 'ops' === scope ) {
-		renderer.setOps( recipe.ops );
+		renderer.setOps( recipe.ops, recipe.space );
 	}
 
 	if ( all || 'document' === scope ) {

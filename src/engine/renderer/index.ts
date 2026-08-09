@@ -23,8 +23,8 @@ import { clampCanvas } from '../../model/document';
 import type { CanvasSize, Layer } from '../../model/document';
 import type { Histogram } from '../histogram';
 import type { Curves, Levels } from '../lut';
-import type { Op } from '../../model/recipe';
-import type { OpSchema } from '../../types';
+import type { Op, WorkingSpace } from '../../model/recipe';
+import type { OpSchema, RendererBackend } from '../../types';
 import { assemble, sizeOf } from './assemble';
 import type { Engine } from './assemble';
 import type { DocumentCompositor } from './compositor';
@@ -52,6 +52,8 @@ export interface RendererOptions {
 	maxRenderPixels: number;
 	/** Op table, used to skip adjustments sitting at rest. */
 	schema: OpSchema;
+	/** Which rendering backend to ask for. Defaults to WebGL. */
+	backend?: RendererBackend;
 }
 
 export type { Viewport } from './camera';
@@ -132,7 +134,10 @@ export class EditorRenderer {
 	 * @param options Renderer options.
 	 */
 	static async create( options: RendererOptions ): Promise< EditorRenderer > {
-		return new EditorRenderer( await GpuContext.create( options.host ), options );
+		return new EditorRenderer(
+			await GpuContext.create( options.host, options.backend ?? 'webgl' ),
+			options
+		);
 	}
 
 	/** The texture every downstream stage reads. */
@@ -231,10 +236,11 @@ export class EditorRenderer {
 	/**
 	 * Sets the adjustments to render.
 	 *
-	 * @param ops Recipe ops.
+	 * @param ops   Recipe ops.
+	 * @param space Working space the adjustments are computed in.
 	 */
-	setOps( ops: Op[] ): void {
-		this.filters.setOps( ops, this.blurTarget() );
+	setOps( ops: Op[], space: WorkingSpace = 'srgb' ): void {
+		this.filters.setOps( ops, space, this.blurTarget() );
 		this.histogram.schedule();
 	}
 
@@ -317,6 +323,9 @@ export class EditorRenderer {
 			document: this.pixels.texture as GpuTexture | null,
 			zoom: this.view.zoom,
 			spriteScale: this.sprite ? Math.abs( this.sprite.scale.x ) : null,
+			viewport: this.view.viewport(),
+			backend: this.gpu.backend,
+			precise: this.gpu.hasPreciseTargets,
 		} );
 	}
 

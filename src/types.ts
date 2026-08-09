@@ -12,6 +12,14 @@ export interface OpSpec {
 /** The adjustment table, keyed by op type. */
 export type OpSchema = Record< string, OpSpec >;
 
+/**
+ * Which rendering backend to ask Pixi for.
+ *
+ * Declared here rather than imported from the engine so the config type stays free of
+ * engine imports -- this file is the contract with PHP and nothing else.
+ */
+export type RendererBackend = 'auto' | 'webgl' | 'webgpu';
+
 /** `window.lienzoConfig`, localized by `lienzo_get_config()`. */
 export interface LienzoConfig {
 	version: string;
@@ -30,6 +38,29 @@ export interface LienzoConfig {
 	 * which house style to fall back to when a component is unavailable.
 	 */
 	desktopMode: boolean;
+	/**
+	 * Which rendering backend to ask for.
+	 *
+	 * `webgl` by default. The adjustment shader ships both a GLSL and a WGSL program,
+	 * so `auto` -- WebGPU where the browser has it -- is a supported configuration
+	 * rather than a way of quietly losing every adjustment. Filterable in PHP through
+	 * `lienzo_renderer_backend`.
+	 */
+	renderer: RendererBackend;
+	/**
+	 * The classic-admin editor page.
+	 *
+	 * Where a "Edit with Lienzo" control goes when there is no desktop shell to open a
+	 * window in.
+	 */
+	editorUrl: string;
+	/**
+	 * Where the vendored PixiJS build lives.
+	 *
+	 * Only ever loaded when nothing else has put Pixi on the page -- in classic admin,
+	 * where there is no desktop shell to borrow a copy from.
+	 */
+	pixiUrl: string;
 	schema: OpSchema;
 }
 
@@ -89,6 +120,14 @@ export interface Preset {
 		ops: import('./model/recipe').Op[];
 		curves: import('./engine/lut').Curves;
 		levels: import('./engine/lut').Levels;
+		/**
+		 * The space the look was made in.
+		 *
+		 * Part of the look, not of the document: it decides what an exposure op means,
+		 * so a preset saved in linear light and replayed in sRGB is a different look.
+		 * Absent on presets saved before the field existed, which were all sRGB.
+		 */
+		space?: import('./model/recipe').WorkingSpace;
 	};
 }
 

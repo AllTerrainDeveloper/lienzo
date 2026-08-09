@@ -43,6 +43,34 @@ describe( 'defaultRecipe', () => {
 	} );
 } );
 
+describe( 'the working space', () => {
+	it( 'defaults to sRGB, which is what every earlier recipe was', () => {
+		expect( defaultRecipe( 7 ).space ).toBe( 'srgb' );
+	} );
+
+	it( 'round-trips linear', () => {
+		expect(
+			validateRecipe( { ...recipe(), space: 'linear' }, SCHEMA ).space
+		).toBe( 'linear' );
+	} );
+
+	it( 'reads a recipe written before the field existed as sRGB', () => {
+		// Version 5 and earlier had no space at all. Refusing would make an old edit
+		// unopenable over a field it could not have known to write.
+		const older = { ...recipe(), version: 5 } as Record< string, unknown >;
+
+		delete older.space;
+
+		expect( validateRecipe( older, SCHEMA ).space ).toBe( 'srgb' );
+	} );
+
+	it( 'falls back to sRGB rather than trusting an unknown name', () => {
+		expect(
+			validateRecipe( { ...recipe(), space: 'prophoto' }, SCHEMA ).space
+		).toBe( 'srgb' );
+	} );
+} );
+
 describe( 'getOp', () => {
 	it( 'returns the stored value', () => {
 		expect( getOp( recipe( [ { type: 'hue', v: 90 } ] ), 'hue', SCHEMA ) ).toBe( 90 );

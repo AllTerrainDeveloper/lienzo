@@ -84,7 +84,14 @@ export class DocumentCompositor {
 			this.layers.set( BASE_LAYER_ID, source );
 		}
 
-		const target = this.gpu.createTarget( canvas.width, canvas.height );
+		// Half-float where the GPU allows it. This is the one texture in the pipeline
+		// that is written and then *sampled again* -- every layer is blended into it and
+		// the adjustment shader reads it -- so it is where eight bits per channel
+		// actually costs something: a stack of semi-transparent layers quantises once
+		// per layer, and the geometry pass quantises before the colour maths has run at
+		// all. Everything downstream of the adjustments is eight bits either way,
+		// because that is what a PNG holds.
+		const target = this.gpu.createTarget( canvas.width, canvas.height, true );
 		const holder = this.gpu.container();
 
 		for ( const layer of stack ) {
@@ -109,9 +116,26 @@ export class DocumentCompositor {
 
 	/**
 	 * Reads the composed document as raw bytes, for flood fill.
+	 *
+	 * Through a resolve, because the composed texture is half-float where the GPU
+	 * allows it and half-float samples read back as bytes are not the numbers anyone
+	 * wanted. The blit costs one full-canvas draw and only happens when something asks
+	 * for pixels -- the eyedropper, the wand, the paint bucket -- never per frame.
 	 */
 	readPixels(): PixelReadback | null {
-		return this.target ? this.gpu.extractPixels( this.target ) : null;
+		if ( ! this.target ) {
+			return null;
+		}
+
+		const resolved = this.gpu.resolve( this.target );
+
+		try {
+			return this.gpu.extractPixels( resolved.texture );
+		} finally {
+			if ( resolved.owned ) {
+				resolved.texture.destroy( true );
+			}
+		}
 	}
 
 	/**
@@ -203,7 +227,13 @@ export class DocumentCompositor {
 			return null;
 		}
 
-		const full = this.gpu.extractCanvas( this.target );
+		const resolved = this.gpu.resolve( this.target );
+		const full = this.gpu.extractCanvas( resolved.texture );
+
+		if ( resolved.owned ) {
+			resolved.texture.destroy( true );
+		}
+
 		const out = document.createElement( 'canvas' );
 
 		out.width = Math.round( width );

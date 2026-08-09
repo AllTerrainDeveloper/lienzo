@@ -10,7 +10,7 @@
 import type { CanvasSize, Layer, LayerTransform } from '../../model/document';
 import type { Histogram } from '../../engine/histogram';
 import type { Curves, Levels } from '../../engine/lut';
-import type { OpType, Recipe } from '../../model/recipe';
+import type { OpType, Recipe, WorkingSpace } from '../../model/recipe';
 import type { BrushSettings } from '../stage-tools';
 import type { MediaPayload, Preset } from '../../types';
 
@@ -78,6 +78,13 @@ export interface PanelContext {
 	setOp: ( type: OpType, value: number ) => void;
 	/** Replaces the output encoding settings without touching undo history. */
 	setOutput: ( patch: { format?: string; quality?: number } ) => void;
+	/**
+	 * Switches the space the adjustments are computed in.
+	 *
+	 * Undoable, unlike the output settings: this one changes the pixels rather than
+	 * how they are encoded.
+	 */
+	setSpace: ( space: WorkingSpace ) => void;
 	/** Moves, scales or rotates the layer. Never touches the canvas. */
 	setLayer: ( layer: LayerTransform, label?: string ) => void;
 	/** Resizes the canvas and repositions the layer together. */

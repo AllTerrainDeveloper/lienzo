@@ -34,8 +34,15 @@ export function migrateRecipe( raw: Record< string, unknown > ): Record< string,
 	// legacy uniform `scale` into both axes.
 	//
 	// v4 -> v5 wraps the single transform in a one-layer stack.
+	//
+	// v5 -> v6 adds the working space, and an absent one means sRGB -- which the
+	// validator already does, so there is nothing to write here.
 	if ( version >= 3 ) {
-		const single = ( raw as { layer?: unknown; layers?: unknown } );
+		const single = raw as {
+			layer?: unknown;
+			layers?: unknown;
+			activeLayerId?: unknown;
+		};
 
 		return {
 			...raw,
@@ -46,7 +53,13 @@ export function migrateRecipe( raw: Record< string, unknown > ): Record< string,
 					transform: normaliseTransform( single.layer ),
 				},
 			],
-			activeLayerId: BASE_LAYER_ID,
+			// Kept when the recipe already had a stack to point into. Overwriting it
+			// would move the active layer back to the image every time an older recipe
+			// was opened, which is a thing a user would notice.
+			activeLayerId:
+				typeof single.activeLayerId === 'string'
+					? single.activeLayerId
+					: BASE_LAYER_ID,
 		};
 	}
 

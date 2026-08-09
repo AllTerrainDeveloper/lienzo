@@ -69,6 +69,7 @@ async function startRenderer( editor: Editor ): Promise< void > {
 		host: editor.shell.stage,
 		maxRenderPixels: editor.config.maxRenderPixels,
 		schema: payload.schema,
+		backend: editor.config.renderer,
 	} );
 
 	if ( editor.isDestroyed ) {

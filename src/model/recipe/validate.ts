@@ -13,7 +13,7 @@ import type { OpSchema } from '../../types';
 import { migrateRecipe } from './migrate';
 import { PANEL_OP_ORDER } from './schema';
 import { RECIPE_VERSION } from './types';
-import type { Op, OpType, Recipe, RecipeOutput } from './types';
+import type { Op, OpType, Recipe, RecipeOutput, WorkingSpace } from './types';
 
 /**
  * Validates and normalises a recipe received from the server or from storage.
@@ -130,7 +130,21 @@ export function validateRecipe( raw: unknown, schema: OpSchema ): Recipe {
 		curves: normaliseCurves( candidate.curves ),
 		levels: normaliseLevels( candidate.levels ),
 		output: { format, quality },
+		space: normaliseSpace( candidate.space ),
 	};
+}
+
+/**
+ * Validates the working space.
+ *
+ * Anything unrecognised -- including the field being absent, which is every recipe
+ * written before v6 -- is sRGB. Refusing would make an old edit unopenable over a
+ * field it could not have known to write.
+ *
+ * @param raw Candidate space.
+ */
+export function normaliseSpace( raw: unknown ): WorkingSpace {
+	return raw === 'linear' ? 'linear' : 'srgb';
 }
 
 /**

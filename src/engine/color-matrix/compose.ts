@@ -7,10 +7,11 @@
  */
 
 import { MATRIX_OP_ORDER } from '../../model/recipe';
-import type { Op, OpType } from '../../model/recipe';
+import type { Op, OpType, WorkingSpace } from '../../model/recipe';
 import type { OpSchema } from '../../types';
 import {
 	contrastMatrix,
+	exposureGain,
 	exposureMatrix,
 	saturationMatrix,
 	temperatureMatrix,
@@ -51,6 +52,14 @@ export function matrixForOp( type: OpType, v: number ): ColorMatrix {
 export interface AdjustUniforms {
 	/** The six linear adjustments, collapsed into one matrix. */
 	matrix: ColorMatrix;
+	/**
+	 * Exposure as a gain applied in linear light, or 1 when it is in the matrix.
+	 *
+	 * In an sRGB working space exposure is one of the matrix's six and this is 1. In a
+	 * linear one it has to happen either side of the transfer curve, which a matrix
+	 * cannot express, so it leaves the matrix and travels here instead.
+	 */
+	exposure: number;
 	/** Vibrance, applied after the matrix because it is not linear. */
 	vibrance: number;
 	/** Unsharp mask amount. Spatial, so it scales with the render target. */
@@ -69,11 +78,22 @@ export interface AdjustUniforms {
  * Ops are applied in `MATRIX_OP_ORDER` regardless of the order they appear in the
  * recipe, so the same slider positions always yield the same pixels.
  *
+ * In a linear working space exposure is lifted out of the matrix and returned as a
+ * gain, because the shader has to apply it between the two halves of the sRGB
+ * transfer curve and a 4x5 matrix has nowhere to put a curve. Every other op stays
+ * exactly where it was: contrast pivots on mid grey and saturation interpolates
+ * towards luma, both of which are defined against the encoded values.
+ *
  * @param ops    Recipe ops.
  * @param schema Op table, used to skip values sitting at their rest position.
+ * @param space  Working space the adjustments are computed in.
  * @return Uniforms for the adjustment shader.
  */
-export function composeAdjustments( ops: Op[], schema: OpSchema ): AdjustUniforms {
+export function composeAdjustments(
+	ops: Op[],
+	schema: OpSchema,
+	space: WorkingSpace = 'srgb'
+): AdjustUniforms {
 	const byType = new Map< string, number >();
 
 	for ( const op of ops ) {
@@ -81,6 +101,7 @@ export function composeAdjustments( ops: Op[], schema: OpSchema ): AdjustUniform
 	}
 
 	let matrix = IDENTITY;
+	let exposure = 1;
 
 	for ( const type of MATRIX_OP_ORDER ) {
 		const value = byType.get( type );
@@ -95,11 +116,18 @@ export function composeAdjustments( ops: Op[], schema: OpSchema ): AdjustUniform
 			continue;
 		}
 
+		if ( type === 'exposure' && space === 'linear' ) {
+			exposure = exposureGain( value );
+
+			continue;
+		}
+
 		matrix = multiply( matrixForOp( type, value ), matrix );
 	}
 
 	return {
 		matrix,
+		exposure,
 		vibrance: byType.get( 'vibrance' ) ?? 0,
 		sharpen: byType.get( 'sharpen' ) ?? 0,
 		vignette: byType.get( 'vignette' ) ?? 0,

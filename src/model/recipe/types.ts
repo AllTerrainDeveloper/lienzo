@@ -22,8 +22,10 @@ import type { Curves, Levels } from '../../engine/lut';
  *   handle can stretch one axis.
  * - v5 replaced the single `layer` with a `layers` stack, which is what pasting
  *   into a new node requires.
+ * - v6 added `space`, the working space the adjustments are computed in. A recipe
+ *   without one is sRGB, which is what every recipe written before this was.
  */
-export const RECIPE_VERSION = 5;
+export const RECIPE_VERSION = 6;
 
 /** Every adjustment Lienzo understands. */
 export type OpType =
@@ -51,6 +53,24 @@ export interface RecipeOutput {
 	quality: number;
 }
 
+/**
+ * The space the adjustments are computed in.
+ *
+ * `srgb` does the arithmetic on the encoded values, which is what core WordPress and
+ * most browser editors do, and what every recipe written before this did.
+ *
+ * `linear` undoes the sRGB transfer curve before applying exposure and puts it back
+ * afterwards, so a stop is a doubling of *light* rather than a doubling of a number
+ * that only stands for light. Two stops up on a mid grey is the case that shows it:
+ * in sRGB the value saturates, in linear it lands where a camera would have put it.
+ * Everything else -- contrast pivoting on mid grey, saturation towards luma, the tone
+ * curve -- is defined against the encoded values by construction and stays there.
+ */
+export type WorkingSpace = 'srgb' | 'linear';
+
+/** The working spaces on offer, in picker order. */
+export const WORKING_SPACES: WorkingSpace[] = [ 'srgb', 'linear' ];
+
 /** A complete edit. */
 export interface Recipe {
 	version: number;
@@ -71,4 +91,6 @@ export interface Recipe {
 	curves: Curves;
 	levels: Levels;
 	output: RecipeOutput;
+	/** The space the adjustments are computed in. */
+	space: WorkingSpace;
 }

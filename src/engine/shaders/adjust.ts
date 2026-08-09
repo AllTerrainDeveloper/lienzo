@@ -84,8 +84,34 @@ uniform float uSharpen;
 uniform float uVignette;
 uniform float uGrain;
 uniform float uSeed;
+uniform float uExposure;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+
+/**
+ * The sRGB transfer curve, and its inverse.
+ *
+ * The piecewise IEC 61966-2-1 definition rather than a plain 2.2 power: the linear
+ * segment near black is what keeps the darkest few values from collapsing into each
+ * other and back, which on an 8-bit shadow is visible as posterisation.
+ */
+vec3 toLinear( vec3 c )
+{
+	return mix(
+		c / 12.92,
+		pow( ( c + 0.055 ) / 1.055, vec3( 2.4 ) ),
+		step( vec3( 0.04045 ), c )
+	);
+}
+
+vec3 toSrgb( vec3 c )
+{
+	return mix(
+		c * 12.92,
+		1.055 * pow( c, vec3( 1.0 / 2.4 ) ) - 0.055,
+		step( vec3( 0.0031308 ), c )
+	);
+}
 
 /**
  * Scales saturation by how unsaturated a pixel already is.
@@ -144,6 +170,18 @@ void main( void )
 
 	if ( color.a > 0.0 ) {
 		color.rgb /= color.a;
+	}
+
+	if ( uExposure != 1.0 ) {
+		// Exposure in linear light. A stop is a doubling of the light that reached the
+		// sensor, and the stored value is not that light -- it is the light through the
+		// sRGB transfer curve. Multiplying the stored value instead is what makes a
+		// "+1 stop" in most browser editors land somewhere other than where the same
+		// correction in a raw developer would.
+		//
+		// Only when the working space is linear: in sRGB this uniform is 1 and the
+		// exposure travels inside the colour matrix, exactly as it always did.
+		color.rgb = clamp( toSrgb( toLinear( clamp( color.rgb, 0.0, 1.0 ) ) * uExposure ), 0.0, 1.0 );
 	}
 
 	vec4 result;

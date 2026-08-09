@@ -7,6 +7,7 @@ import {
 	applyMatrix,
 	composeAdjustments,
 	contrastMatrix,
+	exposureGain,
 	exposureMatrix,
 	hueMatrix,
 	matrixForOp,
@@ -289,5 +290,59 @@ describe( 'composeAdjustments', () => {
 		expect( u.vignette ).toBeCloseTo( -0.3, 10 );
 		expect( u.grain ).toBeCloseTo( 0.2, 10 );
 		expect( u.blur ).toBeCloseTo( 0.5, 10 );
+	} );
+
+	it( 'keeps exposure in the matrix in an sRGB working space', () => {
+		const u = composeAdjustments( [ { type: 'exposure', v: 0.5 } ], SCHEMA, 'srgb' );
+
+		expectMatrixClose( u.matrix, exposureMatrix( 0.5 ) );
+		expect( u.exposure ).toBe( 1 );
+	} );
+
+	it( 'lifts exposure out of the matrix in a linear working space', () => {
+		// A 4x5 matrix has nowhere to put a transfer curve, so in linear light the
+		// gain leaves the matrix and the shader applies it between the two halves.
+		const u = composeAdjustments( [ { type: 'exposure', v: 0.5 } ], SCHEMA, 'linear' );
+
+		expectMatrixClose( u.matrix, IDENTITY );
+		expect( u.exposure ).toBeCloseTo( exposureGain( 0.5 ), 10 );
+		expect( u.exposure ).toBeCloseTo( 2, 10 );
+	} );
+
+	it( 'leaves every other op alone in a linear working space', () => {
+		// Contrast pivots on mid grey and saturation interpolates towards luma, both
+		// of which are defined against the encoded values. Moving them would change
+		// what the sliders do, not merely how correct they are.
+		const ops: Op[] = [
+			{ type: 'contrast', v: 0.4 },
+			{ type: 'saturation', v: -0.3 },
+			{ type: 'hue', v: 25 },
+		];
+
+		expectMatrixClose(
+			composeAdjustments( ops, SCHEMA, 'linear' ).matrix,
+			composeAdjustments( ops, SCHEMA, 'srgb' ).matrix
+		);
+	} );
+
+	it( 'reports no exposure gain when the slider is at rest', () => {
+		expect(
+			composeAdjustments( [ { type: 'exposure', v: 0 } ], SCHEMA, 'linear' ).exposure
+		).toBe( 1 );
+	} );
+} );
+
+describe( 'exposureGain', () => {
+	it( 'maps the slider to plus or minus two stops', () => {
+		expect( exposureGain( 0 ) ).toBe( 1 );
+		expect( exposureGain( 0.5 ) ).toBeCloseTo( 2, 10 );
+		expect( exposureGain( -0.5 ) ).toBeCloseTo( 0.5, 10 );
+		expect( exposureGain( 1 ) ).toBeCloseTo( 4, 10 );
+	} );
+
+	it( 'is the same number the sRGB matrix scales by', () => {
+		// The two spaces disagree about *where* the multiplication happens, never
+		// about how much light a stop is.
+		expect( exposureMatrix( 0.3 )[ 0 ] ).toBeCloseTo( exposureGain( 0.3 ), 12 );
 	} );
 } );
