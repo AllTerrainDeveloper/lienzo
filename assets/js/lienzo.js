@@ -7315,12 +7315,15 @@ fn mainFragment(
     }
     const pager = new MediaPager(config);
     const ui = buildChrome(root);
-    const more = createButton({
+    const more = hasObserver() ? null : createButton({
       label: __("Load more"),
       variant: "secondary",
       onClick: () => void load()
     });
-    ui.footer.append(ui.count, more.el);
+    ui.footer.append(ui.count);
+    if (more) {
+      ui.footer.appendChild(more.el);
+    }
     let loading = false;
     let unwatch = () => {
     };
@@ -7329,7 +7332,7 @@ fn mainFragment(
         return;
       }
       loading = true;
-      more.setDisabled(true);
+      more?.setDisabled(true);
       let items;
       try {
         items = await pager.next();
@@ -7337,7 +7340,7 @@ fn mainFragment(
         loading = false;
         if (!isStale?.()) {
           fail$1(ui, error);
-          more.setDisabled(false);
+          more?.setDisabled(false);
         }
         return;
       }
@@ -7362,16 +7365,16 @@ fn mainFragment(
         pager.hasMore
       );
       if (pager.hasMore) {
-        more.setDisabled(false);
+        more?.setDisabled(false);
         watch();
         return;
       }
       unwatch();
-      more.destroy();
-      more.el.remove();
+      more?.destroy();
+      more?.el.remove();
     }
     function watch() {
-      if ("undefined" === typeof IntersectionObserver) {
+      if (!hasObserver()) {
         return;
       }
       unwatch();
@@ -7392,6 +7395,9 @@ fn mainFragment(
       observer.observe(ui.footer);
     }
     await load();
+  }
+  function hasObserver() {
+    return "undefined" !== typeof IntersectionObserver;
   }
   function buildChrome(root) {
     root.classList.add(PICKER_CLASS);

@@ -233,6 +233,15 @@ describe( 'renderPicker', () => {
 
 		// Nothing to watch for: the last page is already on screen.
 		expect( FakeObserver.instances ).toHaveLength( 0 );
+	} );
+
+	it( 'offers no button where the observer will do the work', async () => {
+		request.mockResolvedValue( page( [ jpeg( 1 ) ], 5 ) );
+
+		await renderPicker( root, CONFIG );
+
+		// A control that could never be the reason anything happened: by the time
+		// anyone reached for it, the page it asks for is already on its way.
 		expect( root.querySelector( '.lz-picker__footer button' ) ).toBeNull();
 	} );
 
@@ -242,19 +251,15 @@ describe( 'renderPicker', () => {
 		await renderPicker( root, CONFIG );
 
 		const observer = FakeObserver.latest;
-		const button = root.querySelector(
-			'.lz-picker__footer button'
-		) as HTMLButtonElement;
 
 		observer.reveal();
-		button.click();
 		observer.reveal();
 		await settle();
 
 		expect( request ).toHaveBeenCalledTimes( 2 );
 	} );
 
-	it( 'leaves the button working where there is no observer', async () => {
+	it( 'falls back to a button where there is no observer', async () => {
 		delete ( globalThis as unknown as { IntersectionObserver?: unknown } )
 			.IntersectionObserver;
 
@@ -270,6 +275,17 @@ describe( 'renderPicker', () => {
 		await settle();
 
 		expect( root.querySelectorAll( '.lz-picker__tile' ) ).toHaveLength( 2 );
+	} );
+
+	it( 'takes the fallback button away at the end of the library', async () => {
+		delete ( globalThis as unknown as { IntersectionObserver?: unknown } )
+			.IntersectionObserver;
+
+		request.mockResolvedValueOnce( page( [ jpeg( 1 ) ], 1 ) );
+
+		await renderPicker( root, CONFIG );
+
+		expect( root.querySelector( '.lz-picker__footer button' ) ).toBeNull();
 	} );
 
 	it( 'stops watching once the picker no longer owns the element', async () => {

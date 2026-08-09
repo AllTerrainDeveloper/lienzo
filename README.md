@@ -1001,9 +1001,10 @@ Stated plainly, because each is better read here than discovered:
   clipped the element against every scrolling ancestor, so it does not matter which of them moved and
   the picker never has to guess. What it cannot do is fetch *ahead*: `rootMargin` expands the
   viewport, not the clip of the desktop window the grid is inside, so inside a window the page is
-  asked for when the footer arrives rather than a screen early. The Load more button stays for the
-  same reason — a window shorter than one row, or a browser with no observer, never produces the
-  callback at all.
+  asked for when the footer arrives rather than a screen early. The Load more button is what a
+  browser with no observer gets *instead* — offering both would leave a control that could never be
+  the reason anything happened, since by the time anyone reached for it the page it asks for is
+  already on its way.
 
 ## Licence
 

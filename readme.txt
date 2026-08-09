@@ -141,7 +141,7 @@ Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and serv
 
 = 0.1.0 =
 * First release.
-* The photo picker loads as you scroll, instead of only when you press Load more.
+* The photo picker loads as you scroll, instead of waiting for a Load more button.
 * The picker says how many images it cannot open, so a library of animated GIFs no longer reads as an empty one.
 * Editing from the media picker and pressing Insert now inserts the copy you just saved, not the photograph you started with.
 * Selections can be stepped back — Cmd/Ctrl+Shift+D, or the Step back button — which takes back an addition made in the wrong mode and brings back a selection you dropped.

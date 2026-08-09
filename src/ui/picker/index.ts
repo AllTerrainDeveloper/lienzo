@@ -14,10 +14,9 @@
  * against every scrolling ancestor between here and the viewport, so it does not
  * matter which of them moved.
  *
- * The button stays. The observer fires when the end of the grid is seen, and there is
- * no guarantee it ever is -- a window can be shorter than one row, and a browser can
- * have no observer at all -- so the one control that always works is still there to
- * press.
+ * The Load more button is what a browser with no observer gets instead, and only that.
+ * Keeping both would leave a control that is never the reason anything happened: by
+ * the time anyone reached for it, the page it asks for is the page already on its way.
  */
 
 import { __, _n, sprintf } from '../../i18n';
@@ -62,13 +61,22 @@ export async function renderPicker(
 	const pager = new MediaPager( config );
 	const ui = buildChrome( root );
 
-	const more = createButton( {
-		label: __( 'Load more' ),
-		variant: 'secondary',
-		onClick: () => void load(),
-	} );
+	// Only where nothing else will ask. An observer that works makes this a control
+	// with nothing to do -- the page it would fetch is the page already arriving -- and
+	// a button that is never the reason anything happened is chrome, not an affordance.
+	const more = hasObserver()
+		? null
+		: createButton( {
+				label: __( 'Load more' ),
+				variant: 'secondary',
+				onClick: () => void load(),
+		  } );
 
-	ui.footer.append( ui.count, more.el );
+	ui.footer.append( ui.count );
+
+	if ( more ) {
+		ui.footer.appendChild( more.el );
+	}
 
 	/** Whether a fetch is already in flight, so two cannot start at once. */
 	let loading = false;
@@ -88,7 +96,7 @@ export async function renderPicker(
 		}
 
 		loading = true;
-		more.setDisabled( true );
+		more?.setDisabled( true );
 
 		let items;
 
@@ -99,7 +107,7 @@ export async function renderPicker(
 
 			if ( ! isStale?.() ) {
 				fail( ui, error );
-				more.setDisabled( false );
+				more?.setDisabled( false );
 			}
 
 			return;
@@ -138,7 +146,7 @@ export async function renderPicker(
 		);
 
 		if ( pager.hasMore ) {
-			more.setDisabled( false );
+			more?.setDisabled( false );
 			watch();
 
 			return;
@@ -150,8 +158,8 @@ export async function renderPicker(
 		// specificity, and inside OpenStation this button is a shell component the
 		// shell gives an explicit `display` -- which wins, so the button stayed on
 		// screen at the end of the library with nothing left to load.
-		more.destroy();
-		more.el.remove();
+		more?.destroy();
+		more?.el.remove();
 	}
 
 	/**
@@ -169,7 +177,7 @@ export async function renderPicker(
 	 * question afresh.
 	 */
 	function watch(): void {
-		if ( 'undefined' === typeof IntersectionObserver ) {
+		if ( ! hasObserver() ) {
 			return;
 		}
 
@@ -196,6 +204,16 @@ export async function renderPicker(
 	}
 
 	await load();
+}
+
+/**
+ * Whether this browser can tell the picker that the end of the grid is on screen.
+ *
+ * The one question that decides which of the two pagers the picker offers, asked in
+ * one place so the button and the observer can never both be absent.
+ */
+function hasObserver(): boolean {
+	return 'undefined' !== typeof IntersectionObserver;
 }
 
 /** The picker's elements. */
