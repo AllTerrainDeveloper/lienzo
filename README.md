@@ -11,9 +11,10 @@ action hooks inside, so it cannot be extended, only replaced. Lienzo replaces it
 ## What it does
 
 Colour and tone with a live per-frame histogram; crop, straighten, rotate and flip; curves and
-levels; sharpen, blur, vignette and grain; saved presets. Then a layer stack, four selection shapes,
-brushes, a magic wand, retouching and toning brushes, a clone stamp, gradients, shapes, paths, and
-text typed directly on the canvas. Undo and redo reach painted pixels, not only settings.
+levels; sharpen, blur, vignette and grain; saved presets. Then a layer stack, four selection shapes
+that add, subtract and intersect, brushes, a magic wand, retouching and toning brushes, a clone
+stamp, gradients, shapes, paths, and text typed directly on the canvas. Undo and redo reach painted
+pixels, not only settings.
 
 Adjustments stay non-destructive: a save always writes a *new* attachment and stores the edit as a
 re-openable recipe, so the original file is never rewritten and repeated edits never compound.
@@ -105,6 +106,28 @@ Accordion rather than tabs, deliberately: a histogram is something you watch *wh
 slider, so putting it behind a tab switch would break the one workflow it exists for. Anything you
 would rather not see gets switched off in the picker instead.
 
+## One bar across the top
+
+The name of the file, the options for the current tool and the document's actions used to be a
+labelled toolbar stacked on top of a labelled options bar: two rows, about ninety pixels, spent above
+a photograph on saying what the photograph is called and then, underneath, what the current tool
+does. They fit on one 47-pixel row because the two things competing for width — the title and the
+tool options — are both content that reads fine truncated, and because the seven actions gave up
+their words.
+
+Four of them are glyphs now (recentre, undo, redo, compare), the two used rarely are behind a `⋯`
+overflow (export, reset, and close where the host wants one), and only **Save a copy** keeps its
+words. The overflow's items are built on every open rather than captured once, and a command that
+would do nothing is left out rather than greyed — a disabled control in a row is a placeholder
+holding its position, but a disabled row in a menu of three is a shorter menu with a gap in it.
+
+The row never wraps. Wrapping is what a flex bar does instead of overflowing, and it would silently
+undo the whole point the first time a tool had one control too many for the window; the options
+scroll sideways within their own slot instead, the hint truncates first with the whole of it in its
+tooltip, and the title drops out entirely below a `@container` width of 620px. A container query
+rather than a media query because the editor is as often an OpenStation window as a whole page, so
+how much room the bar has is a fact about the window and not about the screen it is on.
+
 ## Eighteen tools, four mechanisms
 
 The rail on the leading edge holds the tools, two columns wide and grouped by what they do to the
@@ -114,7 +137,7 @@ selection rectangle cannot disagree about where the pointer is.
 
 | Group | Tools | Keys |
 |---|---|---|
-| Select | Move & transform, Select (rectangle / ellipse / freeform / polygon), Magic wand, Crop | `V` `M` `W` `C` |
+| Select | Move & transform, Select (rectangle / ellipse / freeform / polygon, in new / add / subtract / intersect), Magic wand, Crop | `V` `M` `W` `C` |
 | Retouch | Eyedropper, Retouch (blur / sharpen / smudge / heal), Clone stamp, Dodge & burn (dodge / burn / desaturate / saturate) | `I` `R` `S` `O` |
 | Paint | Brush, History brush, Eraser, Fill | `B` `Y` `E` `G` |
 | Draw | Gradient, Shape (rectangle / rounded / ellipse / line / triangle / star), Path, Text | `N` `U` `P` `T` |
@@ -133,6 +156,45 @@ Two Photoshop slots are deliberately absent: the frame tool, which places an emp
 placeholder and has nothing to do in a library editor, and the separate lasso slot — freeform and
 polygon are shapes of the one Select tool, chosen in its options bar, which is where every other
 selection setting already lives.
+
+### A selection is built, not drawn
+
+The shapes anyone actually wants are almost never one rectangle. A subject is a wand click plus two
+lasso corrections; a vignette mask is an ellipse minus a smaller one. So both selection tools lead
+with the same four-way picker — **New**, **Add**, **Subtract**, **Intersect** — and both read the
+modifiers everyone already has in their fingers: **Shift** adds, **Alt** subtracts, **Shift+Alt**
+intersects, for one gesture, without disturbing what the picker says.
+
+The mode is fixed when the gesture *starts*, not when it ends. Modifier keys are usually let go of
+before the mouse button is, and a subtraction that turned into a replacement on release would be the
+most destructive bug this tool could have.
+
+Adding, subtracting and intersecting are set operations on regions, and the editor stores regions as
+closed paths — so the honest implementation is a path clipper, several hundred lines of numerically
+delicate geometry that has to agree with the rasteriser about every edge case it gets wrong. There is
+already a round trip that does not: `buildSelectionMask()` turns a path into pixels and `traceMask()`
+turns pixels back into paths, exactly, because the tracer walks pixel *corners*. Compositing two
+masks is then the whole of the boolean algebra — `source-over`, `destination-out`, `source-in`, three
+keywords the browser has implemented for twenty years — and the result arrives in the one format the
+outline renderer, the mask rasteriser and the brush clipper already speak.
+
+It runs once per completed gesture, never per pointer move, and the working raster is capped at four
+megapixels: nobody can see a boundary at a finer resolution than the six hundred vertices the tracer
+keeps anyway, and uncapped, one intersection on a fifty-megapixel scan would allocate two hundred
+megabytes to answer a question four hundred points long.
+
+That split is also why the marquee got cheaper rather than dearer. A drag now paints a **pending
+outline** — a path attribute, in the accent colour, beside the ants of the selection it is about to
+change — where it used to replace the selection on every pointer move, rasterising a canvas-sized
+mask and handing it to the GPU sixty times a second. Seeing both outlines at once is the only way to
+aim a subtraction, and it costs less than not seeing them did.
+
+Two consequences worth knowing. A boolean result is always a path, whatever went in: the union of two
+rectangles is not a rectangle, and storing it as one would put its corners back. And disjoint results
+survive — `traceMask` calls every contour after the first a hole, but both rasterisers fill
+**even-odd**, so a loop lying outside the first is filled rather than punched, which is exactly right
+for two regions added without touching. `selectionBounds()` measures every contour for the same
+reason: measuring only the first would crop a copy to whichever region the tracer reached first.
 
 Eighteen tools, but only four gestures, and each one is a single method:
 
@@ -435,7 +497,8 @@ src/
                              `os-*` / `wpd-*` components and events
   model/recipe/            types, schema, mutations, migration, validation
   model/document/          canvas, layer transforms, the layer stack
-  model/selection/         marquee geometry, mask rasterising, contour tracing
+  model/selection/         marquee geometry, mask rasterising, contour tracing,
+                             and the booleans built on the round trip between them
   model/history.ts         undo stack with drag coalescing
   model/pixel-history/     the tiles a paint stroke overwrote, for undo
   engine/color-matrix/     PURE: ops -> one 4x5 matrix
@@ -752,6 +815,14 @@ Stated plainly, because each is better read here than discovered:
 - **Animated GIFs are not offered for editing**, because a canvas round trip flattens them to one
   frame, and quietly destroying an animation is worse than declining. They are also skipped by the
   picker, so a library of them can read as smaller than it is.
+- **Boolean selections are exact to the working raster, not to the path.** Adding, subtracting and
+  intersecting go through a mask round trip rather than a path clipper, and that raster is capped at
+  four megapixels — so on a document larger than that, the combined outline is traced at a reduced
+  scale. It is invisible against the tracer's own six-hundred-vertex budget, which costs more
+  precision than the scaling does, but it does mean the result is a fresh path and not the two paths
+  that went in. Selections are not part of the undo stack either — they describe how someone is
+  working rather than what the picture should look like — so an addition you did not mean has to be
+  redrawn rather than stepped back.
 - **The picker reads the library a page at a time** behind a Load more button rather than loading on
   scroll: it renders inside a desktop window, so which element actually scrolls is not the picker's
   to know, and a scroll listener bound to the wrong one silently never fires.

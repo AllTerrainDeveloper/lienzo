@@ -156,20 +156,54 @@
 
 /* -- Toolbar --------------------------------------------------------------- */
 
+/*
+ * One row, not two.
+ *
+ * The name of the file, the options for the current tool and the document's actions
+ * used to be a labelled toolbar stacked on top of a labelled options bar: something
+ * like a tenth of a laptop screen spent, above a photograph, on saying what the
+ * photograph is called. They fit on one line because the two that wanted the width --
+ * the title and the tool options -- are both content that reads fine truncated, and
+ * because the actions gave up their words for glyphs.
+ *
+ * The row never wraps. Wrapping is what a flex bar does instead of overflowing, and it
+ * would silently undo the whole point the first time a tool had one control too many;
+ * the options scroll sideways within their own slot instead.
+ */
 .lz-topbar {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
-	gap: 16px;
-	padding: 10px 16px;
+	gap: 12px;
+	padding: 4px 10px;
+	min-block-size: 38px;
 	background: var( --lz-surface );
 	border-block-end: 1px solid var( --lz-border );
 	flex: 0 0 auto;
+
+	/*
+	 * Queried by the title below. A container rather than a media query because the
+	 * editor is as often an OpenStation window as it is a whole page, and how much room
+	 * this bar has is a fact about the window, not about the screen it is on. Declared
+	 * here rather than on `.lz-editor` on purpose: `container-type` brings layout
+	 * containment with it, which would make the editor root the containing block for
+	 * the `position: fixed` popovers that are parented to it.
+	 */
+	container-type: inline-size;
 }
 
+/*
+ * The title shrinks before anything else and disappears entirely on a narrow window.
+ * Which file is open is also in the window's own title bar, so this is the one thing
+ * here that can be spared -- unlike the tool options, which exist nowhere else.
+ */
 .lz-topbar__title {
 	margin: 0;
-	font-size: 14px;
+	flex: 0 1 auto;
+	max-inline-size: 22ch;
+
+	/* A flex item will not shrink past its longest word without this. */
+	min-inline-size: 0;
+	font-size: 13px;
 	font-weight: 600;
 	color: var( --lz-fg );
 	white-space: nowrap;
@@ -177,11 +211,42 @@
 	text-overflow: ellipsis;
 }
 
+.lz-topbar__options {
+	display: flex;
+	align-items: center;
+	flex: 1 1 auto;
+
+	/*
+	 * Without this a flex item refuses to shrink below its content, so a long options
+	 * bar would push the Save button off the end rather than scrolling.
+	 */
+	min-inline-size: 0;
+}
+
 .lz-topbar__actions {
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: 2px;
 	flex: 0 0 auto;
+}
+
+/* The glyph actions: undo, redo, compare, recentre, overflow. */
+.lz-topbar .lz-topbar__icon {
+	inline-size: 26px;
+	block-size: 26px;
+	font-size: 14px;
+}
+
+/* The one action still worth its words sits a little apart from the glyphs. */
+.lz-topbar__actions .lz-button {
+	margin-inline-start: 6px;
+	white-space: nowrap;
+}
+
+@container ( max-width: 620px ) {
+	.lz-topbar__title {
+		display: none;
+	}
 }
 
 /* -- Body ------------------------------------------------------------------ */
@@ -1608,23 +1673,37 @@ input.lz-colour {
 
 /* -- Contextual options bar ------------------------------------------------- */
 
+/*
+ * Now a slot inside the top bar rather than a bar of its own, so it brings no
+ * background, no border and no height: it is as tall as its tallest control.
+ *
+ * It scrolls sideways instead of wrapping. A wrap would push the canvas down by a
+ * whole row the first time someone picked a tool with one control too many for the
+ * window, which is exactly the failure this layout was meant to end.
+ */
 .lz-options {
 	display: flex;
 	align-items: center;
-	gap: 10px;
-	flex-wrap: wrap;
-	min-block-size: 40px;
-	padding: 5px 12px;
-	background: var( --lz-surface );
-	border-block-end: 1px solid var( --lz-border );
-	flex: 0 0 auto;
+	gap: 8px;
+	flex-wrap: nowrap;
+	inline-size: 100%;
+	min-inline-size: 0;
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: thin;
 	font-size: 12px;
 }
 
+/*
+ * The bar is not the primary way to know which tool is active -- the rail is, and it
+ * shows it as a pressed button. So the name is a label for the controls beside it, not
+ * a heading, and it stops reserving 124px whether it needs them or not.
+ */
 .lz-options__tool {
 	font-weight: 600;
 	color: var( --lz-fg );
-	min-inline-size: 124px;
+	flex: 0 0 auto;
+	white-space: nowrap;
 	letter-spacing: 0.01em;
 }
 
@@ -1652,6 +1731,14 @@ input.lz-colour {
 	align-items: center;
 	gap: 6px;
 	margin: 0;
+
+	/* The bar scrolls rather than compressing its controls to illegibility. */
+	flex: 0 0 auto;
+}
+
+.lz-options > .lz-button,
+.lz-options > .lz-options__divider {
+	flex: 0 0 auto;
 }
 
 .lz-options .lz-field__label {
@@ -1734,9 +1821,86 @@ input.lz-colour {
 	outline-offset: -2px;
 }
 
+/*
+ * The glyph variant, used by the selection-mode picker. Square cells and a larger
+ * glyph, because `⊞` and `⊟` differ by two pixels of stroke at 11px and the whole
+ * control depends on telling them apart at a glance.
+ */
+.lz-segmented--icons .lz-segmented__item {
+	inline-size: 24px;
+	padding: 4px 0;
+	font-size: 14px;
+	text-align: center;
+}
+
+/*
+ * The glyphs are the label. Clipped rather than removed: the group carries the same
+ * words as its `aria-label` and each button carries its own, so nothing is lost to a
+ * screen reader -- but leaving the text in the flow costs a hundred pixels of a bar
+ * that now has one row to fit everything into.
+ */
+.lz-field--icons > .lz-field__label {
+	position: absolute;
+	inline-size: 1px;
+	block-size: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset( 50% );
+	white-space: nowrap;
+}
+
+/* -- Overflow menu ---------------------------------------------------------- */
+
+.lz-menu {
+	/* Placed by positionFloating(); z-index has to clear an OpenStation window. */
+	z-index: 100001;
+	display: flex;
+	flex-direction: column;
+	min-inline-size: 170px;
+	padding: 6px;
+	background: var( --lz-surface-raised );
+	border: 1px solid var( --lz-border );
+	border-radius: var( --lz-radius );
+	box-shadow: 0 8px 24px rgba( 0, 0, 0, 0.45 );
+}
+
+.lz-menu__item {
+	appearance: none;
+	padding: 6px 8px;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	color: var( --lz-fg );
+	font-size: 12px;
+	text-align: start;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.lz-menu__item:hover {
+	background: rgba( 255, 255, 255, 0.08 );
+}
+
+.lz-menu__item:focus-visible {
+	outline: 2px solid var( --lz-accent );
+	outline-offset: -2px;
+}
+
+/*
+ * The hint gives up its width first. It is the only thing on the bar that is prose
+ * rather than a control, so it is both the least useful thing to keep whole and the
+ * only one that still reads when it is cut short -- with the whole of it in the
+ * tooltip.
+ */
 .lz-options__hint {
 	color: var( --lz-fg-muted );
 	font-size: 11px;
+	flex: 0 1 auto;
+	min-inline-size: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 /* -- Selection outline (any shape) ------------------------------------------ */
@@ -1749,7 +1913,9 @@ svg.lz-selection {
 }
 
 .lz-selection__under,
-.lz-selection__over {
+.lz-selection__over,
+.lz-selection__pending-under,
+.lz-selection__pending-over {
 	fill: none;
 	stroke-width: 1;
 	/*
@@ -1769,6 +1935,23 @@ svg.lz-selection {
 	stroke: #fff;
 	stroke-dasharray: 4 4;
 	animation: lz-march 640ms linear infinite;
+}
+
+/*
+ * The region being dragged right now, shown beside the selection it is about to change.
+ *
+ * Deliberately quieter than the committed marquee and not animated: two sets of
+ * marching ants moving at once is noise, and the question this outline answers -- where
+ * will the thing I am dragging land relative to what is already selected -- is answered
+ * by a still line. A shorter dash and a tint of the accent say "not yet real".
+ */
+.lz-selection__pending-under {
+	stroke: rgba( 0, 0, 0, 0.7 );
+}
+
+.lz-selection__pending-over {
+	stroke: var( --lz-accent );
+	stroke-dasharray: 3 3;
 }
 
 @keyframes lz-march {

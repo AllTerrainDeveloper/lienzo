@@ -9,7 +9,7 @@
 import { floodFillMask, floodFillRegion } from '../../engine/brush';
 import type { FloodRegion } from '../../engine/brush';
 import { rgbToHex } from '../../engine/paint-shapes';
-import { traceMask } from '../../model/selection';
+import { effectiveMode, traceMask } from '../../model/selection';
 import type { Point } from '../../model/selection';
 import { toStage } from './coords';
 import type { StageToolsOptions } from './types';
@@ -135,10 +135,18 @@ export function floodFill( options: StageToolsOptions, point: Point ): void {
  * drawn to a canvas and read back: it is already one byte per pixel, and reading a
  * twenty-megapixel canvas back is the most expensive thing this tool could do.
  *
+ * The wand is where the boolean modes earn their keep: no single tolerance picks out a
+ * whole subject, but three clicks with Shift held very often do.
+ *
  * @param options Tool wiring.
  * @param point   Canvas coordinates.
+ * @param event   Pointer event, for the modifier keys.
  */
-export function magicWand( options: StageToolsOptions, point: Point ): void {
+export function magicWand(
+	options: StageToolsOptions,
+	point: Point,
+	event: PointerEvent
+): void {
 	const region = matchRegion( options, point );
 
 	if ( ! region ) {
@@ -152,9 +160,10 @@ export function magicWand( options: StageToolsOptions, point: Point ): void {
 		bounds: region.bounds,
 	} );
 
-	options.setSelection(
+	options.commitSelection(
 		traced.outer.length > 2
 			? { shape: 'lasso', points: traced.outer, holes: traced.holes }
-			: null
+			: null,
+		effectiveMode( options.getSelectionMode(), event )
 	);
 }

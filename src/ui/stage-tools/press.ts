@@ -11,6 +11,7 @@ import { normalise } from './coords';
 import { previewShape } from './gesture';
 import type { Gesture } from './gesture';
 import { floodFill, magicWand, pickColour, zoomAtPointer } from './point-tools';
+import { effectiveMode } from '../../model/selection';
 import type { Point } from '../../model/selection';
 import type { ActiveTool } from '../panels';
 import type { StageToolsOptions } from './types';
@@ -54,7 +55,7 @@ export function routePress(
 			return 'done';
 
 		case 'wand':
-			magicWand( options, point );
+			magicWand( options, point, event );
 
 			return 'done';
 
@@ -65,8 +66,11 @@ export function routePress(
 
 		case 'path':
 			// Vertices are placed deliberately, one click at a time, and the shape is
-			// only drawn once the path is closed -- so no drag lifecycle at all.
-			options.setSelection( gesture.selection.addVertex( norm() ) );
+			// only drawn once the path is closed -- so no drag lifecycle at all. A pen
+			// path is previewed rather than selected: it is a shape on its way to being
+			// painted, and letting it stand in for the marquee threw away whatever was
+			// selected the moment anyone reached for the tool.
+			options.previewSelection( gesture.selection.addVertex( norm() ) );
 
 			return 'done';
 
@@ -77,11 +81,7 @@ export function routePress(
 			return 'drag';
 
 		case 'select':
-			options.setSelection(
-				gesture.selection.begin( norm(), options.getSelectionShape() )
-			);
-
-			return 'drag';
+			return beginSelection( options, gesture, norm(), event );
 
 		case 'gradient':
 		case 'shape':
@@ -96,6 +96,41 @@ export function routePress(
 		default:
 			return 'stroke';
 	}
+}
+
+/**
+ * Opens a marquee, in whichever mode the picker and the modifier keys agree on.
+ *
+ * A polygon is placed click by click and is only folded in when it closes, so it never
+ * enters the drag lifecycle -- but the *first* click still decides its mode, for the same
+ * reason a drag's press does: by the time the shape is finished the keys are long
+ * released.
+ *
+ * @param options Tool wiring.
+ * @param gesture Gesture state, mutated in place.
+ * @param point   Normalised coordinates.
+ * @param event   Pointer event, for the modifier keys.
+ */
+function beginSelection(
+	options: StageToolsOptions,
+	gesture: Gesture,
+	point: Point,
+	event: PointerEvent
+): PressOutcome {
+	const shape = options.getSelectionShape();
+	const starting =
+		'polygon' !== shape || 0 === gesture.selection.vertices.length;
+
+	if ( starting ) {
+		gesture.selectionMode = effectiveMode( options.getSelectionMode(), event );
+	}
+
+	gesture.pendingSelection = gesture.selection.begin( point, shape );
+	options.previewSelection( gesture.pendingSelection );
+
+	// A polygon is finished with Enter, not with a release, so there is no drag to
+	// follow -- every click is a press of its own.
+	return 'polygon' === shape ? 'done' : 'drag';
 }
 
 /**

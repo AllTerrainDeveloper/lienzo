@@ -126,12 +126,11 @@ export class StageTools {
 		}
 
 		if ( this.gesture.selection.isDragging ) {
-			this.options.setSelection(
-				this.gesture.selection.extend(
-					normalise( this.options.getCanvas(), point ),
-					this.options.getSelectionShape()
-				)
+			this.gesture.pendingSelection = this.gesture.selection.extend(
+				normalise( this.options.getCanvas(), point ),
+				this.options.getSelectionShape()
 			);
+			this.options.previewSelection( this.gesture.pendingSelection );
 
 			return;
 		}
@@ -148,8 +147,20 @@ export class StageTools {
 
 		const wasDrawing = this.gesture.drawing;
 		const dragFrom = this.gesture.dragFrom;
+		const wasSelecting = this.gesture.selection.isDragging;
 
 		endGesture( this.gesture );
+
+		// The marquee is folded into the selection here rather than on every pointer
+		// move: the boolean is a raster round trip, and running one per frame would
+		// stall a large document to show what an outline already showed.
+		if ( wasSelecting ) {
+			this.options.commitSelection(
+				this.gesture.pendingSelection,
+				this.gesture.selectionMode
+			);
+			this.gesture.pendingSelection = null;
+		}
 
 		if ( dragFrom && event instanceof PointerEvent ) {
 			commitRegion( this.options, dragFrom, event );
@@ -159,6 +170,11 @@ export class StageTools {
 			this.options.onStrokeEnd();
 		}
 	};
+
+	/** Whether a polygon or a pen path is half-placed on the canvas. */
+	get hasPath(): boolean {
+		return this.gesture.selection.vertices.length > 0;
+	}
 
 	/** Where the clone stamp is currently sampling from, if anywhere. */
 	getCloneSource(): Point | null {
@@ -187,9 +203,36 @@ export class StageTools {
 		return true;
 	}
 
-	/** Abandons a half-placed polygon. */
+	/**
+	 * Closes a polygon marquee and folds it into the selection.
+	 *
+	 * @return Whether there was a polygon worth closing.
+	 */
+	closePolygon(): boolean {
+		const points = this.gesture.selection.vertices;
+
+		// Two points are a line, and a line encloses nothing. Abandoning is the only
+		// honest reading of "close this" when there is no shape yet.
+		if ( points.length < 3 ) {
+			this.clearPath();
+
+			return false;
+		}
+
+		this.options.commitSelection(
+			{ shape: 'polygon', points: [ ...points ] },
+			this.gesture.selectionMode
+		);
+		this.clearPath();
+
+		return true;
+	}
+
+	/** Abandons a half-placed polygon or pen path, and takes its outline down. */
 	clearPath(): void {
 		this.gesture.selection.clear();
+		this.gesture.pendingSelection = null;
+		this.options.previewSelection( null );
 	}
 
 	/** Removes the listeners. */

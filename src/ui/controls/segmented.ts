@@ -10,6 +10,13 @@ export interface SegmentedOptions {
 	label: string;
 	value: string;
 	options: ControlOption[];
+	/**
+	 * Whether the labels are glyphs rather than words.
+	 *
+	 * Only presentation -- every option still carries a `title`, which is where the
+	 * accessible name comes from once the visible text is a symbol.
+	 */
+	icons?: boolean;
 	onChange: ( value: string ) => void;
 }
 
@@ -22,10 +29,15 @@ export interface SegmentedOptions {
  * @param options Picker configuration.
  */
 export function createSegmented( options: SegmentedOptions ): FieldHandle {
+	// A glyph picker keeps its label for assistive technology and hides it on screen:
+	// the four symbols are the control, and "Selection mode" written beside them is a
+	// hundred pixels of a one-row bar spent naming what the icons already say.
 	const { wrap, text } = labelledRow(
 		'div',
 		options.label,
-		'lz-field lz-field--compact'
+		options.icons
+			? 'lz-field lz-field--compact lz-field--icons'
+			: 'lz-field lz-field--compact'
 	);
 
 	const tag = componentTag( 'segmented' );
@@ -41,6 +53,12 @@ export function createSegmented( options: SegmentedOptions ): FieldHandle {
 
 			segment.setAttribute( 'value', option.value );
 			segment.textContent = option.label;
+
+			if ( option.title ) {
+				segment.setAttribute( 'title', option.title );
+				segment.setAttribute( 'aria-label', option.title );
+			}
+
 			group.appendChild( segment );
 		}
 
@@ -64,7 +82,7 @@ export function createSegmented( options: SegmentedOptions ): FieldHandle {
 	}
 
 	const group = document.createElement( 'div' );
-	group.className = 'lz-segmented';
+	group.className = options.icons ? 'lz-segmented lz-segmented--icons' : 'lz-segmented';
 	group.setAttribute( 'role', 'radiogroup' );
 	group.setAttribute( 'aria-label', options.label );
 
@@ -88,6 +106,12 @@ export function createSegmented( options: SegmentedOptions ): FieldHandle {
 		button.dataset.value = option.value;
 		button.textContent = option.label;
 		button.setAttribute( 'role', 'radio' );
+
+		if ( option.title ) {
+			button.setAttribute( 'title', option.title );
+			button.setAttribute( 'aria-label', option.title );
+		}
+
 		button.addEventListener( 'click', () => {
 			current = option.value;
 			paint();

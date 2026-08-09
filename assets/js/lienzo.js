@@ -3905,6 +3905,73 @@ fn mainFragment(
     el.style.left = `${Math.round(left)}px`;
     el.style.top = `${Math.round(top)}px`;
   }
+  function createMenuButton(options) {
+    let el = null;
+    let detachAway = null;
+    const close = () => {
+      detachAway?.();
+      detachAway = null;
+      el?.remove();
+      el = null;
+      button.setPressed(false);
+    };
+    const open2 = () => {
+      const menu = document.createElement("div");
+      menu.className = "lz-menu";
+      menu.setAttribute("role", "menu");
+      menu.setAttribute("aria-label", options.label);
+      for (const entry of options.getItems()) {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "lz-menu__item";
+        item.setAttribute("role", "menuitem");
+        item.textContent = entry.label;
+        if (entry.title) {
+          item.setAttribute("title", entry.title);
+        }
+        item.addEventListener("click", () => {
+          close();
+          entry.onSelect();
+        });
+        menu.appendChild(item);
+      }
+      floatingHost(button.el).appendChild(menu);
+      positionFloating(menu, button.el, "block-end");
+      el = menu;
+      button.setPressed(true);
+      const onAway = (event) => {
+        if (event.target instanceof Node && !menu.contains(event.target) && !button.el.contains(event.target)) {
+          close();
+        }
+      };
+      const onEscape = (event) => {
+        if ("Escape" === event.key) {
+          close();
+        }
+      };
+      window.setTimeout(() => document.addEventListener("click", onAway), 0);
+      document.addEventListener("keydown", onEscape);
+      detachAway = () => {
+        document.removeEventListener("click", onAway);
+        document.removeEventListener("keydown", onEscape);
+      };
+    };
+    const button = createIconButton({
+      glyph: options.glyph ?? "⋯",
+      label: __(options.label),
+      ...options.className ? { className: options.className } : {},
+      onClick: () => el ? close() : open2()
+    });
+    button.el.setAttribute("aria-haspopup", "menu");
+    return {
+      el: button.el,
+      close,
+      destroy: () => {
+        close();
+        button.destroy();
+      }
+    };
+  }
   function createNumberField(options) {
     const tag = pickComponent(["number-field", "text-field"]);
     return tag ? componentField(tag, options) : nativeField(options);
@@ -4018,7 +4085,7 @@ fn mainFragment(
     const { wrap, text } = labelledRow(
       "div",
       options.label,
-      "lz-field lz-field--compact"
+      options.icons ? "lz-field lz-field--compact lz-field--icons" : "lz-field lz-field--compact"
     );
     const tag = componentTag("segmented");
     if (tag) {
@@ -4029,6 +4096,10 @@ fn mainFragment(
         const segment = document.createElement(siblingTag(tag, "segment"));
         segment.setAttribute("value", option.value);
         segment.textContent = option.label;
+        if (option.title) {
+          segment.setAttribute("title", option.title);
+          segment.setAttribute("aria-label", option.title);
+        }
         group2.appendChild(segment);
       }
       const onPick = (event) => {
@@ -4046,7 +4117,7 @@ fn mainFragment(
       };
     }
     const group = document.createElement("div");
-    group.className = "lz-segmented";
+    group.className = options.icons ? "lz-segmented lz-segmented--icons" : "lz-segmented";
     group.setAttribute("role", "radiogroup");
     group.setAttribute("aria-label", options.label);
     const buttons = [];
@@ -4065,6 +4136,10 @@ fn mainFragment(
       button.dataset.value = option.value;
       button.textContent = option.label;
       button.setAttribute("role", "radio");
+      if (option.title) {
+        button.setAttribute("title", option.title);
+        button.setAttribute("aria-label", option.title);
+      }
       button.addEventListener("click", () => {
         current = option.value;
         paint();
@@ -7771,9 +7846,11 @@ fn mainFragment(
         editor.selection?.set(null);
       },
       hasSelection: () => true === editor.selection?.isActive,
+      hasPendingPath: () => true === editor.stage?.tools.hasPath,
       getTool: () => editor.state.getTool(),
       getSelectionShape: () => editor.selectionShape,
       commitPath: () => true === editor.stage?.tools.commitPath(),
+      closePolygon: () => void editor.stage?.tools.closePolygon(),
       clearPath: () => editor.stage?.tools.clearPath(),
       resetView: () => editor.renderer?.view.reset()
     };
@@ -7902,7 +7979,7 @@ fn mainFragment(
     }
   }
   function handlePlain(event, target) {
-    if ("Escape" === event.key && target.hasSelection()) {
+    if ("Escape" === event.key && (target.hasSelection() || target.hasPendingPath())) {
       event.preventDefault();
       target.deselect();
       return;
@@ -7917,7 +7994,7 @@ fn mainFragment(
       }
       if ("polygon" === target.getSelectionShape()) {
         event.preventDefault();
-        target.clearPath();
+        target.closePolygon();
       }
       return;
     }
@@ -8215,6 +8292,7 @@ fn mainFragment(
       const hint = document.createElement("span");
       hint.className = "lz-options__hint";
       hint.textContent = text;
+      hint.title = text;
       this.el.appendChild(hint);
     }
     /** Pushes the current settings into the controls on the bar. */
@@ -8723,6 +8801,34 @@ fn mainFragment(
     { value: "lasso", label: "Freeform" },
     { value: "polygon", label: "Polygon" }
   ];
+  const SELECTION_MODES = [
+    { value: "new", label: "New selection", glyph: "◻", title: "New selection" },
+    { value: "add", label: "Add", glyph: "⊞", title: "Add to selection (Shift)" },
+    {
+      value: "subtract",
+      label: "Subtract",
+      glyph: "⊟",
+      title: "Subtract from selection (Alt)"
+    },
+    {
+      value: "intersect",
+      label: "Intersect",
+      glyph: "▣",
+      title: "Intersect with selection (Shift+Alt)"
+    }
+  ];
+  function effectiveMode(mode, modifiers) {
+    if (modifiers.shiftKey && modifiers.altKey) {
+      return "intersect";
+    }
+    if (modifiers.shiftKey) {
+      return "add";
+    }
+    if (modifiers.altKey) {
+      return "subtract";
+    }
+    return mode;
+  }
   const MAX_LASSO_POINTS = 600;
   function isEmptySelection(selection) {
     if (!selection || selection.points.length < 2) {
@@ -8736,68 +8842,18 @@ fn mainFragment(
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
-    for (const point of selection.points) {
-      minX = Math.min(minX, point.x);
-      minY = Math.min(minY, point.y);
-      maxX = Math.max(maxX, point.x);
-      maxY = Math.max(maxY, point.y);
+    for (const contour of [selection.points, ...selection.holes ?? []]) {
+      for (const point of contour) {
+        minX = Math.min(minX, point.x);
+        minY = Math.min(minY, point.y);
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
+      }
     }
     if (!Number.isFinite(minX)) {
       return { x: 0, y: 0, w: 0, h: 0 };
     }
     return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
-  }
-  function selectionToPath(selection, width, height) {
-    const at = (point) => `${point.x * width} ${point.y * height}`;
-    if (selection.shape === "rect" || selection.shape === "ellipse") {
-      const b = selectionBounds(selection);
-      const x = b.x * width;
-      const y = b.y * height;
-      const w = b.w * width;
-      const h = b.h * height;
-      if (selection.shape === "rect") {
-        return `M ${x} ${y} H ${x + w} V ${y + h} H ${x} Z`;
-      }
-      const rx = w / 2;
-      const ry = h / 2;
-      return `M ${x} ${y + ry} a ${rx} ${ry} 0 1 0 ${w} 0 a ${rx} ${ry} 0 1 0 ${-w} 0 Z`;
-    }
-    if (selection.points.length < 2) {
-      return "";
-    }
-    const contour = (points) => `M ${at(points[0])} ` + points.slice(1).map((point) => `L ${at(point)}`).join(" ") + " Z";
-    return [selection.points, ...selection.holes ?? []].filter((points) => points.length > 1).map(contour).join(" ");
-  }
-  function thinPath(contour, maxPoints, width, height) {
-    const stride = Math.max(1, Math.ceil(contour.length / Math.max(3, maxPoints)));
-    const out = [];
-    for (let i = 0; i < contour.length; i += stride) {
-      out.push({
-        x: contour[i].x / width,
-        y: contour[i].y / height
-      });
-    }
-    return out;
-  }
-  function selectionFromDrag(shape, from, to) {
-    return {
-      shape,
-      points: [
-        { x: clamp01(Math.min(from.x, to.x)), y: clamp01(Math.min(from.y, to.y)) },
-        { x: clamp01(Math.max(from.x, to.x)), y: clamp01(Math.max(from.y, to.y)) }
-      ]
-    };
-  }
-  function appendPathPoint(points, point, minStep = 4e-3) {
-    const last = points[points.length - 1];
-    if (last && Math.abs(last.x - point.x) < minStep && Math.abs(last.y - point.y) < minStep) {
-      return points;
-    }
-    const next = [...points, { x: clamp01(point.x), y: clamp01(point.y) }];
-    return next.length > MAX_LASSO_POINTS ? next.slice(next.length - MAX_LASSO_POINTS) : next;
-  }
-  function clamp01(value) {
-    return Math.min(1, Math.max(0, value));
   }
   function buildSelectionMask(selection, width, height) {
     if (!selection || isEmptySelection(selection) || width < 1 || height < 1) {
@@ -8862,6 +8918,58 @@ fn mainFragment(
     ctx.drawImage(mask, -Math.round(origin.x), -Math.round(origin.y));
     ctx.restore();
     return true;
+  }
+  function selectionToPath(selection, width, height) {
+    const at = (point) => `${point.x * width} ${point.y * height}`;
+    if (selection.shape === "rect" || selection.shape === "ellipse") {
+      const b = selectionBounds(selection);
+      const x = b.x * width;
+      const y = b.y * height;
+      const w = b.w * width;
+      const h = b.h * height;
+      if (selection.shape === "rect") {
+        return `M ${x} ${y} H ${x + w} V ${y + h} H ${x} Z`;
+      }
+      const rx = w / 2;
+      const ry = h / 2;
+      return `M ${x} ${y + ry} a ${rx} ${ry} 0 1 0 ${w} 0 a ${rx} ${ry} 0 1 0 ${-w} 0 Z`;
+    }
+    if (selection.points.length < 2) {
+      return "";
+    }
+    const contour = (points) => `M ${at(points[0])} ` + points.slice(1).map((point) => `L ${at(point)}`).join(" ") + " Z";
+    return [selection.points, ...selection.holes ?? []].filter((points) => points.length > 1).map(contour).join(" ");
+  }
+  function thinPath(contour, maxPoints, width, height) {
+    const stride = Math.max(1, Math.ceil(contour.length / Math.max(3, maxPoints)));
+    const out = [];
+    for (let i = 0; i < contour.length; i += stride) {
+      out.push({
+        x: contour[i].x / width,
+        y: contour[i].y / height
+      });
+    }
+    return out;
+  }
+  function selectionFromDrag(shape, from, to) {
+    return {
+      shape,
+      points: [
+        { x: clamp01(Math.min(from.x, to.x)), y: clamp01(Math.min(from.y, to.y)) },
+        { x: clamp01(Math.max(from.x, to.x)), y: clamp01(Math.max(from.y, to.y)) }
+      ]
+    };
+  }
+  function appendPathPoint(points, point, minStep = 4e-3) {
+    const last = points[points.length - 1];
+    if (last && Math.abs(last.x - point.x) < minStep && Math.abs(last.y - point.y) < minStep) {
+      return points;
+    }
+    const next = [...points, { x: clamp01(point.x), y: clamp01(point.y) }];
+    return next.length > MAX_LASSO_POINTS ? next.slice(next.length - MAX_LASSO_POINTS) : next;
+  }
+  function clamp01(value) {
+    return Math.min(1, Math.max(0, value));
   }
   const MAX_HOLES = 63;
   const MIN_HOLE_AREA = 4;
@@ -8990,7 +9098,81 @@ fn mainFragment(
       )
     ];
   }
+  const MAX_COMBINE_PIXELS = 4e6;
+  const MAX_COMBINE_POINTS = 600;
+  const OPERATIONS = {
+    add: "source-over",
+    subtract: "destination-out",
+    intersect: "source-in"
+  };
+  function combineSelections(base, incoming, mode, canvas) {
+    const from = isEmptySelection(base) ? null : base;
+    const next = isEmptySelection(incoming) ? null : incoming;
+    if ("new" === mode) {
+      return next;
+    }
+    if (!from) {
+      return "add" === mode ? next : null;
+    }
+    if (!next) {
+      return from;
+    }
+    return traceCombined(from, next, mode, canvas);
+  }
+  function traceCombined(base, incoming, mode, canvas) {
+    const size = workingSize(canvas);
+    const baseMask = buildSelectionMask(base, size.width, size.height);
+    const nextMask = buildSelectionMask(incoming, size.width, size.height);
+    const surface = document.createElement("canvas");
+    surface.width = size.width;
+    surface.height = size.height;
+    const ctx = surface.getContext("2d", { willReadFrequently: true });
+    if (!baseMask || !nextMask || !ctx) {
+      return base;
+    }
+    ctx.drawImage(baseMask, 0, 0);
+    ctx.globalCompositeOperation = OPERATIONS[mode];
+    ctx.drawImage(nextMask, 0, 0);
+    const pixels = ctx.getImageData(0, 0, size.width, size.height);
+    const traced = traceMask(
+      { data: pixels.data, width: size.width, height: size.height },
+      MAX_COMBINE_POINTS
+    );
+    if (traced.outer.length < 3) {
+      return null;
+    }
+    return { shape: "lasso", points: traced.outer, holes: traced.holes };
+  }
+  function workingSize(canvas) {
+    const width = Math.max(1, Math.round(canvas.width));
+    const height = Math.max(1, Math.round(canvas.height));
+    const scale = Math.sqrt(MAX_COMBINE_PIXELS / (width * height));
+    if (scale >= 1) {
+      return { width, height };
+    }
+    return {
+      width: Math.max(1, Math.round(width * scale)),
+      height: Math.max(1, Math.round(height * scale))
+    };
+  }
+  const MODIFIER_HINT = "Shift adds, Alt subtracts, Shift+Alt intersects.";
+  function modePicker(bar) {
+    const field = createSegmented({
+      label: __("Selection mode"),
+      value: bar.options.getSelectionMode(),
+      icons: true,
+      options: SELECTION_MODES.map((mode) => ({
+        value: mode.value,
+        label: mode.glyph,
+        title: __(mode.title)
+      })),
+      onChange: (value) => bar.options.setSelectionMode(value)
+    });
+    bar.add(field, () => field.setValue(bar.options.getSelectionMode()));
+  }
   function renderSelectOptions(bar) {
+    modePicker(bar);
+    bar.divider();
     bar.add(
       createSegmented({
         label: __("Shape"),
@@ -9008,14 +9190,16 @@ fn mainFragment(
     bar.divider();
     selectionButtons(bar);
     bar.hint(
-      "polygon" === bar.options.getSelectionShape() ? __("Click to add points, Enter to close.") : __("Drag on the image. Escape deselects.")
+      "polygon" === bar.options.getSelectionShape() ? __("Click to add points, Enter to close, Escape to abandon.") : __(MODIFIER_HINT)
     );
   }
   function renderWandOptions(bar) {
+    modePicker(bar);
+    bar.divider();
     toleranceField(bar);
     bar.divider();
     selectionButtons(bar);
-    bar.hint(__("Click a colour to select the region around it."));
+    bar.hint(__(MODIFIER_HINT));
   }
   function renderTextOptions(bar) {
     bar.add(
@@ -9613,7 +9797,9 @@ fn mainFragment(
       drawing: false,
       last: null,
       dragFrom: null,
-      cloneSource: null
+      cloneSource: null,
+      selectionMode: "new",
+      pendingSelection: null
     };
   }
   function endGesture(gesture) {
@@ -9731,7 +9917,7 @@ fn mainFragment(
     );
     options.onStrokeEnd();
   }
-  function magicWand(options, point) {
+  function magicWand(options, point, event) {
     const region = matchRegion(options, point);
     if (!region) {
       return;
@@ -9742,8 +9928,9 @@ fn mainFragment(
       height: region.height,
       bounds: region.bounds
     });
-    options.setSelection(
-      traced.outer.length > 2 ? { shape: "lasso", points: traced.outer, holes: traced.holes } : null
+    options.commitSelection(
+      traced.outer.length > 2 ? { shape: "lasso", points: traced.outer, holes: traced.holes } : null,
+      effectiveMode(options.getSelectionMode(), event)
     );
   }
   function routePress(options, gesture, tool, point, event) {
@@ -9756,23 +9943,20 @@ fn mainFragment(
         floodFill(options, point);
         return "done";
       case "wand":
-        magicWand(options, point);
+        magicWand(options, point, event);
         return "done";
       case "text":
         options.onPlaceText(point);
         return "done";
       case "path":
-        options.setSelection(gesture.selection.addVertex(norm()));
+        options.previewSelection(gesture.selection.addVertex(norm()));
         return "done";
       case "eyedropper":
         pickColour(options, point);
         gesture.last = point;
         return "drag";
       case "select":
-        options.setSelection(
-          gesture.selection.begin(norm(), options.getSelectionShape())
-        );
-        return "drag";
+        return beginSelection(options, gesture, norm(), event);
       case "gradient":
       case "shape":
         gesture.dragFrom = point;
@@ -9783,6 +9967,16 @@ fn mainFragment(
       default:
         return "stroke";
     }
+  }
+  function beginSelection(options, gesture, point, event) {
+    const shape = options.getSelectionShape();
+    const starting = "polygon" !== shape || 0 === gesture.selection.vertices.length;
+    if (starting) {
+      gesture.selectionMode = effectiveMode(options.getSelectionMode(), event);
+    }
+    gesture.pendingSelection = gesture.selection.begin(point, shape);
+    options.previewSelection(gesture.pendingSelection);
+    return "polygon" === shape ? "done" : "drag";
   }
   function routeClonePress(options, gesture, point, event) {
     if (event.altKey) {
@@ -9945,12 +10139,11 @@ fn mainFragment(
           return;
         }
         if (this.gesture.selection.isDragging) {
-          this.options.setSelection(
-            this.gesture.selection.extend(
-              normalise(this.options.getCanvas(), point),
-              this.options.getSelectionShape()
-            )
+          this.gesture.pendingSelection = this.gesture.selection.extend(
+            normalise(this.options.getCanvas(), point),
+            this.options.getSelectionShape()
           );
+          this.options.previewSelection(this.gesture.pendingSelection);
           return;
         }
         continueStroke(this.options, this.gesture, point, tool);
@@ -9962,7 +10155,15 @@ fn mainFragment(
         window.removeEventListener("blur", this.onPointerUp);
         const wasDrawing = this.gesture.drawing;
         const dragFrom = this.gesture.dragFrom;
+        const wasSelecting = this.gesture.selection.isDragging;
         endGesture(this.gesture);
+        if (wasSelecting) {
+          this.options.commitSelection(
+            this.gesture.pendingSelection,
+            this.gesture.selectionMode
+          );
+          this.gesture.pendingSelection = null;
+        }
         if (dragFrom && event instanceof PointerEvent) {
           commitRegion(this.options, dragFrom, event);
         }
@@ -9980,6 +10181,10 @@ fn mainFragment(
       window.addEventListener("pointerup", this.onPointerUp);
       window.addEventListener("pointercancel", this.onPointerUp);
       window.addEventListener("blur", this.onPointerUp);
+    }
+    /** Whether a polygon or a pen path is half-placed on the canvas. */
+    get hasPath() {
+      return this.gesture.selection.vertices.length > 0;
     }
     /** Where the clone stamp is currently sampling from, if anywhere. */
     getCloneSource() {
@@ -10003,9 +10208,29 @@ fn mainFragment(
       this.clearPath();
       return true;
     }
-    /** Abandons a half-placed polygon. */
+    /**
+     * Closes a polygon marquee and folds it into the selection.
+     *
+     * @return Whether there was a polygon worth closing.
+     */
+    closePolygon() {
+      const points = this.gesture.selection.vertices;
+      if (points.length < 3) {
+        this.clearPath();
+        return false;
+      }
+      this.options.commitSelection(
+        { shape: "polygon", points: [...points] },
+        this.gesture.selectionMode
+      );
+      this.clearPath();
+      return true;
+    }
+    /** Abandons a half-placed polygon or pen path, and takes its outline down. */
     clearPath() {
       this.gesture.selection.clear();
+      this.gesture.pendingSelection = null;
+      this.options.previewSelection(null);
     }
     /** Removes the listeners. */
     destroy() {
@@ -10579,7 +10804,7 @@ fn mainFragment(
         ...options.optionsBar,
         getTool: frame.getTool
       });
-      options.topbar.after(this.optionsBar.el);
+      options.optionsHost.appendChild(this.optionsBar.el);
       this.tools = new StageTools({
         ...options.tools,
         stage: frame.stage,
@@ -10633,11 +10858,13 @@ fn mainFragment(
      */
     constructor(options) {
       this.selection = null;
+      this.pending = null;
       this.sync = () => {
         const viewport = this.options.getViewport();
-        if (!this.selection || !viewport) {
+        if (!this.selection && !this.pending || !viewport) {
           this.svg.style.display = "none";
-          this.paint("");
+          this.paint("lz-selection__", "");
+          this.paint("lz-selection__pending-", "");
           return;
         }
         this.svg.style.display = "";
@@ -10645,13 +10872,19 @@ fn mainFragment(
         this.svg.style.insetBlockStart = `${viewport.y}px`;
         this.svg.setAttribute("width", String(viewport.width));
         this.svg.setAttribute("height", String(viewport.height));
-        this.paint(selectionToPath(this.selection, viewport.width, viewport.height));
+        this.paint("lz-selection__", this.outline(this.selection, viewport));
+        this.paint("lz-selection__pending-", this.outline(this.pending, viewport));
       };
       this.options = options;
       this.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       this.svg.setAttribute("class", "lz-selection");
       this.svg.setAttribute("aria-hidden", "true");
-      for (const cls of ["lz-selection__under", "lz-selection__over"]) {
+      for (const cls of [
+        "lz-selection__under",
+        "lz-selection__over",
+        "lz-selection__pending-under",
+        "lz-selection__pending-over"
+      ]) {
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute("class", cls);
         this.svg.appendChild(path);
@@ -10674,6 +10907,7 @@ fn mainFragment(
      */
     set(selection) {
       this.selection = isEmptySelection(selection) ? null : selection;
+      this.pending = null;
       const canvas = this.options.getCanvas();
       this.options.setMask(
         buildSelectionMask(this.selection, canvas.width, canvas.height)
@@ -10681,18 +10915,51 @@ fn mainFragment(
       this.sync();
       this.options.onChange();
     }
+    /**
+     * Shows a region being drawn, without committing it.
+     *
+     * No mask is built and no listener is told: this is an outline following a pointer,
+     * and nothing downstream of the selection has changed yet.
+     *
+     * @param selection Region in progress, or null to take the outline down.
+     */
+    setPending(selection) {
+      this.pending = selection;
+      this.sync();
+    }
+    /**
+     * Folds a finished region into the selection.
+     *
+     * @param selection Region just drawn, or null when the gesture produced nothing.
+     * @param mode      What that region does to the selection already in place.
+     */
+    combine(selection, mode) {
+      this.set(
+        combineSelections(this.selection, selection, mode, this.options.getCanvas())
+      );
+    }
     /** Selects the whole canvas. */
     selectAll() {
       this.set({ ...SELECT_ALL });
     }
     /**
-     * Writes one path into both outline strokes.
+     * One selection as path data, or nothing when there is none.
      *
-     * @param d Path data.
+     * @param selection Selection to draw, or null.
+     * @param viewport  Where the canvas sits.
      */
-    paint(d) {
-      for (const node of this.svg.querySelectorAll("path")) {
-        node.setAttribute("d", d);
+    outline(selection, viewport) {
+      return selection ? selectionToPath(selection, viewport.width, viewport.height) : "";
+    }
+    /**
+     * Writes one path into both strokes of an outline.
+     *
+     * @param prefix Class prefix identifying which outline.
+     * @param d      Path data.
+     */
+    paint(prefix, d) {
+      for (const suffix of ["under", "over"]) {
+        this.svg.querySelector(`.${prefix}${suffix}`)?.setAttribute("d", d);
       }
     }
     /** Takes the outline off the stage. */
@@ -10820,7 +11087,7 @@ fn mainFragment(
         getBrush: () => state2.getBrush()
       },
       body: shell2.root.querySelector(".lz-body") ?? shell2.root,
-      topbar: shell2.topbar,
+      optionsHost: shell2.options,
       rail: {
         getActive: () => state2.getTool(),
         onSelect: (tool) => state2.setTool(tool),
@@ -10841,7 +11108,10 @@ fn mainFragment(
         setSelectionShape: (shape) => {
           editor.selectionShape = shape;
           toolset.tools.clearPath();
-          selection.set(null);
+        },
+        getSelectionMode: () => editor.selectionMode,
+        setSelectionMode: (mode) => {
+          editor.selectionMode = mode;
         },
         hasSelection: () => selection.isActive,
         deselect: () => {
@@ -10888,7 +11158,9 @@ fn mainFragment(
         readDocument: () => renderer.pixels.readPixels(),
         readPristine: () => renderer.readPristinePixels(),
         getSelectionShape: () => editor.selectionShape,
-        setSelection: (next) => selection.set(next),
+        getSelectionMode: () => editor.selectionMode,
+        previewSelection: (next) => selection.setPending(next),
+        commitSelection: (next, mode) => selection.combine(next, mode),
         pan: (dx, dy) => renderer.view.pan(dx, dy),
         zoomAt: (factor, x, y) => renderer.view.zoomAt(factor, x, y),
         onToolStateChange: () => toolset.optionsBar.render(),
@@ -11225,6 +11497,9 @@ fn mainFragment(
   function onToolChange(editor, previous) {
     if ("text" === previous) {
       editor.stage?.text.commit();
+    }
+    if ("select" === previous || "path" === previous) {
+      editor.stage?.tools.clearPath();
     }
     const tool = editor.state.getTool();
     editor.stage?.rail.sync(tool);
@@ -11956,9 +12231,11 @@ fn mainFragment(
       this.title = document.createElement("h1");
       this.title.className = "lz-topbar__title";
       this.title.textContent = __("Loading image…");
+      this.options = document.createElement("div");
+      this.options.className = "lz-topbar__options";
       this.actions = document.createElement("div");
       this.actions.className = "lz-topbar__actions";
-      this.topbar.append(this.title, this.actions);
+      this.topbar.append(this.title, this.options, this.actions);
       const body = document.createElement("div");
       body.className = "lz-body";
       this.stage = document.createElement("div");
@@ -12046,10 +12323,10 @@ fn mainFragment(
     }
   }
   function createCompareControl(setBypass) {
-    const handle = createButton({
-      label: __("Compare"),
-      title: __("Hold to see the original"),
-      variant: "ghost",
+    const handle = createIconButton({
+      glyph: "◑",
+      label: __("Compare: hold to see the original (\\)"),
+      className: "lz-topbar__icon",
       onClick: () => {
       }
     });
@@ -12090,75 +12367,93 @@ fn mainFragment(
      * @param actions What each button does.
      */
     constructor(host, actions) {
+      this.state = {
+        canUndo: false,
+        canRedo: false,
+        identity: true,
+        ready: false,
+        canSave: false
+      };
       this.handles = [];
       this.detach = [];
-      this.undoButton = createButton({
-        label: __("Undo"),
-        title: __("Undo (Ctrl+Z)"),
-        variant: "ghost",
+      const recentre = createIconButton({
+        glyph: "⊕",
+        label: __("Recentre the view (0)"),
+        className: "lz-topbar__icon",
+        onClick: actions.recentre
+      });
+      this.undoButton = createIconButton({
+        glyph: "↶",
+        label: __("Undo (Ctrl+Z)"),
+        className: "lz-topbar__icon",
         onClick: actions.undo
       });
-      this.redoButton = createButton({
-        label: __("Redo"),
-        title: __("Redo (Ctrl+Shift+Z)"),
-        variant: "ghost",
+      this.redoButton = createIconButton({
+        glyph: "↷",
+        label: __("Redo (Ctrl+Shift+Z)"),
+        className: "lz-topbar__icon",
         onClick: actions.redo
       });
       const compare = createCompareControl(actions.setBypass);
       this.detach.push(compare.detach);
-      this.resetButton = createButton({
-        label: __("Reset"),
-        title: __("Return every adjustment to zero"),
-        variant: "secondary",
-        onClick: actions.reset
-      });
-      const recentre = createButton({
-        label: "⊕",
-        // Easy to scroll into empty pasteboard and lose the picture entirely;
-        // this is the way back that does not require knowing the shortcut.
-        title: __("Recentre the view (0)"),
-        variant: "ghost",
-        onClick: actions.recentre
-      });
-      this.exportButton = createButton({
-        label: __("Export"),
-        title: __("Download the edited image to this device"),
-        variant: "secondary",
-        onClick: actions.exportToDevice
-      });
       this.saveButton = createButton({
         label: __("Save a copy"),
         title: __("Save as a new image, leaving the original untouched"),
         variant: "primary",
         onClick: actions.save
       });
-      host.appendChild(recentre.el);
+      this.overflow = createMenuButton({
+        label: __("More actions"),
+        className: "lz-topbar__icon",
+        getItems: () => this.moreActions(actions)
+      });
       host.append(
+        recentre.el,
         this.undoButton.el,
         this.redoButton.el,
         compare.handle.el,
-        this.resetButton.el,
-        this.exportButton.el,
-        this.saveButton.el
+        this.saveButton.el,
+        this.overflow.el
       );
       this.handles.push(
         recentre,
         this.undoButton,
         this.redoButton,
         compare.handle,
-        this.resetButton,
-        this.exportButton,
-        this.saveButton
+        this.saveButton,
+        this.overflow
       );
-      if (actions.close) {
-        const close = createButton({
-          label: __("Close"),
-          variant: "ghost",
-          onClick: actions.close
+    }
+    /**
+     * The commands behind the overflow, with the ones that would do nothing left out.
+     *
+     * Omitted rather than greyed out, unlike the buttons on the bar itself: a disabled
+     * control in a row is a placeholder holding its position, but a disabled row in a
+     * menu of three is just a shorter menu with a gap in it.
+     *
+     * @param actions What each command does.
+     */
+    moreActions(actions) {
+      const items = [];
+      const live = this.state.ready && !this.state.identity;
+      if (live) {
+        items.push({
+          label: __("Export…"),
+          title: __("Download the edited image to this device"),
+          onSelect: actions.exportToDevice
         });
-        this.handles.push(close);
-        host.appendChild(close.el);
       }
+      if (!this.state.identity) {
+        items.push({
+          label: __("Reset all edits"),
+          title: __("Return every adjustment to zero"),
+          onSelect: actions.reset
+        });
+      }
+      if (actions.close) {
+        items.push({ label: __("Close"), onSelect: actions.close });
+      }
+      return items;
     }
     /**
      * Enables or disables the buttons to match the state.
@@ -12166,12 +12461,11 @@ fn mainFragment(
      * @param state Current editor state.
      */
     sync(state2) {
+      this.state = state2;
       this.undoButton.setDisabled(!state2.canUndo);
       this.redoButton.setDisabled(!state2.canRedo);
-      this.resetButton.setDisabled(state2.identity);
       const live = state2.ready && !state2.identity;
       this.saveButton.setDisabled(!live || !state2.canSave);
-      this.exportButton.setDisabled(!live);
     }
     /** Releases every button and key binding. */
     destroy() {
@@ -12193,6 +12487,7 @@ fn mainFragment(
     constructor(element, options) {
       this.store = emptyStore(0);
       this.selectionShape = "rect";
+      this.selectionMode = "new";
       this.payload = null;
       this.renderer = null;
       this.loaded = null;

@@ -1,15 +1,26 @@
 /**
- * The toolbar row.
+ * The action end of the top bar.
  *
- * Undo, redo, compare, reset, recentre, export and save -- plus the rule for when each
+ * Undo, redo, compare, recentre, export, reset and save -- plus the rule for when each
  * of them is available. Enabling state is derived in one place from one snapshot,
  * because a Save button that is live on an unedited image produces a duplicate and a
  * Save button that is live twice over produces two.
+ *
+ * Seven commands used to be seven labelled buttons, which was most of the width of the
+ * editor for a row that is not what anyone came to look at. Now the four that are used
+ * constantly are glyphs, the two that are used rarely are behind an overflow, and only
+ * the one that ends the session keeps its words. The commands are the same; what changed
+ * is how much of the picture they were standing on.
  */
 
 import { __ } from '../i18n';
-import { createButton } from '../ui/controls';
-import type { ButtonHandle } from '../ui/controls';
+import { createButton, createIconButton, createMenuButton } from '../ui/controls';
+import type {
+	ButtonHandle,
+	IconButtonHandle,
+	MenuButtonHandle,
+	MenuItem,
+} from '../ui/controls';
 import { createCompareControl } from './compare-control';
 
 export interface ToolbarActions {
@@ -41,18 +52,30 @@ export interface ToolbarState {
  * The toolbar's buttons and their enabling rules.
  */
 export class EditorToolbar {
-	private undoButton: ButtonHandle;
+	private undoButton: IconButtonHandle;
 
-	private redoButton: ButtonHandle;
-
-	private resetButton: ButtonHandle;
+	private redoButton: IconButtonHandle;
 
 	private saveButton: ButtonHandle;
 
-	private exportButton: ButtonHandle;
+	private overflow: MenuButtonHandle;
+
+	/**
+	 * The last state pushed in.
+	 *
+	 * The overflow's commands are built fresh on every open, so their availability is
+	 * read from here rather than pushed into elements that do not exist yet.
+	 */
+	private state: ToolbarState = {
+		canUndo: false,
+		canRedo: false,
+		identity: true,
+		ready: false,
+		canSave: false,
+	};
 
 	/** Everything to release, including the buttons with no state of their own. */
-	private handles: ButtonHandle[] = [];
+	private handles: Array< { destroy: () => void } > = [];
 
 	private detach: Array< () => void > = [];
 
@@ -61,46 +84,32 @@ export class EditorToolbar {
 	 * @param actions What each button does.
 	 */
 	constructor( host: HTMLElement, actions: ToolbarActions ) {
-		this.undoButton = createButton( {
-			label: __( 'Undo' ),
-			title: __( 'Undo (Ctrl+Z)' ),
-			variant: 'ghost',
+		// Easy to scroll into empty pasteboard and lose the picture entirely; this is
+		// the way back that does not require knowing the shortcut.
+		const recentre = createIconButton( {
+			glyph: '⊕',
+			label: __( 'Recentre the view (0)' ),
+			className: 'lz-topbar__icon',
+			onClick: actions.recentre,
+		} );
+
+		this.undoButton = createIconButton( {
+			glyph: '↶',
+			label: __( 'Undo (Ctrl+Z)' ),
+			className: 'lz-topbar__icon',
 			onClick: actions.undo,
 		} );
 
-		this.redoButton = createButton( {
-			label: __( 'Redo' ),
-			title: __( 'Redo (Ctrl+Shift+Z)' ),
-			variant: 'ghost',
+		this.redoButton = createIconButton( {
+			glyph: '↷',
+			label: __( 'Redo (Ctrl+Shift+Z)' ),
+			className: 'lz-topbar__icon',
 			onClick: actions.redo,
 		} );
 
 		const compare = createCompareControl( actions.setBypass );
 
 		this.detach.push( compare.detach );
-
-		this.resetButton = createButton( {
-			label: __( 'Reset' ),
-			title: __( 'Return every adjustment to zero' ),
-			variant: 'secondary',
-			onClick: actions.reset,
-		} );
-
-		const recentre = createButton( {
-			label: '⊕',
-			// Easy to scroll into empty pasteboard and lose the picture entirely;
-			// this is the way back that does not require knowing the shortcut.
-			title: __( 'Recentre the view (0)' ),
-			variant: 'ghost',
-			onClick: actions.recentre,
-		} );
-
-		this.exportButton = createButton( {
-			label: __( 'Export' ),
-			title: __( 'Download the edited image to this device' ),
-			variant: 'secondary',
-			onClick: actions.exportToDevice,
-		} );
 
 		this.saveButton = createButton( {
 			label: __( 'Save a copy' ),
@@ -109,15 +118,19 @@ export class EditorToolbar {
 			onClick: actions.save,
 		} );
 
-		// Recentre first, matching the order the buttons were originally appended in.
-		host.appendChild( recentre.el );
+		this.overflow = createMenuButton( {
+			label: __( 'More actions' ),
+			className: 'lz-topbar__icon',
+			getItems: () => this.moreActions( actions ),
+		} );
+
 		host.append(
+			recentre.el,
 			this.undoButton.el,
 			this.redoButton.el,
 			compare.handle.el,
-			this.resetButton.el,
-			this.exportButton.el,
-			this.saveButton.el
+			this.saveButton.el,
+			this.overflow.el
 		);
 
 		this.handles.push(
@@ -125,21 +138,47 @@ export class EditorToolbar {
 			this.undoButton,
 			this.redoButton,
 			compare.handle,
-			this.resetButton,
-			this.exportButton,
-			this.saveButton
+			this.saveButton,
+			this.overflow
 		);
+	}
+
+	/**
+	 * The commands behind the overflow, with the ones that would do nothing left out.
+	 *
+	 * Omitted rather than greyed out, unlike the buttons on the bar itself: a disabled
+	 * control in a row is a placeholder holding its position, but a disabled row in a
+	 * menu of three is just a shorter menu with a gap in it.
+	 *
+	 * @param actions What each command does.
+	 */
+	private moreActions( actions: ToolbarActions ): MenuItem[] {
+		const items: MenuItem[] = [];
+		// Exporting an unedited image would download the original, and exporting twice
+		// while a render is in flight would render it twice.
+		const live = this.state.ready && ! this.state.identity;
+
+		if ( live ) {
+			items.push( {
+				label: __( 'Export…' ),
+				title: __( 'Download the edited image to this device' ),
+				onSelect: actions.exportToDevice,
+			} );
+		}
+
+		if ( ! this.state.identity ) {
+			items.push( {
+				label: __( 'Reset all edits' ),
+				title: __( 'Return every adjustment to zero' ),
+				onSelect: actions.reset,
+			} );
+		}
 
 		if ( actions.close ) {
-			const close = createButton( {
-				label: __( 'Close' ),
-				variant: 'ghost',
-				onClick: actions.close,
-			} );
-
-			this.handles.push( close );
-			host.appendChild( close.el );
+			items.push( { label: __( 'Close' ), onSelect: actions.close } );
 		}
+
+		return items;
 	}
 
 	/**
@@ -148,16 +187,16 @@ export class EditorToolbar {
 	 * @param state Current editor state.
 	 */
 	sync( state: ToolbarState ): void {
+		this.state = state;
+
 		this.undoButton.setDisabled( ! state.canUndo );
 		this.redoButton.setDisabled( ! state.canRedo );
-		this.resetButton.setDisabled( state.identity );
 
 		// Saving an unedited image would just duplicate it, and saving twice while a
 		// render is in flight would create two copies.
 		const live = state.ready && ! state.identity;
 
 		this.saveButton.setDisabled( ! live || ! state.canSave );
-		this.exportButton.setDisabled( ! live );
 	}
 
 	/** Releases every button and key binding. */

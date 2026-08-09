@@ -27,8 +27,20 @@ export interface ShellOptions {
 export class EditorShell {
 	readonly root: HTMLElement;
 
-	/** The toolbar row. The options bar is inserted after it. */
+	/** The one bar across the top. */
 	readonly topbar: HTMLElement;
+
+	/**
+	 * Where the contextual options bar goes.
+	 *
+	 * In the middle of the top bar rather than in a row of its own. Two rows cost
+	 * something like a tenth of the height of a laptop screen to say the file's name and
+	 * then, underneath, what the current tool does -- on a screen whose entire purpose is
+	 * to show a photograph as large as it can. One row holds all of it, because the two
+	 * things that were competing for width, the title and the tool options, are both
+	 * happy to be truncated and neither needed a full row to itself.
+	 */
+	readonly options: HTMLElement;
 
 	/** The canvas area. Overlays attach here. */
 	readonly stage: HTMLElement;
@@ -74,10 +86,13 @@ export class EditorShell {
 		this.title.className = 'lz-topbar__title';
 		this.title.textContent = __( 'Loading image…' );
 
+		this.options = document.createElement( 'div' );
+		this.options.className = 'lz-topbar__options';
+
 		this.actions = document.createElement( 'div' );
 		this.actions.className = 'lz-topbar__actions';
 
-		this.topbar.append( this.title, this.actions );
+		this.topbar.append( this.title, this.options, this.actions );
 
 		const body = document.createElement( 'div' );
 		body.className = 'lz-body';

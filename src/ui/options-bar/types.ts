@@ -2,7 +2,7 @@
  * What the options bar is given, and what it hands back.
  */
 
-import type { SelectionShape } from '../../model/selection';
+import type { SelectionMode, SelectionShape } from '../../model/selection';
 import type { ActiveTool, PanelContext } from '../panels';
 
 export interface OptionsBarOptions {
@@ -10,6 +10,9 @@ export interface OptionsBarOptions {
 	getTool: () => ActiveTool;
 	getSelectionShape: () => SelectionShape;
 	setSelectionShape: ( shape: SelectionShape ) => void;
+	/** What a newly drawn region does to the selection already in place. */
+	getSelectionMode: () => SelectionMode;
+	setSelectionMode: ( mode: SelectionMode ) => void;
 	hasSelection: () => boolean;
 	deselect: () => void;
 	selectAll: () => void;

@@ -25,6 +25,81 @@ export const SELECTION_SHAPES: Array< { value: SelectionShape; label: string } >
 	{ value: 'polygon', label: 'Polygon' },
 ];
 
+/**
+ * What a newly drawn region does to the selection that is already there.
+ *
+ * The distinction every raster editor makes, and the reason a selection tool is a tool
+ * rather than a gesture: the shapes anyone actually wants are almost never one
+ * rectangle. A subject is a wand click plus two lasso corrections; a vignette mask is an
+ * ellipse minus a smaller one. Without these, each of those is a redraw from scratch.
+ */
+export type SelectionMode = 'new' | 'add' | 'subtract' | 'intersect';
+
+/** A mode, as the picker presents it. */
+export interface SelectionModeDef {
+	value: SelectionMode;
+	/** Accessible name. */
+	label: string;
+	/**
+	 * The glyph on the button.
+	 *
+	 * One square family throughout, so the four read as one control: an empty square
+	 * replaces, plus and minus add and take away, and the square with a core is the
+	 * part two regions share.
+	 */
+	glyph: string;
+	/** Tooltip, naming the modifier that reaches the mode without the picker. */
+	title: string;
+}
+
+/** The modes on offer, in picker order -- the same order Photoshop has used since 3.0. */
+export const SELECTION_MODES: SelectionModeDef[] = [
+	{ value: 'new', label: 'New selection', glyph: '◻', title: 'New selection' },
+	{ value: 'add', label: 'Add', glyph: '⊞', title: 'Add to selection (Shift)' },
+	{
+		value: 'subtract',
+		label: 'Subtract',
+		glyph: '⊟',
+		title: 'Subtract from selection (Alt)',
+	},
+	{
+		value: 'intersect',
+		label: 'Intersect',
+		glyph: '▣',
+		title: 'Intersect with selection (Shift+Alt)',
+	},
+];
+
+/**
+ * The mode a gesture actually runs in, once its modifier keys are read.
+ *
+ * Held modifiers win over the picker, and are forgotten as soon as the gesture ends --
+ * that is what makes "one quick subtraction" cost a keypress rather than two trips to
+ * the options bar. The combination is the one every editor uses, so the muscle memory
+ * transfers.
+ *
+ * @param mode      Mode chosen in the options bar.
+ * @param modifiers Modifier keys held when the gesture began.
+ */
+export function effectiveMode(
+	mode: SelectionMode,
+	modifiers: { shiftKey: boolean; altKey: boolean }
+): SelectionMode {
+	if ( modifiers.shiftKey && modifiers.altKey ) {
+		return 'intersect';
+	}
+
+	if ( modifiers.shiftKey ) {
+		return 'add';
+	}
+
+	if ( modifiers.altKey ) {
+		return 'subtract';
+	}
+
+	return mode;
+}
+
 /** A selected region. */
 export interface Selection {
 	shape: SelectionShape;

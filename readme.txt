@@ -32,6 +32,7 @@ Eighteen tools on a two column rail, grouped the way you would expect:
 
 * Move and transform, with handles that scale, rotate and snap
 * Select as a rectangle, an ellipse, a freeform lasso or a polygon
+* Build a selection up: add to it, subtract from it, or keep only the overlap, from the options bar or by holding Shift, Alt or both
 * Magic wand, which selects the region around the colour you click
 * Crop, with aspect presets
 * Eyedropper, brush, eraser, paint bucket and gradient
@@ -151,6 +152,8 @@ Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and serv
 * Crop, straighten, rotate and flip, with the canvas independent of the image sitting on it.
 * Layers, with reorder, hide and delete.
 * Selections as a rectangle, an ellipse, a lasso or a polygon, plus a magic wand.
+* Selection modes: new, add, subtract and intersect, from the options bar or with Shift, Alt and Shift+Alt.
+* One top bar instead of two, giving the picture back about half the height the chrome used to take.
 * Brushes, eraser, paint bucket, gradient, shapes, paths and text typed on the canvas.
 * Retouching: blur, sharpen, smudge, heal and clone stamp.
 * Dodge, burn, desaturate and saturate.

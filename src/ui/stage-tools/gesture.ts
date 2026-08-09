@@ -8,7 +8,7 @@
  * every stroke after it.
  */
 
-import type { Point } from '../../model/selection';
+import type { Point, Selection, SelectionMode } from '../../model/selection';
 import { DragPreview } from './drag-preview';
 import { PixelStroke } from './pixel-stroke';
 import { SelectionGesture } from './selection-gesture';
@@ -30,6 +30,17 @@ export interface Gesture {
 	dragFrom: Point | null;
 	/** Where the clone stamp samples from, in canvas pixels. */
 	cloneSource: Point | null;
+	/**
+	 * What the region being drawn will do to the selection already in place.
+	 *
+	 * Fixed when the gesture starts rather than read when it ends, because the modifier
+	 * keys that reach a mode without the picker are usually let go of before the mouse
+	 * button is -- and a subtraction that turned into a replacement on release would be
+	 * the single most destructive bug this tool could have.
+	 */
+	selectionMode: SelectionMode;
+	/** The region drawn so far, waiting to be folded in on release. */
+	pendingSelection: Selection | null;
 }
 
 /**
@@ -46,11 +57,17 @@ export function newGesture( options: StageToolsOptions ): Gesture {
 		last: null,
 		dragFrom: null,
 		cloneSource: null,
+		selectionMode: 'new',
+		pendingSelection: null,
 	};
 }
 
 /**
  * Clears everything one gesture owned, leaving the clone sample point alone.
+ *
+ * The region drawn is deliberately *not* cleared here: a marquee is folded into the
+ * selection after the drag lifecycle closes, and forgetting it first would commit
+ * nothing. `StageTools` reads it and clears it itself.
  *
  * @param gesture Gesture to reset.
  */

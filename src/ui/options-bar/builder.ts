@@ -115,6 +115,9 @@ export class OptionsBuilder {
 
 		hint.className = 'lz-options__hint';
 		hint.textContent = text;
+		// The bar is one row now, so a long hint is shown truncated. The tooltip is
+		// where the rest of it lives rather than being lost.
+		hint.title = text;
 		this.el.appendChild( hint );
 	}
 
