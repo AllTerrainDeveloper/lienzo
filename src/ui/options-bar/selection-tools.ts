@@ -54,10 +54,12 @@ export function renderSelectOptions( bar: OptionsBuilder ): void {
 	bar.divider();
 
 	// Segmented rather than a dropdown: four choices worth seeing at once, and a
-	// shape you can identify without opening anything.
+	// shape you can identify without opening anything. Unlabelled, because "Rectangle,
+	// Ellipse, Freeform, Polygon" does not need the word "Shape" in front of it.
 	bar.add(
 		createSegmented( {
 			label: __( 'Shape' ),
+			hideLabel: true,
 			value: bar.options.getSelectionShape(),
 			options: SELECTION_SHAPES.map( ( entry ) => ( {
 				value: entry.value,

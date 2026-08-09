@@ -82,16 +82,14 @@ export class ViewController {
 	 * Called from `fit()` so there is exactly one place that can get this wrong, and
 	 * every path that repositions the image goes through it.
 	 *
-	 * @return The host's size in CSS pixels.
+	 * @return The host's size in CSS pixels, and whether the surface was replaced.
 	 */
-	private syncSurface(): { width: number; height: number } {
+	private syncSurface(): { width: number; height: number; resized: boolean } {
 		const bounds = this.host.getBoundingClientRect();
 		const width = Math.max( 1, Math.floor( bounds.width ) );
 		const height = Math.max( 1, Math.floor( bounds.height ) );
 
-		this.gpu.resize( width, height );
-
-		return { width, height };
+		return { width, height, resized: this.gpu.resize( width, height ) };
 	}
 
 	/** Extra inset when the rulers are showing, so fitting never tucks under them. */
@@ -107,6 +105,26 @@ export class ViewController {
 	 */
 	fit(): void {
 		const bounds = this.syncSurface();
+
+		this.place( bounds );
+
+		// A resize replaced the drawing buffer with an empty one, and this frame's
+		// ticker render has already been and gone -- so without this the browser paints
+		// the blank surface and the picture flickers all the way through a window drag.
+		// Unconditional on `resized` rather than on there being something to draw: an
+		// empty surface still has to be painted once, or the last frame's pixels linger
+		// stretched across the new one.
+		if ( bounds.resized ) {
+			this.gpu.renderNow();
+		}
+	}
+
+	/**
+	 * Scales and centres the sprite for a given surface size.
+	 *
+	 * @param bounds Surface size in CSS pixels.
+	 */
+	private place( bounds: { width: number; height: number } ): void {
 		const sprite = this.subject.sprite();
 		const size = this.subject.size();
 

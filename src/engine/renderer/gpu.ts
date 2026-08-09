@@ -124,13 +124,36 @@ export class GpuContext {
 	 *
 	 * @param width  Width in CSS pixels.
 	 * @param height Height in CSS pixels.
+	 * @return Whether the surface actually changed, which means it was also cleared.
 	 */
-	resize( width: number, height: number ): void {
+	resize( width: number, height: number ): boolean {
 		const screen = this.app.renderer.screen;
 
-		if ( screen.width !== width || screen.height !== height ) {
-			this.app.renderer.resize( width, height );
+		if ( screen.width === width && screen.height === height ) {
+			return false;
 		}
+
+		this.app.renderer.resize( width, height );
+
+		return true;
+	}
+
+	/**
+	 * Draws the stage now, instead of waiting for the ticker's next frame.
+	 *
+	 * Resizing reallocates the drawing buffer, and a reallocated buffer is transparent
+	 * until something is drawn into it. That is normally invisible -- but a
+	 * ResizeObserver callback runs *after* the frame's animation callbacks, so the
+	 * ticker has already drawn this frame by the time the surface is replaced, and the
+	 * browser paints the empty one. One blank frame per resize step, which during a
+	 * window drag is every frame: the picture flickers, or seems to vanish and come
+	 * back.
+	 *
+	 * Drawing here closes that gap. The ResizeObserver still runs before paint, so the
+	 * frame the user sees has the picture in it at the new size.
+	 */
+	renderNow(): void {
+		this.app.render();
 	}
 
 	/**

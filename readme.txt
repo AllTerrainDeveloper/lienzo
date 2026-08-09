@@ -153,7 +153,8 @@ Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and serv
 * Layers, with reorder, hide and delete.
 * Selections as a rectangle, an ellipse, a lasso or a polygon, plus a magic wand.
 * Selection modes: new, add, subtract and intersect, from the options bar or with Shift, Alt and Shift+Alt.
-* One top bar instead of two, giving the picture back about half the height the chrome used to take.
+* One top bar instead of two, and a third the height: 31 pixels where the chrome used to take about 90.
+* The picture no longer flickers while a window is being resized.
 * Brushes, eraser, paint bucket, gradient, shapes, paths and text typed on the canvas.
 * Retouching: blur, sharpen, smudge, heal and clone stamp.
 * Dodge, burn, desaturate and saturate.

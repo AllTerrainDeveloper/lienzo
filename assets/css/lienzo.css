@@ -171,11 +171,27 @@
  * the options scroll sideways within their own slot instead.
  */
 .lz-topbar {
+	/*
+	 * One number the whole bar is built from. Every control in it -- button, glyph,
+	 * segment -- is exactly this tall, so the bar's height is this plus its padding and
+	 * nothing else, and there is no tallest-child surprise hiding in it.
+	 */
+	--lz-bar-control: 24px;
+
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	padding: 4px 10px;
-	min-block-size: 38px;
+	gap: 8px;
+	padding: 3px 8px;
+
+	/*
+	 * The control height, not the control height plus the padding. WordPress's admin
+	 * sets `box-sizing: border-box` globally and the harness does not, so anything that
+	 * counts the padding here is a different number in the two places -- and the larger
+	 * of the two wins, which is how a bar built for thirty-one pixels renders at
+	 * thirty-seven. Stated this way it is a floor in both box models and binds in
+	 * neither: the tallest child already decides.
+	 */
+	min-block-size: var( --lz-bar-control );
 	background: var( --lz-surface );
 	border-block-end: 1px solid var( --lz-border );
 	flex: 0 0 auto;
@@ -199,12 +215,13 @@
 .lz-topbar__title {
 	margin: 0;
 	flex: 0 1 auto;
-	max-inline-size: 22ch;
+	max-inline-size: 20ch;
 
 	/* A flex item will not shrink past its longest word without this. */
 	min-inline-size: 0;
-	font-size: 13px;
+	font-size: 12px;
 	font-weight: 600;
+	line-height: 1;
 	color: var( --lz-fg );
 	white-space: nowrap;
 	overflow: hidden;
@@ -230,17 +247,59 @@
 	flex: 0 0 auto;
 }
 
-/* The glyph actions: undo, redo, compare, recentre, overflow. */
+/*
+ * Everything in the bar, at one height.
+ *
+ * Written against the bar rather than against each control because the point is that
+ * they agree: a 29px button beside a 26px glyph beside a 27px segment is what made the
+ * row need forty-seven pixels to hold twenty-four pixels of content.
+ */
 .lz-topbar .lz-topbar__icon {
-	inline-size: 26px;
-	block-size: 26px;
-	font-size: 14px;
+	inline-size: var( --lz-bar-control );
+	block-size: var( --lz-bar-control );
+	font-size: 13px;
+}
+
+.lz-topbar .lz-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	block-size: var( --lz-bar-control );
+	padding: 0 9px;
+	font-size: 11.5px;
+	line-height: 1;
+	white-space: nowrap;
+}
+
+/* The shell's own button brings its own padding; this is the same height, its way. */
+.lz-topbar wpd-button::part( button ),
+.lz-topbar os-button::part( button ) {
+	padding-block: 0;
+	min-block-size: var( --lz-bar-control );
+}
+
+.lz-topbar .lz-segmented {
+	padding: 1px;
+	gap: 1px;
+}
+
+.lz-topbar .lz-segmented__item {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	block-size: calc( var( --lz-bar-control ) - 4px );
+	padding: 0 8px;
+}
+
+.lz-topbar .lz-segmented--icons .lz-segmented__item {
+	inline-size: 22px;
+	padding: 0;
+	font-size: 13px;
 }
 
 /* The one action still worth its words sits a little apart from the glyphs. */
 .lz-topbar__actions .lz-button {
-	margin-inline-start: 6px;
-	white-space: nowrap;
+	margin-inline-start: 4px;
 }
 
 @container ( max-width: 620px ) {
@@ -1684,7 +1743,7 @@ input.lz-colour {
 .lz-options {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: 6px;
 	flex-wrap: nowrap;
 	inline-size: 100%;
 	min-inline-size: 0;
@@ -1709,8 +1768,9 @@ input.lz-colour {
 
 .lz-options__divider {
 	inline-size: 1px;
-	align-self: stretch;
-	margin-block: 4px;
+	block-size: 16px;
+	flex: 0 0 auto;
+	margin-inline: 2px;
 	background: var( --lz-border );
 }
 
@@ -1839,7 +1899,7 @@ input.lz-colour {
  * screen reader -- but leaving the text in the flow costs a hundred pixels of a bar
  * that now has one row to fit everything into.
  */
-.lz-field--icons > .lz-field__label {
+.lz-field--unlabelled > .lz-field__label {
 	position: absolute;
 	inline-size: 1px;
 	block-size: 1px;

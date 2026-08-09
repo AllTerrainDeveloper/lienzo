@@ -111,11 +111,22 @@ would rather not see gets switched off in the picker instead.
 The name of the file, the options for the current tool and the document's actions used to be a
 labelled toolbar stacked on top of a labelled options bar: two rows, about ninety pixels, spent above
 a photograph on saying what the photograph is called and then, underneath, what the current tool
-does. They fit on one 47-pixel row because the two things competing for width — the title and the
-tool options — are both content that reads fine truncated, and because the seven actions gave up
-their words.
+does. It is **one 31-pixel row** now.
 
-Four of them are glyphs now (recentre, undo, redo, compare), the two used rarely are behind a `⋯`
+Half of that came from merging the rows; the other half came from the row admitting it was mostly
+air. Every control in the bar is exactly `--lz-bar-control` tall — one custom property, declared on
+`.lz-topbar` and applied to buttons, glyphs and segments alike — because a 29px button beside a 26px
+glyph beside a 27px segment is how a row needs forty-seven pixels to hold twenty-four pixels of
+content. And `min-block-size` states the control height rather than the control height plus the
+padding: WordPress's admin sets `box-sizing: border-box` globally, so anything counting the padding
+is a different number in the admin than it is anywhere else, and the larger of the two wins.
+
+The labels went too, where the control already said what it was. "Selection mode" in front of four
+symbols and "Shape" in front of the word "Rectangle" are a hundred pixels each of a one-row bar spent
+naming the obvious; both are clipped rather than removed, so the group keeps its `aria-label` and a
+screen reader loses nothing.
+
+Four actions are glyphs now (recentre, undo, redo, compare), the two used rarely are behind a `⋯`
 overflow (export, reset, and close where the host wants one), and only **Save a copy** keeps its
 words. The overflow's items are built on every open rather than captured once, and a command that
 would do nothing is left out rather than greyed — a disabled control in a row is a placeholder
@@ -791,6 +802,13 @@ repoint rather than a restore from backup. A gallery swap keeps its position.
 
 Stated plainly, because each is better read here than discovered:
 
+- **A resize repaints the picture inside the ResizeObserver callback.** Resizing the drawing buffer
+  clears it, and a ResizeObserver runs *after* the frame's animation callbacks — so the ticker has
+  already drawn by the time the surface is replaced, and the browser paints the empty one. That was
+  one blank frame per resize step, which during a window drag is every frame: the picture flickered,
+  or seemed to vanish and come back. `ViewController.fit()` now draws synchronously whenever the
+  surface actually changed, which is still before paint. The cost is one extra render per resize step
+  and no extra render on a pan or a zoom, where the buffer is untouched.
 - **The flood fill is still CPU work.** A span fill over a memoised match test answers a
   twenty-megapixel photograph in about 200ms rather than a few seconds, which is fast enough to feel
   like a click — but it is one thread, and a fill that covers the whole frame is closer to 800ms

@@ -2909,14 +2909,13 @@ fn mainFragment(
      * Called from `fit()` so there is exactly one place that can get this wrong, and
      * every path that repositions the image goes through it.
      *
-     * @return The host's size in CSS pixels.
+     * @return The host's size in CSS pixels, and whether the surface was replaced.
      */
     syncSurface() {
       const bounds = this.host.getBoundingClientRect();
       const width = Math.max(1, Math.floor(bounds.width));
       const height = Math.max(1, Math.floor(bounds.height));
-      this.gpu.resize(width, height);
-      return { width, height };
+      return { width, height, resized: this.gpu.resize(width, height) };
     }
     /** Extra inset when the rulers are showing, so fitting never tucks under them. */
     get gutter() {
@@ -2930,6 +2929,17 @@ fn mainFragment(
      */
     fit() {
       const bounds = this.syncSurface();
+      this.place(bounds);
+      if (bounds.resized) {
+        this.gpu.renderNow();
+      }
+    }
+    /**
+     * Scales and centres the sprite for a given surface size.
+     *
+     * @param bounds Surface size in CSS pixels.
+     */
+    place(bounds) {
       const sprite = this.subject.sprite();
       const size = this.subject.size();
       if (!sprite || size.width <= 0) {
@@ -3200,12 +3210,32 @@ fn mainFragment(
      *
      * @param width  Width in CSS pixels.
      * @param height Height in CSS pixels.
+     * @return Whether the surface actually changed, which means it was also cleared.
      */
     resize(width, height) {
       const screen = this.app.renderer.screen;
-      if (screen.width !== width || screen.height !== height) {
-        this.app.renderer.resize(width, height);
+      if (screen.width === width && screen.height === height) {
+        return false;
       }
+      this.app.renderer.resize(width, height);
+      return true;
+    }
+    /**
+     * Draws the stage now, instead of waiting for the ticker's next frame.
+     *
+     * Resizing reallocates the drawing buffer, and a reallocated buffer is transparent
+     * until something is drawn into it. That is normally invisible -- but a
+     * ResizeObserver callback runs *after* the frame's animation callbacks, so the
+     * ticker has already drawn this frame by the time the surface is replaced, and the
+     * browser paints the empty one. One blank frame per resize step, which during a
+     * window drag is every frame: the picture flickers, or seems to vanish and come
+     * back.
+     *
+     * Drawing here closes that gap. The ResizeObserver still runs before paint, so the
+     * frame the user sees has the picture in it at the new size.
+     */
+    renderNow() {
+      this.app.render();
     }
     /**
      * Creates a render target.
@@ -4082,10 +4112,11 @@ fn mainFragment(
     return section;
   }
   function createSegmented(options) {
+    const clipped = options.icons || options.hideLabel;
     const { wrap, text } = labelledRow(
       "div",
       options.label,
-      options.icons ? "lz-field lz-field--compact lz-field--icons" : "lz-field lz-field--compact"
+      clipped ? "lz-field lz-field--compact lz-field--unlabelled" : "lz-field lz-field--compact"
     );
     const tag = componentTag("segmented");
     if (tag) {
@@ -9176,6 +9207,7 @@ fn mainFragment(
     bar.add(
       createSegmented({
         label: __("Shape"),
+        hideLabel: true,
         value: bar.options.getSelectionShape(),
         options: SELECTION_SHAPES.map((entry) => ({
           value: entry.value,
