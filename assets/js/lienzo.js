@@ -5933,9 +5933,14 @@ fn mainFragment(
   }
   const GRAB_RADIUS = 12;
   const DELETE_DISTANCE = 40;
+  function isPointerEvent(event) {
+    return !!event && "pointerId" in event;
+  }
   class CurveEditor {
     constructor(options) {
       this.dragIndex = -1;
+      this.dragPointer = -1;
+      this.dragAt = { x: 0, y: 0 };
       this.resizeObserver = null;
       this.sync = () => this.draw();
       this.onPointerDown = (event) => {
@@ -5951,14 +5956,18 @@ fn mainFragment(
           this.options.onChange(points);
         }
         this.dragIndex = index;
-        this.canvas.setPointerCapture(event.pointerId);
-        this.canvas.addEventListener("pointermove", this.onPointerMove);
-        this.canvas.addEventListener("pointerup", this.onPointerUp);
+        this.dragPointer = event.pointerId;
+        this.dragAt = at;
+        try {
+          this.canvas.setPointerCapture(event.pointerId);
+        } catch {
+        }
+        this.listen();
         event.preventDefault();
         this.draw();
       };
       this.onPointerMove = (event) => {
-        if (this.dragIndex < 0) {
+        if (this.dragIndex < 0 || event.pointerId !== this.dragPointer) {
           return;
         }
         const points = this.options.getPoints().map((p) => [...p]);
@@ -5966,6 +5975,7 @@ fn mainFragment(
           return;
         }
         const at = this.toGraph(event);
+        this.dragAt = at;
         const isEndpoint = this.dragIndex === 0 || this.dragIndex === points.length - 1;
         points[this.dragIndex] = [
           isEndpoint ? points[this.dragIndex][0] : at.x,
@@ -5975,13 +5985,24 @@ fn mainFragment(
         this.draw();
       };
       this.onPointerUp = (event) => {
+        if (this.dragIndex < 0) {
+          return;
+        }
+        if (isPointerEvent(event) && -1 !== this.dragPointer && event.pointerId !== this.dragPointer) {
+          return;
+        }
         const points = this.options.getPoints().map((p) => [...p]);
         const index = this.dragIndex;
         this.dragIndex = -1;
-        this.canvas.releasePointerCapture?.(event.pointerId);
-        this.canvas.removeEventListener("pointermove", this.onPointerMove);
-        this.canvas.removeEventListener("pointerup", this.onPointerUp);
-        const at = this.toGraph(event);
+        this.release();
+        if (isPointerEvent(event)) {
+          try {
+            this.canvas.releasePointerCapture?.(event.pointerId);
+          } catch {
+          }
+        }
+        this.dragPointer = -1;
+        const at = this.dragAt;
         const outside = at.x < -DELETE_DISTANCE || at.x > 255 + DELETE_DISTANCE || at.y < -DELETE_DISTANCE || at.y > 255 + DELETE_DISTANCE;
         if (outside && index > 0 && index < points.length - 1) {
           points.splice(index, 1);
@@ -6027,6 +6048,28 @@ fn mainFragment(
         x: (event.clientX - rect.left) / rect.width * 255,
         y: (1 - (event.clientY - rect.top) / rect.height) * 255
       };
+    }
+    /**
+     * Tracks the drag on the window, so a release anywhere ends it.
+     *
+     * The same rule the stage tools follow, and for the same reason: these listeners
+     * used to be on the canvas, so letting go outside the graph left the point grabbed
+     * and following the mouse with no button held. `pointercancel` and `blur` are here
+     * too -- a gesture the browser takes over, or a window that loses focus mid-drag,
+     * are both ways a `pointerup` never comes.
+     */
+    listen() {
+      window.addEventListener("pointermove", this.onPointerMove);
+      window.addEventListener("pointerup", this.onPointerUp);
+      window.addEventListener("pointercancel", this.onPointerUp);
+      window.addEventListener("blur", this.onPointerUp);
+    }
+    /** Stops tracking. Safe to call when nothing is being tracked. */
+    release() {
+      window.removeEventListener("pointermove", this.onPointerMove);
+      window.removeEventListener("pointerup", this.onPointerUp);
+      window.removeEventListener("pointercancel", this.onPointerUp);
+      window.removeEventListener("blur", this.onPointerUp);
     }
     /** Paints the grid, the curve and its control points. */
     draw() {
@@ -6087,8 +6130,11 @@ fn mainFragment(
         ctx.fill();
       });
     }
-    /** Releases listeners. */
+    /** Releases listeners, including a drag still in progress. */
     destroy() {
+      this.dragIndex = -1;
+      this.dragPointer = -1;
+      this.release();
       this.resizeObserver?.disconnect();
       this.canvas.removeEventListener("pointerdown", this.onPointerDown);
       this.canvas.removeEventListener("dblclick", this.onDoubleClick);

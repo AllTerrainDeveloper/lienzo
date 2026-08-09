@@ -20,6 +20,19 @@ const GRAB_RADIUS = 12;
 /** Beyond this, a drag out of the graph deletes the point instead. */
 const DELETE_DISTANCE = 40;
 
+/**
+ * Whether an event is one a pointer sent.
+ *
+ * By shape rather than by `instanceof PointerEvent`, which is a global that not every
+ * environment running this code defines -- and `instanceof` against a missing global
+ * throws rather than answering false, so the guard would be worse than no guard.
+ *
+ * @param event Event to test, if there is one.
+ */
+function isPointerEvent( event?: Event ): event is PointerEvent {
+	return !! event && 'pointerId' in event;
+}
+
 export interface CurveEditorOptions {
 	/** Current control points. */
 	getPoints: () => CurvePoint[];
@@ -42,6 +55,25 @@ export class CurveEditor {
 	private options: CurveEditorOptions;
 
 	private dragIndex = -1;
+
+	/**
+	 * Which pointer owns the drag.
+	 *
+	 * The move and release are tracked on `window`, which hears every pointer on the
+	 * page -- so a second finger, or a mouse moving while a pen is down, would otherwise
+	 * drive a point it never grabbed.
+	 */
+	private dragPointer = -1;
+
+	/**
+	 * Where the drag last was, in graph units.
+	 *
+	 * Kept because a drag does not always end with coordinates. A cancelled gesture and
+	 * a window losing focus both have to finish the drag, and neither carries a
+	 * position -- so the flick-to-delete test reads the last place the pointer actually
+	 * was rather than the place the ending event claims it is.
+	 */
+	private dragAt = { x: 0, y: 0 };
 
 	private resizeObserver: ResizeObserver | null = null;
 
@@ -106,18 +138,52 @@ export class CurveEditor {
 		}
 
 		this.dragIndex = index;
+		this.dragPointer = event.pointerId;
+		this.dragAt = at;
 
-		this.canvas.setPointerCapture( event.pointerId );
-		this.canvas.addEventListener( 'pointermove', this.onPointerMove );
-		this.canvas.addEventListener( 'pointerup', this.onPointerUp );
+		// Capture keeps the cursor and the text selection sane while the pointer is
+		// outside the graph. It is not what makes the release arrive -- `window` is --
+		// because capture can be lost without warning, and every way of losing it ends
+		// with a point that follows the mouse forever.
+		try {
+			this.canvas.setPointerCapture( event.pointerId );
+		} catch {
+			// A pointer that has already gone. The window listeners still finish the job.
+		}
+
+		this.listen();
 		event.preventDefault();
 
 		this.draw();
 	};
 
+	/**
+	 * Tracks the drag on the window, so a release anywhere ends it.
+	 *
+	 * The same rule the stage tools follow, and for the same reason: these listeners
+	 * used to be on the canvas, so letting go outside the graph left the point grabbed
+	 * and following the mouse with no button held. `pointercancel` and `blur` are here
+	 * too -- a gesture the browser takes over, or a window that loses focus mid-drag,
+	 * are both ways a `pointerup` never comes.
+	 */
+	private listen(): void {
+		window.addEventListener( 'pointermove', this.onPointerMove );
+		window.addEventListener( 'pointerup', this.onPointerUp );
+		window.addEventListener( 'pointercancel', this.onPointerUp );
+		window.addEventListener( 'blur', this.onPointerUp );
+	}
+
+	/** Stops tracking. Safe to call when nothing is being tracked. */
+	private release(): void {
+		window.removeEventListener( 'pointermove', this.onPointerMove );
+		window.removeEventListener( 'pointerup', this.onPointerUp );
+		window.removeEventListener( 'pointercancel', this.onPointerUp );
+		window.removeEventListener( 'blur', this.onPointerUp );
+	}
+
 	/** Moves the grabbed point. */
 	private onPointerMove = ( event: PointerEvent ): void => {
-		if ( this.dragIndex < 0 ) {
+		if ( this.dragIndex < 0 || event.pointerId !== this.dragPointer ) {
 			return;
 		}
 
@@ -128,6 +194,8 @@ export class CurveEditor {
 		}
 
 		const at = this.toGraph( event );
+
+		this.dragAt = at;
 
 		// Endpoints keep their x. Letting the black point slide inwards would
 		// silently clip the shadows, which is what the Levels control is for.
@@ -143,17 +211,47 @@ export class CurveEditor {
 		this.draw();
 	};
 
-	/** Drops the point, deleting it if it was dragged well outside the graph. */
-	private onPointerUp = ( event: PointerEvent ): void => {
+	/**
+	 * Drops the point, deleting it if it was dragged well outside the graph.
+	 *
+	 * Takes any event, or none: a release, a cancelled gesture and a lost window focus
+	 * all end the drag, and only the first of them is a `PointerEvent`. Idempotent, so
+	 * two of them arriving cannot delete a second point.
+	 *
+	 * @param event The event that ended the drag, if there was one.
+	 */
+	private onPointerUp = ( event?: Event ): void => {
+		if ( this.dragIndex < 0 ) {
+			return;
+		}
+
+		if (
+			isPointerEvent( event ) &&
+			-1 !== this.dragPointer &&
+			event.pointerId !== this.dragPointer
+		) {
+			return;
+		}
+
 		const points = this.options.getPoints().map( ( p ) => [ ...p ] as CurvePoint );
 		const index = this.dragIndex;
 
 		this.dragIndex = -1;
-		this.canvas.releasePointerCapture?.( event.pointerId );
-		this.canvas.removeEventListener( 'pointermove', this.onPointerMove );
-		this.canvas.removeEventListener( 'pointerup', this.onPointerUp );
+		this.release();
 
-		const at = this.toGraph( event );
+		if ( isPointerEvent( event ) ) {
+			try {
+				this.canvas.releasePointerCapture?.( event.pointerId );
+			} catch {
+				// Never captured, or already let go. Nothing to release either way.
+			}
+		}
+
+		this.dragPointer = -1;
+
+		// The last place the pointer actually was, not wherever the ending event says
+		// it is -- a cancel or a blur says nothing at all.
+		const at = this.dragAt;
 		const outside =
 			at.x < -DELETE_DISTANCE ||
 			at.x > 255 + DELETE_DISTANCE ||
@@ -259,8 +357,11 @@ export class CurveEditor {
 		} );
 	}
 
-	/** Releases listeners. */
+	/** Releases listeners, including a drag still in progress. */
 	destroy(): void {
+		this.dragIndex = -1;
+		this.dragPointer = -1;
+		this.release();
 		this.resizeObserver?.disconnect();
 		this.canvas.removeEventListener( 'pointerdown', this.onPointerDown );
 		this.canvas.removeEventListener( 'dblclick', this.onDoubleClick );
