@@ -11,10 +11,10 @@ action hooks inside, so it cannot be extended, only replaced. Lienzo replaces it
 ## What it does
 
 Colour and tone with a live per-frame histogram; crop, straighten, rotate and flip; curves and
-levels; sharpen, blur, vignette and grain; saved presets. Then a layer stack, four selection shapes
-that add, subtract and intersect, brushes, a magic wand, retouching and toning brushes, a clone
-stamp, gradients, shapes, paths, and text typed directly on the canvas. Undo and redo reach painted
-pixels, not only settings.
+levels; sharpen, blur, vignette and grain; saved presets. Then a layer stack, five selection shapes
+that add, subtract and intersect — including a **magnetic lasso** that snaps to the boundary you are
+tracing — brushes, a magic wand, retouching and toning brushes, a clone stamp, gradients, shapes,
+paths, and text typed directly on the canvas. Undo and redo reach painted pixels, not only settings.
 
 Adjustments stay non-destructive: a save always writes a *new* attachment and stores the edit as a
 re-openable recipe, so the original file is never rewritten and repeated edits never compound.
@@ -147,7 +147,7 @@ tooltip, and the title drops out entirely below a `@container` width of 620px. A
 rather than a media query because the editor is as often an OpenStation window as a whole page, so
 how much room the bar has is a fact about the window and not about the screen it is on.
 
-## Eighteen tools, four mechanisms
+## Eighteen tools, five mechanisms
 
 The rail on the leading edge holds the tools, two columns wide and grouped by what they do to the
 image. Exactly one owns the stage at a time, because they all want the same pointer events on the
@@ -156,7 +156,7 @@ selection rectangle cannot disagree about where the pointer is.
 
 | Group | Tools | Keys |
 |---|---|---|
-| Select | Move & transform, Select (rectangle / ellipse / freeform / polygon, in new / add / subtract / intersect), Magic wand, Crop | `V` `M` `W` `C` |
+| Select | Move & transform, Select (rectangle / ellipse / freeform / polygon / magnetic, in new / add / subtract / intersect), Magic wand, Crop | `V` `M` `W` `C` |
 | Retouch | Eyedropper, Retouch (blur / sharpen / smudge / heal), Clone stamp, Dodge & burn (dodge / burn / desaturate / saturate) | `I` `R` `S` `O` |
 | Paint | Brush, History brush, Eraser, Fill | `B` `Y` `E` `G` |
 | Draw | Gradient, Shape (rectangle / rounded / ellipse / line / triangle / star), Path, Text | `N` `U` `P` `T` |
@@ -172,9 +172,11 @@ one that just grows. `⋯` lists every tool by name with its shortcut, since eig
 to click and slow to learn.
 
 Two Photoshop slots are deliberately absent: the frame tool, which places an empty image
-placeholder and has nothing to do in a library editor, and the separate lasso slot — freeform and
-polygon are shapes of the one Select tool, chosen in its options bar, which is where every other
-selection setting already lives.
+placeholder and has nothing to do in a library editor, and the separate lasso slot — freeform,
+polygon and magnetic are shapes of the one Select tool, chosen in its options bar, which is where
+every other selection setting already lives. Photoshop splits those three across a flyout you have
+to hold the mouse down on; they differ by one setting each and belong in the row that already holds
+every other selection setting.
 
 ### A selection is built, not drawn
 
@@ -215,7 +217,89 @@ survive — `traceMask` calls every contour after the first a hole, but both ras
 for two regions added without touching. `selectionBounds()` measures every contour for the same
 reason: measuring only the first would crop a copy to whichever region the tracer reached first.
 
-Eighteen tools, but only four gestures, and each one is a single method:
+### The magnetic lasso follows the picture, not the pointer
+
+![The magnetic lasso tracing the scalloped gold rim of a porcelain dish, the marching ants sitting
+exactly on the boundary through every curve of it](.github/media/magnetic-lasso.png)
+
+*Traced in one pass, roughly, at Width 20 and Frequency 40. The ants are on the gilding — through
+sixteen scallops, four corners and a rim that is two pixels of gold against a pink backdrop.*
+
+Every other selection shape records where the pointer went. The magnetic one does not: it records
+where the *boundary* went, and treats the pointer as a hint about which boundary is meant. Trace
+roughly round a subject and the outline snaps onto its edge as you go — six pixels of slop in the
+hand, half a pixel of error in the result.
+
+**It is a live wire, in the Mortensen–Barrett sense.** The document is convolved once into an *edge
+field*: for every pixel, how much of a boundary it is and which way that boundary runs. Following an
+edge is then made cheap and cutting across a flat area dear, and the outline between the last anchor
+and the pointer is simply the shortest path — Dijkstra, over a graph whose weights are the
+photograph.
+
+Three decisions in the field are about photographs rather than about gradient operators:
+
+- **The gradient is taken per channel and the strongest wins.** A red poppy against green leaves is
+  a boundary anyone can see and almost none at all in luminance; a detector working on brightness
+  slides straight through the flower. Three Sobels instead of one is the entire reason this snaps to
+  *colour*.
+- **Strength is normalised against the 99th percentile of the gradients actually present**, so "a
+  strong edge" means strong *in this photograph*. A fixed divisor reads a soft-focus portrait as
+  having no edges, and the wire then walks through it in straight lines. A percentile rather than the
+  maximum, because one specular highlight on a chrome bumper is several times stronger than anything
+  that matters and would push the whole picture into the noise.
+- **Past two megapixels the field is sampled at a stride.** A fifty-megapixel scan would otherwise
+  spend a second and 150MB before the first anchor, to place a boundary more precisely than the six
+  hundred vertices a `Selection` keeps could record. A 20-megapixel photograph builds in 34ms.
+
+**The search is never restarted.** Dijkstra settles nodes in cost order, so a node settled for one
+pointer position stays settled for every later one — moving the pointer expands the frontier a
+little or, far more often, walks the back-pointers home for free. Only an anchor reseeds. The queue
+is an array of buckets rather than a heap, because link costs are quantised to small integers and
+Dial's algorithm then applies: push is an array push, pop is a pop, and nothing is ever compared. A
+full reseed at the widest setting is 3ms; the frames in between are nothing.
+
+**Anchors land on the edge, never under the pointer.** The last stretch of any wire is the hop out
+to wherever the hand actually is. Pinning there is the single most visible way this tool can go
+wrong — the slop is baked in permanently, and because the next wire starts from the anchor and has
+to climb back onto the boundary, what you get is a *spike* out to where your hand was and straight
+back. So each anchor goes to the last point genuinely on an edge, measured against the strongest
+edge that particular wire found rather than a fixed number.
+
+**Width and Frequency are read in screen pixels, not image pixels.** Both describe how precisely
+someone is pointing, and that is a fact about the picture on the monitor rather than the file behind
+it. Photoshop measures them in image pixels, which is why its magnetic lasso is unusable at fit zoom
+on a 50-megapixel scan and twitchy at 400% on a thumbnail: one setting, two different gestures. The
+conversion happens once, when the trace begins, so a zoom mid-gesture cannot change the tool under
+your hand. The search box is sized to the Width *plus* the anchor spacing, because those are the two
+ways the pointer gets away from the anchor and the box has to hold both — sizing it to the width
+alone looks fine until a hand wobbles by most of it, and then every other frame is out of reach,
+visible as a chain of straight jogs across an outline it was otherwise tracing perfectly.
+
+**It is placed, not dragged.** Press to start; move — button held or not — to extend; press again to
+pin an anchor where you want one; **Backspace** takes the last one back; **Enter**, a double-click,
+or a press back on the first anchor closes it. Releasing the button does nothing at all, which is
+what lets you trace a whole subject in one pass, let go halfway to reposition your hand, and carry
+on. Closing on release would make a slipped finger destroy a minute of careful work.
+
+**And the anchors are on screen, marked by how they got there.** An anchor is the only irreversible
+thing the tool does while it is running: everything behind the last one is fixed until Backspace
+takes it back, and only the stretch in front of it still moves with your hand. That is not something
+anyone should have to infer. Small hollow squares are the ones Frequency placed; larger solid ones
+in the accent colour are the ones you clicked. Two *sizes* rather than two colours, because hue is
+the one channel the photograph underneath is already using — a green marker and a red one are the
+same marker over the wrong picture, where a big solid square and a small hollow one stay apart over
+anything.
+
+And if there are no pixels to read — nothing loaded yet — the tool does not refuse the press. It
+falls back to an ordinary freeform drag, because a tool that briefly behaves like a plainer tool is
+better than a tool that does nothing.
+
+The result is a `lasso` selection like any other, so add, subtract, intersect, the mask, the quick
+mask and the clipboard all work on it unchanged. Three settings: **Width** (how far to look),
+**Contrast** (how strong an edge has to be before it counts — turn it up to stop the wire being
+distracted by texture), **Frequency** (how often anchors pin themselves).
+
+Eighteen tools, but only five gestures, and each one is a single method:
 
 - **Stroking** — brush, eraser and the retouching brushes. A stroke is interpolated into evenly
   spaced dabs, so how fast you drag does not change the result.
@@ -223,6 +307,10 @@ Eighteen tools, but only four gestures, and each one is a single method:
   the pixels are only committed on release: allocating and uploading a canvas-sized bitmap on every
   pointer move would stall a 20-megapixel document to show what an outline conveys perfectly.
 - **Clicking a point** — fill, wand, eyedropper, zoom.
+- **Placing a shape** — the polygon marquee, the pen path, and the magnetic lasso. No release
+  finishes any of them: they are built click by click and closed with Enter, a double-click, or a
+  press back on the first vertex. That is why they alone outlive the drag lifecycle, and why the
+  magnetic lasso follows the pointer with no button held at all.
 - **Typing on the canvas** — text, which lands as an *object* rather than as paint: each commit
   becomes its own layer, named after its words, with a texture the size of the glyphs and a transform
   that puts it where it was typed. That is what makes it movable, scalable and deletable on its own —
@@ -278,6 +366,9 @@ precomputed, so a ten-pixel fill costs ten comparisons and not twenty million. A
 box travels with the region**, so the mask is rasterised at the size the fill actually reached, the
 texture uploaded to the GPU is that size, and undo records that rectangle instead of offering the
 whole document to a collector that would only refuse it.
+
+`engine/magnetic/` is the edge field and the live wire above — a Sobel pass and a Dijkstra search,
+with no idea that pointers, selections or an editor exist. It is handed pixels and asked for a route.
 
 `model/selection.ts` gained `traceMask()`, and that is why the magic wand was cheap: it reuses the
 paint bucket's flood fill, then traces the region into closed paths. The rest of the editor speaks
@@ -518,13 +609,15 @@ src/
   model/recipe/            types, schema, mutations, migration, validation
   model/document/          canvas, layer transforms, the layer stack
   model/selection/         marquee geometry, mask rasterising, contour tracing,
-                             and the booleans built on the round trip between them
+                             path simplification, and the booleans built on the
+                             round trip between rasterising and tracing
   model/history.ts         undo stack with drag coalescing
   model/pixel-history/     the tiles a paint stroke overwrote, for undo
   engine/color-matrix/     PURE: ops -> one 4x5 matrix
   engine/histogram.ts      PURE: pixels -> bucket counts
   engine/lut/              PURE: curves + levels -> one 256x1 table
   engine/brush/            PURE: stamps, stroke interpolation, flood fill
+  engine/magnetic/         PURE: the edge field, and the live wire over it
   engine/pixel-tools/      PURE: one dab routine, eight retouching kernels
   engine/paint-shapes/     gradients, shapes and text -> one bitmap each
   engine/renderer/         Pixi context, layer textures, compositor, camera,
@@ -863,6 +956,20 @@ Stated plainly, because each is better read here than discovered:
   that went in. Selections are not part of the undo stack either — they describe how someone is
   working rather than what the picture should look like — so an addition you did not mean has to be
   redrawn rather than stepped back.
+- **The magnetic lasso reads the document once, when the trace begins.** It has to: the read-back
+  from the GPU and the convolution over it are the one expensive thing the tool does, and repeating
+  them per anchor would put that cost on every click instead of the first. The consequence is that
+  painting *during* a trace is invisible to the wire, which keeps following the picture as it was
+  when you pressed. Closing and starting again picks up the change.
+- **Its edge field is capped at two megapixels**, so on a larger document the boundary is found at a
+  stride — one field pixel per two, three or four document pixels. Against the six-hundred-vertex
+  budget every selection path is held to, and against a hand that is six pixels out to begin with,
+  this has not been the limiting term; on a 50-megapixel scan it is a stride of five, and there it
+  would be.
+- **It follows the strongest edge near the pointer, which is not always the one you meant.** Two
+  boundaries a few pixels apart — a rim light, a shadow just outside a subject — are genuinely
+  ambiguous, and the wire resolves them by cost rather than by intent. Narrowing Width, raising
+  Frequency and pinning anchors by hand are the three answers, in that order.
 - **The picker reads the library a page at a time** behind a Load more button rather than loading on
   scroll: it renders inside a desktop window, so which element actually scrolls is not the picker's
   to know, and a scroll listener bound to the wrong one silently never fires.

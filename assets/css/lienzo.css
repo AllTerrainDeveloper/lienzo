@@ -1486,10 +1486,39 @@ input.lz-field__control {
 }
 
 /* The cursor is the clearest signal of which tool has the stage. */
+
+/*
+ * A crosshair of our own, rather than the platform's.
+ *
+ * `cursor: crosshair` is drawn by the operating system in one colour, and on a
+ * photograph that colour is regularly the same as whatever is under it -- a black cross
+ * over a shadow, a white one over a sky. Aiming a selection at an edge you cannot see
+ * the aim on is the one place that matters most. This one is white over a dark halo, so
+ * it reads on any pixel, and it carries a centre dot because the whole point of a cross
+ * is saying exactly where the click lands. `crosshair` stays as the fallback.
+ */
 .lz-stage[ data-tool='select' ],
 .lz-stage[ data-tool='gradient' ],
 .lz-stage[ data-tool='shape' ],
-.lz-stage[ data-tool='path' ] { cursor: crosshair; }
+.lz-stage[ data-tool='path' ] {
+	cursor: url( "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26'><g fill='none' stroke='%23000' stroke-width='3.25' stroke-linecap='round' opacity='.5'><path d='M13 2.5v6.5M13 17v6.5M2.5 13h6.5M17 13h6.5'/></g><g fill='none' stroke='%23fff' stroke-width='1.4' stroke-linecap='round'><path d='M13 2.5v6.5M13 17v6.5M2.5 13h6.5M17 13h6.5'/></g><circle cx='13' cy='13' r='1.4' fill='%23fff' stroke='%23000' stroke-width='.7'/></svg>" )
+			13 13,
+		crosshair;
+}
+
+/*
+ * The magnetic lasso says so.
+ *
+ * The same cross, because it aims the same way, with the tool's own glyph hung off it:
+ * a horseshoe magnet, which is what everybody's icon for this is. Worth the extra
+ * marks -- the marquee's five shapes all live under one tool, so the cursor is the only
+ * thing on screen that says which of them a press is about to start.
+ */
+.lz-stage[ data-tool='select' ][ data-shape='magnetic' ] {
+	cursor: url( "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='30' height='30'><g fill='none' stroke='%23000' stroke-width='3.25' stroke-linecap='round' opacity='.5'><path d='M13 2.5v6.5M13 17v6.5M2.5 13h6.5M17 13h6.5'/><path d='M19 27v-4a4 4 0 018 0v4'/><path d='M19 24.5h8'/></g><g fill='none' stroke='%23fff' stroke-width='1.4' stroke-linecap='round'><path d='M13 2.5v6.5M13 17v6.5M2.5 13h6.5M17 13h6.5'/><path d='M19 27v-4a4 4 0 018 0v4'/><path d='M19 24.5h8'/></g><circle cx='13' cy='13' r='1.4' fill='%23fff' stroke='%23000' stroke-width='.7'/></svg>" )
+			13 13,
+		crosshair;
+}
 
 /*
  * The sized tools get a ring instead. `none` rather than `crosshair`, because two
@@ -2076,6 +2105,39 @@ svg.lz-selection {
 .lz-selection__pending-over {
 	stroke: var( --lz-accent );
 	stroke-dasharray: 3 3;
+}
+
+/*
+ * The magnetic lasso's anchors.
+ *
+ * Squares, because that is what every editor with this tool marks them with, and because
+ * a square reads as "fixed" where a round dot reads as a handle you could drag.
+ *
+ * The two kinds differ by size and fill rather than by hue. Hue is the one channel the
+ * photograph underneath is already using, so a green marker and a red one are the same
+ * marker over the wrong picture -- whereas a big solid square and a small hollow one
+ * stay apart over anything. Both carry a dark outline for the same reason the ants do.
+ *
+ * They mark the boundary between the part of the trace that still follows the hand and
+ * the part that has stopped: everything behind the last one is fixed until Backspace
+ * takes it back.
+ */
+.lz-selection__anchor-auto,
+.lz-selection__anchor-manual {
+	stroke: rgba( 0, 0, 0, 0.85 );
+	stroke-width: 1;
+	vector-effect: non-scaling-stroke;
+}
+
+/* Pinned by the Frequency setting: hollow, so it reads as the tool's doing. */
+.lz-selection__anchor-auto {
+	fill: rgba( 255, 255, 255, 0.35 );
+}
+
+/* Pinned by a click: solid, larger, and in the accent. Yours, and it shows. */
+.lz-selection__anchor-manual {
+	fill: var( --lz-accent );
+	stroke-width: 1.25;
 }
 
 @keyframes lz-march {

@@ -11,7 +11,7 @@
 import { __ } from '../../i18n';
 import { SELECTION_MODES, SELECTION_SHAPES } from '../../model/selection';
 import type { SelectionMode, SelectionShape } from '../../model/selection';
-import { createSegmented } from '../controls';
+import { createNumberField, createSegmented } from '../controls';
 import { selectionButtons, toleranceField } from './fields';
 import type { OptionsBuilder } from './builder';
 
@@ -45,6 +45,75 @@ function modePicker( bar: OptionsBuilder ): void {
 }
 
 /**
+ * The three settings that shape a magnetic trace.
+ *
+ * Photoshop's names, because these are settings anyone who has met this tool already
+ * knows -- and because each one is genuinely the shortest true description of what it
+ * does. Only the units differ: Width is in screen pixels here, so that "look this far
+ * for an edge" means the same gesture whether the photograph is on screen at 12% or at
+ * 400%.
+ *
+ * @param bar The bar being built.
+ */
+function magneticFields( bar: OptionsBuilder ): void {
+	const width = createNumberField( {
+		compact: true,
+		label: __( 'Width' ),
+		value: bar.brush.magneticWidth,
+		min: 4,
+		max: 80,
+		suffix: 'px',
+		onChange: ( value ) => bar.setBrush( { magneticWidth: value } ),
+	} );
+
+	bar.add( width, () => width.setValue( bar.brush.magneticWidth ) );
+
+	const contrast = createNumberField( {
+		compact: true,
+		label: __( 'Contrast' ),
+		value: bar.brush.magneticContrast,
+		min: 0,
+		max: 95,
+		suffix: '%',
+		onChange: ( value ) => bar.setBrush( { magneticContrast: value } ),
+	} );
+
+	bar.add( contrast, () => contrast.setValue( bar.brush.magneticContrast ) );
+
+	const frequency = createNumberField( {
+		compact: true,
+		label: __( 'Frequency' ),
+		value: bar.brush.magneticFrequency,
+		min: 0,
+		max: 100,
+		onChange: ( value ) => bar.setBrush( { magneticFrequency: value } ),
+	} );
+
+	bar.add( frequency, () => frequency.setValue( bar.brush.magneticFrequency ) );
+}
+
+/**
+ * The one line of guidance the bar has room for, for whichever shape is selected.
+ *
+ * @param shape Shape the marquee tool is drawing.
+ */
+function shapeHint( shape: SelectionShape ): string {
+	if ( 'polygon' === shape ) {
+		return __( 'Click to add points, Enter to close, Escape to abandon.' );
+	}
+
+	if ( 'magnetic' === shape ) {
+		return __(
+			'Trace an edge and it follows it. Click to pin a point, Backspace undoes one, ' +
+				'click the start or press Enter to close. Lower Frequency pins fewer ' +
+				'points for you.'
+		);
+	}
+
+	return __( MODIFIER_HINT );
+}
+
+/**
  * Mode, shape, and the two selection-wide buttons.
  *
  * @param bar The bar being built.
@@ -72,14 +141,15 @@ export function renderSelectOptions( bar: OptionsBuilder ): void {
 		} )
 	);
 
+	if ( 'magnetic' === bar.options.getSelectionShape() ) {
+		bar.divider();
+		magneticFields( bar );
+	}
+
 	bar.divider();
 	selectionButtons( bar );
 
-	bar.hint(
-		'polygon' === bar.options.getSelectionShape()
-			? __( 'Click to add points, Enter to close, Escape to abandon.' )
-			: __( MODIFIER_HINT )
-	);
+	bar.hint( shapeHint( bar.options.getSelectionShape() ) );
 }
 
 /**

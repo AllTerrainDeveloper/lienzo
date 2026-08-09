@@ -64,7 +64,8 @@ export function shortcutTarget( editor: Editor ): ShortcutTarget {
 		getTool: () => editor.state.getTool(),
 		getSelectionShape: () => editor.selectionShape,
 		commitPath: () => true === editor.stage?.tools.commitPath(),
-		closePolygon: () => void editor.stage?.tools.closePolygon(),
+		closeShape: () => void editor.stage?.tools.closeShape(),
+		undoAnchor: () => true === editor.stage?.tools.undoAnchor(),
 		clearPath: () => editor.stage?.tools.clearPath(),
 		resetView: () => editor.renderer?.view.reset(),
 	};

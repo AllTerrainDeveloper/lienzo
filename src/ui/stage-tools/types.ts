@@ -5,6 +5,7 @@
 import type { CanvasSize } from '../../model/document';
 import type {
 	Selection,
+	SelectionAnchor,
 	SelectionMode,
 	SelectionShape,
 } from '../../model/selection';
@@ -65,6 +66,14 @@ export interface StageToolsOptions {
 	 * placed so far. Null takes the outline down.
 	 */
 	previewSelection: ( selection: Selection | null ) => void;
+	/**
+	 * Marks the points a magnetic trace has committed to.
+	 *
+	 * Separate from the outline because they are separate facts: the outline says what
+	 * would be selected, and these say how much of it is already settled. An empty list
+	 * takes the marks down.
+	 */
+	previewAnchors: ( anchors: SelectionAnchor[] ) => void;
 	/**
 	 * Folds a finished region into the selection.
 	 *

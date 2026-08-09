@@ -32,6 +32,7 @@ Eighteen tools on a two column rail, grouped the way you would expect:
 
 * Move and transform, with handles that scale, rotate and snap
 * Select as a rectangle, an ellipse, a freeform lasso or a polygon
+* A magnetic lasso that snaps to the edge you are tracing, so trace roughly round a subject and the outline finds its boundary for you
 * Build a selection up: add to it, subtract from it, or keep only the overlap, from the options bar or by holding Shift, Alt or both
 * Magic wand, which selects the region around the colour you click
 * Crop, with aspect presets
@@ -151,7 +152,9 @@ Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and serv
 * Live RGB and luma histogram.
 * Crop, straighten, rotate and flip, with the canvas independent of the image sitting on it.
 * Layers, with reorder, hide and delete.
-* Selections as a rectangle, an ellipse, a lasso or a polygon, plus a magic wand.
+* Selections as a rectangle, an ellipse, a lasso, a polygon or a magnetic lasso, plus a magic wand.
+* The magnetic lasso finds the shortest path along the edges of the photograph itself, taking the gradient on each colour channel rather than on brightness, so it snaps to a boundary between two colours of the same lightness as readily as to a light one against a dark.
+* Its anchor points are marked as you trace, hollow where the tool placed one for you and solid where you clicked, so it is always clear how much of the outline has stopped moving.
 * Selection modes: new, add, subtract and intersect, from the options bar or with Shift, Alt and Shift+Alt.
 * One top bar instead of two, and a third the height: 31 pixels where the chrome used to take about 90.
 * The picture no longer flickers while a window is being resized.

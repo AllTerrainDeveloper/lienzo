@@ -31,6 +31,24 @@ export interface BrushSettings {
 	background: string;
 	/** Flood fill match tolerance, 0..255. */
 	tolerance: number;
+	/**
+	 * How far the magnetic lasso looks for an edge, in *screen* pixels.
+	 *
+	 * Screen rather than document pixels, here and for the frequency below, because both
+	 * describe how precisely someone is pointing -- and that is a fact about the picture
+	 * on the monitor rather than about the file behind it. The conversion happens once,
+	 * when a trace begins.
+	 */
+	magneticWidth: number;
+	/** How strong an edge has to be before the magnetic lasso will follow it, 0..100. */
+	magneticContrast: number;
+	/**
+	 * How often the magnetic lasso pins an anchor, 0..100. Higher means more often.
+	 *
+	 * Zero does not quite mean never -- the search has to stay near the pointer somehow --
+	 * but it is close enough to read as "I will place them myself".
+	 */
+	magneticFrequency: number;
 	/** Which pixel operation the retouch tool performs. */
 	retouch: PixelOp;
 	/** Which pixel operation the dodge/burn tool performs. */
@@ -69,6 +87,13 @@ export function defaultBrush(): BrushSettings {
 		colour: '#000000',
 		background: '#ffffff',
 		tolerance: 32,
+		magneticWidth: 20,
+		magneticContrast: 10,
+		// Below Photoshop's 57, deliberately. An anchor is permanent, and the stretch
+		// between the last one and the pointer is the part still being reconsidered --
+		// so the default errs towards leaving more of the trace live and letting a click
+		// be what commits it.
+		magneticFrequency: 40,
 		retouch: 'blur',
 		tone: 'dodge',
 		strength: 0.5,

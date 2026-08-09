@@ -10,6 +10,7 @@
 import { normalise } from './coords';
 import { previewShape } from './gesture';
 import type { Gesture } from './gesture';
+import { pressMagnetic } from './magnetic-tools';
 import { floodFill, magicWand, pickColour, zoomAtPointer } from './point-tools';
 import { effectiveMode } from '../../model/selection';
 import type { Point } from '../../model/selection';
@@ -81,7 +82,7 @@ export function routePress(
 			return 'drag';
 
 		case 'select':
-			return beginSelection( options, gesture, norm(), event );
+			return beginSelection( options, gesture, point, norm(), event );
 
 		case 'gradient':
 		case 'shape':
@@ -104,20 +105,31 @@ export function routePress(
  * A polygon is placed click by click and is only folded in when it closes, so it never
  * enters the drag lifecycle -- but the *first* click still decides its mode, for the same
  * reason a drag's press does: by the time the shape is finished the keys are long
- * released.
+ * released. A magnetic trace is placed the same way, and reads its mode in the same
+ * place, one layer down in `pressMagnetic()`.
  *
  * @param options Tool wiring.
  * @param gesture Gesture state, mutated in place.
- * @param point   Normalised coordinates.
+ * @param at      Canvas coordinates.
+ * @param point   The same point, normalised.
  * @param event   Pointer event, for the modifier keys.
  */
 function beginSelection(
 	options: StageToolsOptions,
 	gesture: Gesture,
+	at: Point,
 	point: Point,
 	event: PointerEvent
 ): PressOutcome {
 	const shape = options.getSelectionShape();
+
+	// The magnetic lasso needs pixels to follow, and there are none until an image has
+	// loaded. Rather than refusing the press, it declines and the freeform lasso takes
+	// it: a tool that does nothing at all is worse than a tool that is briefly ordinary.
+	if ( 'magnetic' === shape && pressMagnetic( options, gesture, at, event ) ) {
+		return 'done';
+	}
+
 	const starting =
 		'polygon' !== shape || 0 === gesture.selection.vertices.length;
 

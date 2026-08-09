@@ -52,7 +52,7 @@ export class SelectionGesture {
 	 * @return The selection to show, or null to clear it.
 	 */
 	begin( point: Point, shape: SelectionShape ): Selection | null {
-		if ( 'polygon' === shape ) {
+		if ( 'polygon' === this.drawn( shape ) ) {
 			return this.addVertex( point );
 		}
 
@@ -60,6 +60,20 @@ export class SelectionGesture {
 		this.points = [ point ];
 
 		return null;
+	}
+
+	/**
+	 * The shape a gesture actually draws.
+	 *
+	 * Only ever different for the magnetic lasso, which reaches this class at all when
+	 * it could not read the document to find an edge in. What it falls back to is a
+	 * freeform drag -- the same tool with the magnetism switched off -- so that is what
+	 * gets drawn.
+	 *
+	 * @param shape Shape the marquee tool is set to.
+	 */
+	private drawn( shape: SelectionShape ): SelectionShape {
+		return 'magnetic' === shape ? 'lasso' : shape;
 	}
 
 	/**
@@ -74,13 +88,15 @@ export class SelectionGesture {
 			return null;
 		}
 
-		if ( 'lasso' === shape ) {
+		const drawn = this.drawn( shape );
+
+		if ( 'lasso' === drawn ) {
 			this.points = appendPathPoint( this.points, point );
 
 			return { shape: 'lasso', points: this.points };
 		}
 
-		return selectionFromDrag( shape as 'rect' | 'ellipse', this.from, point );
+		return selectionFromDrag( drawn as 'rect' | 'ellipse', this.from, point );
 	}
 
 	/** Ends a drag, leaving whatever it produced in place. */

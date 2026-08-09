@@ -7,12 +7,17 @@
  */
 
 import {
+	anchorMarks,
 	buildSelectionMask,
 	combineSelections,
 	isEmptySelection,
 	selectionToPath,
 } from '../model/selection';
-import type { Selection, SelectionMode } from '../model/selection';
+import type {
+	Selection,
+	SelectionAnchor,
+	SelectionMode,
+} from '../model/selection';
 import type { CanvasSize } from '../model/document';
 import type { Viewport } from '../ui/panels';
 
@@ -57,6 +62,16 @@ export class SelectionOverlay {
 	 */
 	private pending: Selection | null = null;
 
+	/**
+	 * The points a magnetic trace has committed to.
+	 *
+	 * Drawn separately from the outline because they answer a different question. The
+	 * outline says what would be selected; these say how much of it has stopped moving.
+	 * Anything behind the last one is fixed until Backspace takes it back, and the only
+	 * way to know that without being told is to see where they landed.
+	 */
+	private anchors: SelectionAnchor[] = [];
+
 	private svg: SVGSVGElement;
 
 	private options: SelectionOverlayOptions;
@@ -76,11 +91,14 @@ export class SelectionOverlay {
 		// Two paths per outline, opposite colours, one dashed and animated: marching
 		// ants that stay visible over both light and dark pixels. Two outlines, because
 		// a gesture in progress is shown beside the selection it will change.
+		// Anchors last, so their marks sit over the ants rather than under them.
 		for ( const cls of [
 			'lz-selection__under',
 			'lz-selection__over',
 			'lz-selection__pending-under',
 			'lz-selection__pending-over',
+			'lz-selection__anchor-auto',
+			'lz-selection__anchor-manual',
 		] ) {
 			const path = document.createElementNS( 'http://www.w3.org/2000/svg', 'path' );
 			path.setAttribute( 'class', cls );
@@ -109,6 +127,7 @@ export class SelectionOverlay {
 	set( selection: Selection | null ): void {
 		this.selection = isEmptySelection( selection ) ? null : selection;
 		this.pending = null;
+		this.anchors = [];
 
 		const canvas = this.options.getCanvas();
 
@@ -130,6 +149,22 @@ export class SelectionOverlay {
 	 */
 	setPending( selection: Selection | null ): void {
 		this.pending = selection;
+		this.sync();
+	}
+
+	/**
+	 * Marks the points a magnetic trace has committed to.
+	 *
+	 * @param anchors Anchors to mark. Empty takes the marks down.
+	 */
+	setAnchors( anchors: SelectionAnchor[] ): void {
+		// Nothing to redraw when there were none and there still are none, which is every
+		// pointer move made by every other tool in the editor.
+		if ( 0 === anchors.length && 0 === this.anchors.length ) {
+			return;
+		}
+
+		this.anchors = anchors;
 		this.sync();
 	}
 
@@ -168,6 +203,8 @@ export class SelectionOverlay {
 			this.svg.style.display = 'none';
 			this.paint( 'lz-selection__', '' );
 			this.paint( 'lz-selection__pending-', '' );
+			this.mark( 'auto', '' );
+			this.mark( 'manual', '' );
 
 			return;
 		}
@@ -180,7 +217,38 @@ export class SelectionOverlay {
 
 		this.paint( 'lz-selection__', this.outline( this.selection, viewport ) );
 		this.paint( 'lz-selection__pending-', this.outline( this.pending, viewport ) );
+
+		// Bigger for the ones a click put there. Two sizes rather than two colours,
+		// because the marks sit on a photograph and colour is the one channel the
+		// photograph is already using.
+		for ( const kind of [ 'auto', 'manual' ] as const ) {
+			const of = this.anchors.filter(
+				( anchor ) => anchor.manual === ( 'manual' === kind )
+			);
+
+			this.mark(
+				kind,
+				anchorMarks(
+					of,
+					viewport.width,
+					viewport.height,
+					'manual' === kind ? 9 : 6
+				)
+			);
+		}
 	};
+
+	/**
+	 * Writes the anchor marks of one kind.
+	 *
+	 * @param kind Which set.
+	 * @param d    Path data.
+	 */
+	private mark( kind: 'auto' | 'manual', d: string ): void {
+		this.svg
+			.querySelector( `.lz-selection__anchor-${ kind }` )
+			?.setAttribute( 'd', d );
+	}
 
 	/**
 	 * One selection as path data, or nothing when there is none.
