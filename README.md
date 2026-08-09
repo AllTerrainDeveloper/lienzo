@@ -542,6 +542,17 @@ input backgrounds onto a dark panel. Labels measured about 2:1. One block of var
 takes those labels to 5.5:1. The block is declared under both spellings (`--wpd-*` and `--os-ui-*`,
 `--desktop-mode-*` and `--os-*`) for the same reason the components are resolved by bare name.
 
+**Lienzo's own markup has to read the same tokens, and forgetting is silent.** A shell control that
+cannot find a variable falls back to a light-theme literal; a rule of ours that hardcodes one *is*
+that literal, with no fallback to notice. The picker was written before the block existed and kept
+WordPress's `#50575e` for a photo's name and `#f0f0f1` behind a thumbnail — about 2:1 on a dark panel,
+and sixty white slabs flashing over it while the grid decoded. The save-choice dialog asked for
+`--lz-text` and `--lz-text-muted`, which are not tokens this stylesheet has ever declared, so both
+fell through to their light-theme defaults every time. **The rule is `var( --lz-fg )` /
+`var( --lz-fg-muted )` / `var( --lz-danger )`, never the hex, and never a `var()` fallback naming a
+colour** — a fallback that fires is a token whose name is wrong, and the whole point of the block is
+that it cannot be quietly bypassed.
+
 The surround stays dark in every host, deliberately: judging an exposure against a white panel is
 judging the panel. So the editor does *not* adopt the shell's window palette, which is light because
 it dresses the frame rather than the content. What it does adopt is the accent and the corner

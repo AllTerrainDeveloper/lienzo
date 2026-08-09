@@ -144,6 +144,7 @@ Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and serv
 * The photo picker loads as you scroll, instead of waiting for a Load more button.
 * The picker says how many images it cannot open, so a library of animated GIFs no longer reads as an empty one.
 * Editing from the media picker and pressing Insert now inserts the copy you just saved, not the photograph you started with.
+* The photo picker's captions, counts and placeholders follow the editor's theme instead of WordPress's light-page greys, which were close to unreadable on the dark panel.
 * Selections can be stepped back — Cmd/Ctrl+Shift+D, or the Step back button — which takes back an addition made in the wrong mode and brings back a selection you dropped.
 * Opens with the desktop switched off as well as in a window: an editor page under Media, and an overlay from the Media Library, the media picker and the image block.
 * Magic wand and paint bucket rewritten to walk runs rather than pixels — a twenty-megapixel photo answers in a fifth of a second instead of a few seconds.
