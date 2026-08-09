@@ -6,6 +6,8 @@
  */
 
 /**
+ * Tests for includes/post-attach.php.
+ *
  * @group lienzo
  * @group lienzo-post-attach
  */
@@ -28,12 +30,14 @@ class Tests_Lienzo_Post_Attach extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A featured image is swapped for the edit.
+	 *
 	 * @covers ::lienzo_attach_to_post
 	 */
 	public function test_repoints_the_featured_image() {
-		$post  = self::factory()->post->create();
-		$was   = $this->make_attachment();
-		$now   = $this->make_attachment();
+		$post = self::factory()->post->create();
+		$was  = $this->make_attachment();
+		$now  = $this->make_attachment();
 
 		set_post_thumbnail( $post, $was );
 
@@ -58,6 +62,8 @@ class Tests_Lienzo_Post_Attach extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A gallery swap keeps the image where it was in the order.
+	 *
 	 * @covers ::lienzo_replace_in_gallery
 	 */
 	public function test_keeps_a_gallery_images_position() {
@@ -77,6 +83,8 @@ class Tests_Lienzo_Post_Attach extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Swapping an image the gallery no longer holds is refused, not appended.
+	 *
 	 * @covers ::lienzo_replace_in_gallery
 	 */
 	public function test_refuses_a_gallery_swap_for_an_image_that_left() {
@@ -94,6 +102,8 @@ class Tests_Lienzo_Post_Attach extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A post cannot be pointed at a file the editor could not have produced.
+	 *
 	 * @covers ::lienzo_attach_to_post
 	 */
 	public function test_refuses_an_unsupported_image() {
@@ -107,6 +117,8 @@ class Tests_Lienzo_Post_Attach extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A missing post is an error rather than a silent no-op.
+	 *
 	 * @covers ::lienzo_attach_to_post
 	 */
 	public function test_refuses_a_post_that_does_not_exist() {
@@ -117,6 +129,8 @@ class Tests_Lienzo_Post_Attach extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The capability is the post's own, not the attachment's.
+	 *
 	 * @covers ::lienzo_can_attach_to_post
 	 */
 	public function test_a_subscriber_may_not_repoint_someone_elses_post() {
@@ -128,6 +142,8 @@ class Tests_Lienzo_Post_Attach extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Someone who can edit the post can repoint it.
+	 *
 	 * @covers ::lienzo_can_attach_to_post
 	 */
 	public function test_an_editor_may_repoint_a_post() {
@@ -139,6 +155,8 @@ class Tests_Lienzo_Post_Attach extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The change fires an action, so a plugin can follow it.
+	 *
 	 * @covers ::lienzo_attach_to_post
 	 */
 	public function test_announces_the_change() {

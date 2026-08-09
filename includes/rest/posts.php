@@ -66,15 +66,15 @@ function lienzo_rest_get_post_image( $request ) {
 
 	return rest_ensure_response(
 		array(
-			'attachmentId' => $attachment_id,
-			'postId'       => $post_id,
-			'postTitle'    => html_entity_decode( get_the_title( $post ), ENT_QUOTES, 'UTF-8' ),
-			'postType'     => $post->post_type,
+			'attachmentId'  => $attachment_id,
+			'postId'        => $post_id,
+			'postTitle'     => html_entity_decode( get_the_title( $post ), ENT_QUOTES, 'UTF-8' ),
+			'postType'      => $post->post_type,
 			// The singular label, so the editor can say "Update the product" rather
 			// than guessing from a slug that might be `cpt-product` or `my_thing`.
 			'postTypeLabel' => $type ? $type->labels->singular_name : $post->post_type,
-			'slot'         => lienzo_post_image_slot( $post_id, $attachment_id ),
-			'canAttach'    => lienzo_can_attach_to_post( $post_id ),
+			'slot'          => lienzo_post_image_slot( $post_id, $attachment_id ),
+			'canAttach'     => lienzo_can_attach_to_post( $post_id ),
 		)
 	);
 }
