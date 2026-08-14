@@ -111,7 +111,7 @@ function open( root: HTMLElement, attachmentId: number ): void {
  * That window then stays on screen, so whatever it says has to still make sense a
  * minute later.
  *
- * It used to say "Opening Lienzo on your desktop…", and an ellipsis that never resolves
+ * It used to say "Opening AllTerrain Photo Editor on your desktop…", and an ellipsis that never resolves
  * is a promise the page cannot keep -- the editor is in a different window, so nothing
  * is ever going to happen here. It now says where the editor went and carries the
  * button that takes you back to it, which is also the answer when the window was
@@ -129,11 +129,11 @@ function handOverToDesktop( root: HTMLElement, attachmentId: number ): void {
 	const message = document.createElement( 'p' );
 	message.className = 'lz-page-notice__text';
 	message.textContent = opened
-		? __( 'Lienzo opened in a window of its own on your desktop.' )
-		: __( 'Lienzo opens as a window on your desktop. Open it from the dock or its icon.' );
+		? __( 'AllTerrain Photo Editor opened in a window of its own on your desktop.' )
+		: __( 'AllTerrain Photo Editor opens as a window on your desktop. Open it from the dock or its icon.' );
 
 	const button = createButton( {
-		label: opened ? __( 'Bring Lienzo to the front' ) : __( 'Open Lienzo' ),
+		label: opened ? __( 'Bring AllTerrain Photo Editor to the front' ) : __( 'Open AllTerrain Photo Editor' ),
 		variant: 'primary',
 		onClick: () => openDesktopWindow( attachmentId ),
 	} );
@@ -151,7 +151,7 @@ function showPicker( root: HTMLElement ): void {
 	const config = window.lienzoConfig;
 
 	if ( ! config ) {
-		root.textContent = __( 'Lienzo could not load its configuration.' );
+		root.textContent = __( 'AllTerrain Photo Editor could not load its configuration.' );
 
 		return;
 	}

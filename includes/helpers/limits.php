@@ -2,13 +2,13 @@
 /**
  * What this site will let the editor allocate and upload.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Returns the maximum size, in bytes, Lienzo will accept for a rendered upload.
+ * Returns the maximum size, in bytes, AllTerrain Photo Editor will accept for a rendered upload.
  *
  * Defaults to the smaller of the PHP upload limit and 64MB. A full-resolution PNG
  * render of a 6000x4000 photograph can legitimately exceed 40MB, so this ceiling

@@ -2,7 +2,7 @@
 /**
  * The save pipeline.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 /**

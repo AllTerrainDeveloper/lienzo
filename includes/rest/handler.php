@@ -2,7 +2,7 @@
 /**
  * The wrapper every REST handler is filtered through.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;

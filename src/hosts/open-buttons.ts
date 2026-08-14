@@ -1,5 +1,5 @@
 /**
- * The "Edit with Lienzo" controls scattered around the admin.
+ * The "Edit with AllTerrain Photo Editor" controls scattered around the admin.
  *
  * The row action in the media list, the button on the attachment screen, and anything
  * a plugin adds with the same attribute. They are links to the classic editor page

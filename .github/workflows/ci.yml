@@ -72,17 +72,17 @@ jobs:
         run: npm ci
 
       # .wp-env.json mounts the sibling `../alcazaba-plugin` checkout so the
-      # local QA site has OpenStation to host Lienzo. That path does not exist
+      # local QA site has OpenStation to host AllTerrain Photo Editor. That path does not exist
       # on a runner and wp-env treats a missing mapping as fatal. The override
       # file is merged last and replaces `mappings` wholesale, so this drops the
-      # sibling and keeps Lienzo. Nothing is lost: the PHPUnit bootstrap stubs
-      # the two OpenStation functions Lienzo requires rather than installing it.
+      # sibling and keeps AllTerrain Photo Editor. Nothing is lost: the PHPUnit bootstrap stubs
+      # the two OpenStation functions AllTerrain Photo Editor requires rather than installing it.
       - name: Point wp-env at this repository only
         run: |
           cat > .wp-env.override.json <<'JSON'
           {
             "mappings": {
-              "wp-content/plugins/lienzo": "."
+              "wp-content/plugins/allterrain-photo-editor": "."
             }
           }
           JSON
@@ -97,7 +97,7 @@ jobs:
         run: npm run test:php
 
       - name: Coding standards
-        run: npx wp-env run cli --env-cwd=wp-content/plugins/lienzo vendor/bin/phpcs
+        run: npx wp-env run cli --env-cwd=wp-content/plugins/allterrain-photo-editor vendor/bin/phpcs
 
   plugin-check:
     name: Plugin Check
@@ -126,7 +126,7 @@ jobs:
           cat > .wp-env.override.json <<'JSON'
           {
             "mappings": {
-              "wp-content/plugins/lienzo": "."
+              "wp-content/plugins/allterrain-photo-editor": "."
             }
           }
           JSON

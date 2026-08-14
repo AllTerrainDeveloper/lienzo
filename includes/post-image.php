@@ -2,7 +2,7 @@
 /**
  * Finding the image a post is "about".
  *
- * Dropping a product onto Lienzo should open the product's photo, not ask which of
+ * Dropping a product onto AllTerrain Photo Editor should open the product's photo, not ask which of
  * the site's four thousand images you meant. Which image that is depends on the post
  * type, so the lookup is a filterable chain rather than a hardcoded featured-image
  * read: featured image, then WooCommerce's gallery, then anything an image is
@@ -13,7 +13,7 @@
  * its own idea of "the post's image" hooks `lienzo_post_image_id` instead of asking
  * for a WooCommerce branch here.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -52,10 +52,10 @@ function lienzo_post_image_id( $post_id ) {
 	}
 
 	/**
-	 * Filters the image Lienzo opens for a post.
+	 * Filters the image AllTerrain Photo Editor opens for a post.
 	 *
 	 * Fires whether or not one was found, so a plugin can answer for a post type
-	 * whose image lives somewhere Lienzo would never think to look.
+	 * whose image lives somewhere AllTerrain Photo Editor would never think to look.
 	 *
 	 * @since 0.2.0
 	 *
@@ -121,12 +121,12 @@ function lienzo_post_image_candidates( $post ) {
 }
 
 /**
- * Whether an attachment exists and Lienzo can open it.
+ * Whether an attachment exists and AllTerrain Photo Editor can open it.
  *
  * @since 0.2.0
  *
  * @param int $attachment_id Attachment to test.
- * @return bool True when it is an image Lienzo supports.
+ * @return bool True when it is an image AllTerrain Photo Editor supports.
  */
 function lienzo_is_editable_attachment( $attachment_id ) {
 	$attachment_id = (int) $attachment_id;

@@ -36,7 +36,7 @@ export interface LienzoApi {
 	 * Opens an image in whichever surface this page can offer.
 	 *
 	 * The way in. A desktop window inside the shell, an overlay outside it -- callers
-	 * should not have to know which, and every one of Lienzo's own entry points goes
+	 * should not have to know which, and every one of AllTerrain Photo Editor's own entry points goes
 	 * through here.
 	 */
 	openEditor: typeof openEditor;

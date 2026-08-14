@@ -8,16 +8,16 @@
  */
 
 /**
- * Translates a string in the `lienzo` text domain.
+ * Translates a string in the `allterrain-photo-editor` text domain.
  *
  * @param text Untranslated string.
  */
 export function __( text: string ): string {
-	return window.wp?.i18n?.__?.( text, 'lienzo' ) ?? text;
+	return window.wp?.i18n?.__?.( text, 'allterrain-photo-editor' ) ?? text;
 }
 
 /**
- * Picks the singular or the plural in the `lienzo` text domain.
+ * Picks the singular or the plural in the `allterrain-photo-editor` text domain.
  *
  * Both forms are passed to `wp.i18n` rather than chosen here, because which of them a
  * language wants is a property of the language: English has two forms and picks on
@@ -30,7 +30,7 @@ export function __( text: string ): string {
  */
 export function _n( single: string, plural: string, count: number ): string {
 	return (
-		window.wp?.i18n?._n?.( single, plural, count, 'lienzo' ) ??
+		window.wp?.i18n?._n?.( single, plural, count, 'allterrain-photo-editor' ) ??
 		( 1 === count ? single : plural )
 	);
 }

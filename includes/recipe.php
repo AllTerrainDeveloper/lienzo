@@ -12,7 +12,7 @@
  * whole one (`recipe-validate`), and how to read one back off an attachment
  * (`storage`).
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;

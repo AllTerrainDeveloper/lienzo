@@ -2,7 +2,7 @@
 /**
  * The classic-admin editor page and its place in the menu.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 /**

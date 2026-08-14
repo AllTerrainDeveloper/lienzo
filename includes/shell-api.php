@@ -4,7 +4,7 @@
  *
  * The desktop shell was called Desktop Mode and is now called OpenStation, and the
  * rename went all the way down: `desktop_mode_register_window()` became
- * `openstation_register_window()`, and every hook with it. Lienzo ships to sites
+ * `openstation_register_window()`, and every hook with it. AllTerrain Photo Editor ships to sites
  * running either version and cannot know which, so it asks for a capability by its
  * bare name and this file resolves the spelling.
  *
@@ -13,7 +13,7 @@
  * a fatal error on every request -- which is the same promise the rest of the
  * integration makes.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;

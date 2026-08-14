@@ -1,7 +1,7 @@
 /**
  * The media modal host.
  *
- * Adds an "Edit with Lienzo" button to the attachment details views, in both the
+ * Adds an "Edit with AllTerrain Photo Editor" button to the attachment details views, in both the
  * grid modal (`upload.php?mode=grid`) and the insert-media modal.
  *
  * The button is added by extending the view's `render()` rather than by replacing
@@ -122,7 +122,7 @@ function addButton( view: Record< string, unknown > ): void {
 	const button = document.createElement( 'button' );
 	button.type = 'button';
 	button.className = 'button lz-modal-button';
-	button.textContent = __( 'Edit with Lienzo' );
+	button.textContent = __( 'Edit with AllTerrain Photo Editor' );
 
 	button.addEventListener( 'click', ( event ) => {
 		event.preventDefault();
@@ -139,7 +139,7 @@ function addButton( view: Record< string, unknown > ): void {
 /**
  * Points the modal at the copy the editor just saved.
  *
- * A save writes a *new* attachment -- Lienzo never rewrites an original -- so a modal
+ * A save writes a *new* attachment -- AllTerrain Photo Editor never rewrites an original -- so a modal
  * left alone goes on showing, and on inserting, the photograph as it was. Someone who
  * opened the picker to insert an image, edited it, and pressed Insert got the version
  * they had just finished changing.

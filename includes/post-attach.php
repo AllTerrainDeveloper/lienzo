@@ -2,13 +2,13 @@
 /**
  * Putting an edited image back onto the post it came from.
  *
- * Never destructive. The edit is a *new* attachment -- Lienzo has no path that
+ * Never destructive. The edit is a *new* attachment -- AllTerrain Photo Editor has no path that
  * rewrites an original, and this does not add one -- so "update the product" means
  * pointing the product at the copy and leaving the original in the library. That is
  * what makes the change reversible: the previous image is still there, and putting it
  * back is one more repoint.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -33,7 +33,7 @@ function lienzo_attach_to_post( $post_id, $attachment_id, $slot, $replacing = 0 
 	if ( ! get_post( $post_id ) ) {
 		return new WP_Error(
 			'lienzo_attach_no_post',
-			__( 'That post no longer exists.', 'lienzo' ),
+			__( 'That post no longer exists.', 'allterrain-photo-editor' ),
 			array( 'status' => 404 )
 		);
 	}
@@ -41,7 +41,7 @@ function lienzo_attach_to_post( $post_id, $attachment_id, $slot, $replacing = 0 
 	if ( ! lienzo_is_editable_attachment( $attachment_id ) ) {
 		return new WP_Error(
 			'lienzo_attach_bad_image',
-			__( 'That image cannot be attached to a post.', 'lienzo' ),
+			__( 'That image cannot be attached to a post.', 'allterrain-photo-editor' ),
 			array( 'status' => 400 )
 		);
 	}
@@ -55,13 +55,13 @@ function lienzo_attach_to_post( $post_id, $attachment_id, $slot, $replacing = 0 
 	if ( ! $set ) {
 		return new WP_Error(
 			'lienzo_attach_failed',
-			__( 'The image could not be set on that post.', 'lienzo' ),
+			__( 'The image could not be set on that post.', 'allterrain-photo-editor' ),
 			array( 'status' => 500 )
 		);
 	}
 
 	/**
-	 * Fires after Lienzo repoints a post's image.
+	 * Fires after AllTerrain Photo Editor repoints a post's image.
 	 *
 	 * @since 0.2.0
 	 *
@@ -95,7 +95,7 @@ function lienzo_replace_in_gallery( $post_id, $attachment_id, $replacing ) {
 	if ( false === $at ) {
 		return new WP_Error(
 			'lienzo_attach_not_in_gallery',
-			__( 'That image is no longer in the product gallery.', 'lienzo' ),
+			__( 'That image is no longer in the product gallery.', 'allterrain-photo-editor' ),
 			array( 'status' => 409 )
 		);
 	}

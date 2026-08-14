@@ -2,7 +2,7 @@
 /**
  * Recipe schema and validation.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 /**

@@ -2,7 +2,7 @@
 /**
  * The preset endpoints.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;

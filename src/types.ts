@@ -66,14 +66,14 @@ export interface LienzoConfig {
 	/**
 	 * The classic-admin editor page.
 	 *
-	 * Where an "Edit with Lienzo" control goes when there is no shell on the page to
+	 * Where an "Edit with AllTerrain Photo Editor" control goes when there is no shell on the page to
 	 * open a window in.
 	 */
 	editorUrl: string;
 	/**
 	 * Where OpenStation's PixiJS lives.
 	 *
-	 * Lienzo ships none of its own. Inside the shell the module registry answers first
+	 * AllTerrain Photo Editor ships none of its own. Inside the shell the module registry answers first
 	 * and this is never used; on a classic admin screen there is no registry, and this
 	 * is OpenStation's own file. Empty when it could not be resolved.
 	 */

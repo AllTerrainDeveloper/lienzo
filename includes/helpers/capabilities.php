@@ -2,7 +2,7 @@
 /**
  * Who may edit which image.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;

@@ -2,8 +2,8 @@
 /**
  * The OpenStation requirement.
  *
- * Lienzo is an OpenStation application, not a standalone plugin that happens to
- * integrate with one. The rendering library is OpenStation's: Lienzo ships no PixiJS
+ * AllTerrain Photo Editor is an OpenStation application, not a standalone plugin that happens to
+ * integrate with one. The rendering library is OpenStation's: AllTerrain Photo Editor ships no PixiJS
  * and borrows the shell's, which is what keeps it a few tens of kilobytes instead of
  * eight hundred and keeps exactly one Pixi on the page. An editor with no Pixi cannot
  * draw a pixel, on any screen.
@@ -18,7 +18,7 @@
  * preference -- and with it off there is still an editor, on its own admin page and in
  * an overlay. See `includes/admin-page.php`.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -45,7 +45,7 @@ add_action( 'admin_notices', 'lienzo_requirements_notice' );
  * Explains why nothing happened, on the plugins screen.
  *
  * Only on that screen: a notice on every admin page would be nagging, and the plugins
- * screen is where someone who just activated Lienzo is standing.
+ * screen is where someone who just activated AllTerrain Photo Editor is standing.
  *
  * @since 0.1.0
  *
@@ -64,10 +64,10 @@ function lienzo_requirements_notice() {
 
 	printf(
 		'<div class="notice notice-warning"><p><strong>%1$s</strong> %2$s</p></div>',
-		esc_html__( 'Lienzo needs OpenStation.', 'lienzo' ),
+		esc_html__( 'AllTerrain Photo Editor needs OpenStation.', 'allterrain-photo-editor' ),
 		esc_html__(
-			'The image editor renders with the PixiJS that OpenStation provides, rather than shipping a second copy of it. Activate OpenStation to use Lienzo.',
-			'lienzo'
+			'The image editor renders with the PixiJS that OpenStation provides, rather than shipping a second copy of it. Activate OpenStation to use AllTerrain Photo Editor.',
+			'allterrain-photo-editor'
 		)
 	);
 }

@@ -2,7 +2,7 @@
 /**
  * Reading a stored recipe back off an attachment.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;

@@ -85,7 +85,7 @@ describe( 'MediaPager', () => {
 		expect( pager.hasMore ).toBe( false );
 	} );
 
-	it( 'drops images Lienzo cannot open', async () => {
+	it( 'drops images AllTerrain Photo Editor cannot open', async () => {
 		request.mockResolvedValueOnce(
 			page( [ JPEG, { id: 2, mime_type: 'image/svg+xml' } ], 1 )
 		);

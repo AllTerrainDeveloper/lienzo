@@ -4,8 +4,8 @@
  * Produces two things under `dist/`, matching the two halves of a WordPress.org
  * submission:
  *
- *   dist/lienzo.zip   the plugin itself, with a single `lienzo/` folder inside so it
- *                     unpacks to the right slug however it is installed
+ *   dist/allterrain-photo-editor.zip  the plugin itself, in a single `allterrain-photo-editor/`
+ *                     folder, so it unpacks to the right slug however it is installed
  *   dist/assets/      the directory listing's banner and icon art, which lives in
  *                     SVN's own `assets/` path and is NOT part of the download
  *
@@ -26,7 +26,7 @@ import { readFileSync } from 'node:fs';
 import { ships } from './ships.mjs';
 
 const root = resolve( dirname( fileURLToPath( import.meta.url ) ), '..' );
-const slug = 'lienzo';
+const slug = 'allterrain-photo-editor';
 const dist = join( root, 'dist' );
 const stage = join( dist, slug );
 

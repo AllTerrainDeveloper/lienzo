@@ -2,7 +2,7 @@
 /**
  * Script and style registration.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -38,7 +38,7 @@ function lienzo_register_assets() {
 		true
 	);
 
-	wp_set_script_translations( 'lienzo', 'lienzo', LIENZO_DIR . 'languages' );
+	wp_set_script_translations( 'lienzo', 'allterrain-photo-editor', LIENZO_DIR . 'languages' );
 
 	wp_register_style(
 		'lienzo',
@@ -145,9 +145,9 @@ function lienzo_get_config() {
 /**
  * Returns the URL of OpenStation's vendored PixiJS.
  *
- * Lienzo ships no rendering library. Inside the shell the browser asks OpenStation's
+ * AllTerrain Photo Editor ships no rendering library. Inside the shell the browser asks OpenStation's
  * module registry for `pixijs` and never comes here; on a classic admin screen that
- * registry is not on the page, but OpenStation *is* installed -- Lienzo requires it --
+ * registry is not on the page, but OpenStation *is* installed -- AllTerrain Photo Editor requires it --
  * so its file can be loaded directly.
  *
  * The URL is built from OpenStation's own constant rather than from a slug, so a

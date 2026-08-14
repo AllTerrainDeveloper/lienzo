@@ -6,13 +6,13 @@
  * wrong is a permission callback nobody read closely enough, and they read more
  * closely together than scattered between the handlers they guard.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Shared permission callback for every Lienzo route.
+ * Shared permission callback for every AllTerrain Photo Editor route.
  *
  * Distinguishes "not logged in" (401) from "logged in but not allowed" (403) so the
  * client can tell a expired session apart from a genuine permission problem and
@@ -27,7 +27,7 @@ function lienzo_rest_permission( $request ) {
 	if ( ! is_user_logged_in() ) {
 		return new WP_Error(
 			'lienzo_not_logged_in',
-			__( 'You must be logged in to edit images.', 'lienzo' ),
+			__( 'You must be logged in to edit images.', 'allterrain-photo-editor' ),
 			array( 'status' => 401 )
 		);
 	}
@@ -37,7 +37,7 @@ function lienzo_rest_permission( $request ) {
 	if ( ! lienzo_can_edit( $attachment_id ) ) {
 		return new WP_Error(
 			'lienzo_cannot_edit',
-			__( 'You are not allowed to edit this image.', 'lienzo' ),
+			__( 'You are not allowed to edit this image.', 'allterrain-photo-editor' ),
 			array( 'status' => 403 )
 		);
 	}
@@ -69,7 +69,7 @@ function lienzo_rest_save_permission( $request ) {
 	if ( ! current_user_can( 'upload_files' ) ) {
 		return new WP_Error(
 			'lienzo_cannot_upload',
-			__( 'You are not allowed to add files to the media library.', 'lienzo' ),
+			__( 'You are not allowed to add files to the media library.', 'allterrain-photo-editor' ),
 			array( 'status' => 403 )
 		);
 	}
@@ -92,7 +92,7 @@ function lienzo_rest_presets_permission() {
 	if ( ! is_user_logged_in() ) {
 		return new WP_Error(
 			'lienzo_not_logged_in',
-			__( 'You must be logged in to use presets.', 'lienzo' ),
+			__( 'You must be logged in to use presets.', 'allterrain-photo-editor' ),
 			array( 'status' => 401 )
 		);
 	}
@@ -100,7 +100,7 @@ function lienzo_rest_presets_permission() {
 	if ( ! current_user_can( 'upload_files' ) ) {
 		return new WP_Error(
 			'lienzo_cannot_edit',
-			__( 'You are not allowed to edit images.', 'lienzo' ),
+			__( 'You are not allowed to edit images.', 'allterrain-photo-editor' ),
 			array( 'status' => 403 )
 		);
 	}

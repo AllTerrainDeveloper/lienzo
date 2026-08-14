@@ -1,7 +1,7 @@
 /**
  * Getting PixiJS from the shell.
  *
- * Lienzo ships no rendering library, and that is a deliberate part of what it *is*:
+ * AllTerrain Photo Editor ships no rendering library, and that is a deliberate part of what it *is*:
  * OpenStation already vendors PixiJS v8 (MIT), so borrowing it keeps this plugin a
  * few tens of kilobytes instead of eight hundred, and keeps exactly one Pixi on the
  * page. Two Pixi 8 instances share GPU resource registries through globals, and
@@ -19,14 +19,14 @@
  *    but the plugin is installed and its file is right there, and PHP resolves the
  *    URL from the shell's own constant rather than either plugin guessing.
  *
- * The third step is what lets the editor open in classic admin without Lienzo
+ * The third step is what lets the editor open in classic admin without AllTerrain Photo Editor
  * carrying a second copy of Pixi to do it.
  *
  * Both spellings of the namespace are read, for the reason set out in `platform.ts`:
- * OpenStation 0.9.9 renamed `wp.desktop` to `wp.os` and Lienzo ships to sites running
+ * OpenStation 0.9.9 renamed `wp.desktop` to `wp.os` and AllTerrain Photo Editor ships to sites running
  * either version. This file used to read only `wp.desktop`, which meant that on a
  * current shell the loader looked exactly like a page with no shell at all and every
- * canvas failed to open with "Lienzo needs OpenStation".
+ * canvas failed to open with "AllTerrain Photo Editor needs OpenStation".
  */
 
 import type * as PixiNamespace from 'pixi.js';
@@ -114,7 +114,7 @@ function injectFromShell(): Promise< Pixi > {
 	if ( ! url ) {
 		return Promise.reject(
 			new Error(
-				'Lienzo needs the desktop shell: PixiJS comes from it, and this page can reach neither its module registry nor its files.'
+				'AllTerrain Photo Editor needs the desktop shell: PixiJS comes from it, and this page can reach neither its module registry nor its files.'
 			)
 		);
 	}

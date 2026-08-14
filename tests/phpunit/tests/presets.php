@@ -2,7 +2,7 @@
 /**
  * User presets.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 /**

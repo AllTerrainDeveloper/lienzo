@@ -3,7 +3,7 @@
  * OpenStation integration.
  *
  * Every registration in this file is additive and sits behind a `function_exists()`
- * gate. Lienzo is a standalone plugin: with OpenStation absent, nothing here
+ * gate. AllTerrain Photo Editor is a standalone plugin: with OpenStation absent, nothing here
  * runs and all four standalone hosts continue to work untouched. There is
  * deliberately no `Requires Plugins: desktop-mode` header on the bootstrap.
  *
@@ -11,7 +11,7 @@
  * is the detection helper the rest of the plugin uses to decide whether to offer
  * desktop affordances.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
  * Two separate questions, and both matter. `function_exists()` answers "is the
  * plugin active"; `openstation_is_enabled()` answers "has this particular user
  * opted in", since OpenStation is a per-user preference rather than a site-wide
- * one. Only when both hold should Lienzo present itself as a desktop app.
+ * one. Only when both hold should AllTerrain Photo Editor present itself as a desktop app.
  *
  * @since 0.1.0
  *
@@ -84,7 +84,7 @@ function lienzo_register_desktop_window() {
 		'register_window',
 		'lienzo',
 		array(
-			'title'        => __( 'Lienzo.', 'lienzo' ),
+			'title'        => __( 'AllTerrain Photo Editor', 'allterrain-photo-editor' ),
 			'icon'         => 'dashicons-format-image',
 			'template'     => 'lienzo_render_desktop_template',
 			'script'       => 'lienzo',
@@ -107,7 +107,7 @@ function lienzo_register_desktop_window() {
 			'register_icon',
 			'lienzo',
 			array(
-				'title'        => __( 'Lienzo.', 'lienzo' ),
+				'title'        => __( 'AllTerrain Photo Editor', 'allterrain-photo-editor' ),
 				'icon'         => 'dashicons-format-image',
 				'window'       => 'lienzo',
 				'position'     => 30,
@@ -121,7 +121,7 @@ function lienzo_register_desktop_window() {
 			'register_file_opener',
 			'lienzo',
 			array(
-				'label'        => __( 'Edit in Lienzo', 'lienzo' ),
+				'label'        => __( 'Edit in AllTerrain Photo Editor', 'allterrain-photo-editor' ),
 				'types'        => array( 'attachment' ),
 				'is_default'   => false,
 				'sort'         => 15,
@@ -170,7 +170,7 @@ function lienzo_enqueue_in_shell() {
 }
 
 /**
- * Adds "Edit in Lienzo" to the My WordPress media preview rail.
+ * Adds "Edit in AllTerrain Photo Editor" to the My WordPress media preview rail.
  *
  * @since 0.1.0
  *
@@ -180,7 +180,7 @@ function lienzo_enqueue_in_shell() {
 function lienzo_my_wordpress_action( $actions ) {
 	$actions[] = array(
 		'id'         => 'lienzo',
-		'label'      => __( 'Edit in Lienzo', 'lienzo' ),
+		'label'      => __( 'Edit in AllTerrain Photo Editor', 'allterrain-photo-editor' ),
 		'icon'       => 'dashicons-format-image',
 		'capability' => 'upload_files',
 		'mime'       => '^image/',

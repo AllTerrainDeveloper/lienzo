@@ -8,7 +8,7 @@
  * native window, because all four call the same `window.lienzo.mount()`.
  *
  * It exists because desktop mode is a *per-user preference*. OpenStation is installed
- * -- Lienzo requires it -- but a user who has switched it off has no shell on the page
+ * -- AllTerrain Photo Editor requires it -- but a user who has switched it off has no shell on the page
  * to render into, and until now that left them with an editor they had installed and
  * could not open.
  *
@@ -18,13 +18,13 @@
  * is not on the page. What the shell adds is the window, the icons and the drag bridge,
  * and none of those is the editor.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
 
 /** The `page` query argument, and the submenu slug. */
-define( 'LIENZO_PAGE_SLUG', 'lienzo' );
+define( 'LIENZO_PAGE_SLUG', 'allterrain-photo-editor' );
 
 add_action( 'admin_menu', 'lienzo_register_admin_page' );
 
@@ -51,8 +51,8 @@ add_action( 'admin_menu', 'lienzo_register_admin_page' );
 function lienzo_register_admin_page() {
 	$hook = add_submenu_page(
 		'upload.php',
-		__( 'Lienzo Image Editor', 'lienzo' ),
-		__( 'Edit Photos', 'lienzo' ),
+		__( 'AllTerrain Photo Editor Image Editor', 'allterrain-photo-editor' ),
+		__( 'Edit Photos', 'allterrain-photo-editor' ),
 		'upload_files',
 		LIENZO_PAGE_SLUG,
 		'lienzo_render_admin_page'
@@ -156,7 +156,7 @@ function lienzo_editor_page_url( $attachment_id = 0 ) {
 function lienzo_render_admin_page() {
 	if ( ! current_user_can( 'upload_files' ) ) {
 		wp_die(
-			esc_html__( 'You are not allowed to edit images.', 'lienzo' ),
+			esc_html__( 'You are not allowed to edit images.', 'allterrain-photo-editor' ),
 			'',
 			array( 'response' => 403 )
 		);

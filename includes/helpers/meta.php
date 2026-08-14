@@ -1,8 +1,8 @@
 <?php
 /**
- * Reading Lienzo\'s post meta, including under its former key.
+ * Reading AllTerrain Photo Editor\'s post meta, including under its former key.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;

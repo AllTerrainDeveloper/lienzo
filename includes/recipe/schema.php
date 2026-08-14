@@ -6,7 +6,7 @@
  * half and the two op tables must agree exactly. When you add an op, add it in both
  * places and add a case to `src/engine/color-matrix.ts`.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -38,7 +38,7 @@ function lienzo_working_spaces() {
 }
 
 /**
- * Returns the table of adjustment operations Lienzo understands.
+ * Returns the table of adjustment operations AllTerrain Photo Editor understands.
  *
  * Every op is a single scalar stored under the key `v`. Keeping the shape uniform
  * is what lets the validator, the UI slider factory and the colour-matrix composer

@@ -2,7 +2,7 @@
 /**
  * Tests for putting an edited image back onto its post.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 /**

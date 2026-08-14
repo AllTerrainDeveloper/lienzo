@@ -1,12 +1,12 @@
 https://github.com/user-attachments/assets/ed057f67-54c8-495e-a8f1-88437d278800
 
-# Lienzo.
+# AllTerrain Photo Editor.
 
 A non-destructive, GPU-accelerated image editor for the WordPress media library.
 
 WordPress has shipped the same image editor since 2008 — rotate, flip, crop, scale — and
 `wp-admin/includes/image-edit.php` renders its toolbar as hardcoded `onclick=` markup with no
-action hooks inside, so it cannot be extended, only replaced. Lienzo replaces it.
+action hooks inside, so it cannot be extended, only replaced. AllTerrain Photo Editor replaces it.
 
 ## What it does
 
@@ -19,8 +19,8 @@ paths, and text typed directly on the canvas. Undo and redo reach painted pixels
 Adjustments stay non-destructive: a save always writes a *new* attachment and stores the edit as a
 re-openable recipe, so the original file is never rewritten and repeated edits never compound.
 
-Lienzo is an **OpenStation application** and requires it: the rendering library is OpenStation's, and
-Lienzo ships none. At its best it runs as a **native window** in the shell — the dock, a desktop
+AllTerrain Photo Editor is an **OpenStation application** and requires it: the rendering library is OpenStation's, and
+AllTerrain Photo Editor ships none. At its best it runs as a **native window** in the shell — the dock, a desktop
 icon, a double-clicked image, the Media Library row action, the attachment screen, the media modal
 and the `core/image` block toolbar all open that same window. For a user who has switched desktop
 mode *off*, it opens as an **admin page under Media** and as an **overlay** instead.
@@ -411,14 +411,14 @@ invisible at fit zoom and obvious at 100% — that is arithmetic, not a bug.
 
 ## An OpenStation application
 
-Lienzo requires OpenStation — previously called Desktop Mode — and the requirement is load-bearing
-rather than ceremonial: **the rendering library is OpenStation's**. Lienzo ships no PixiJS at all,
+AllTerrain Photo Editor requires OpenStation — previously called Desktop Mode — and the requirement is load-bearing
+rather than ceremonial: **the rendering library is OpenStation's**. AllTerrain Photo Editor ships no PixiJS at all,
 which keeps it a few tens of kilobytes instead of eight hundred and keeps exactly one Pixi on the
 page. Two Pixi 8 instances share GPU resource registries through globals, so one copy is not merely
 smaller but safer. With OpenStation absent there is nothing to render with, on any screen, so
 nothing registers but a notice on the plugins screen saying so.
 
-Inside the shell, Lienzo runs as a **native window**, rendering into the shell's own DOM. That is not
+Inside the shell, AllTerrain Photo Editor runs as a **native window**, rendering into the shell's own DOM. That is not
 a preference either: the components, the drag bridge and the Pixi all live in the parent frame, and a
 chromeless iframe can reach none of them, because no component is registered there at all. So inside
 the shell there is exactly one editing surface, and the row action, the media modal button and the
@@ -443,7 +443,7 @@ reached still goes somewhere sensible instead of doing nothing.
 
 The requirement is checked by **capability, not by plugin slug** — do the functions being called
 exist — so a fork, a rename or a bundled copy all work. It is checked on `plugins_loaded`, and that
-detail is load-bearing: plugins load alphabetically, so `lienzo` runs *before* `desktop-mode` and
+detail is load-bearing: plugins load alphabetically, so `allterrain-photo-editor` runs *before* `desktop-mode` and
 none of its functions exist yet at file scope. Checking there would fail on every site, every time,
 and the plugin would silently never load. `Requires Plugins:` governs activation, not load order.
 
@@ -454,7 +454,7 @@ and the drag bridge. Not the editor.
 
 OpenStation renamed its whole surface: `wp.desktop` became `wp.os`, `<wpd-*>` became `<os-*>` along
 with every event, `--wpd-*` became `--os-ui-*`, `--desktop-mode-*` became `--os-*`, and
-`desktop_mode_*()` became `openstation_*()`. Lienzo ships to sites running either version and cannot
+`desktop_mode_*()` became `openstation_*()`. AllTerrain Photo Editor ships to sites running either version and cannot
 know which, so nothing outside `src/platform.ts` and `includes/shell-api.php` writes a prefix at
 all — code asks by bare name and those two files resolve the spelling:
 
@@ -542,7 +542,7 @@ input backgrounds onto a dark panel. Labels measured about 2:1. One block of var
 takes those labels to 5.5:1. The block is declared under both spellings (`--wpd-*` and `--os-ui-*`,
 `--desktop-mode-*` and `--os-*`) for the same reason the components are resolved by bare name.
 
-**Lienzo's own markup has to read the same tokens, and forgetting is silent.** A shell control that
+**AllTerrain Photo Editor's own markup has to read the same tokens, and forgetting is silent.** A shell control that
 cannot find a variable falls back to a light-theme literal; a rule of ours that hardcodes one *is*
 that literal, with no fallback to notice. The picker was written before the block existed and kept
 WordPress's `#50575e` for a photo's name and `#f0f0f1` behind a thumbnail — about 2:1 on a dark panel,
@@ -573,7 +573,7 @@ has to live there**, not in a module-level variable.
 
 ## PixiJS comes from OpenStation
 
-Lienzo ships no rendering library. OpenStation vendors PixiJS v8 (MIT), and
+AllTerrain Photo Editor ships no rendering library. OpenStation vendors PixiJS v8 (MIT), and
 `src/engine/pixi-loader.ts` reaches for that one copy three ways, in this order:
 
 1. **`window.PIXI`**, if anything has already put it there.
@@ -607,7 +607,7 @@ below has no extension, `index.ts` is the public surface and the modules beside 
 it — so `src/editor` is imported as `../editor`, never as `../editor/recipe-store`.
 
 ```
-lienzo.php               plugin bootstrap, constants
+allterrain-photo-editor.php               plugin bootstrap, constants
 includes/
   shell-api.php            resolves the shell's renamed functions and hooks
   requirements.php         the shell capability gate
@@ -687,7 +687,7 @@ npm run test:php       # phpunit, @group lienzo
 ```bash
 npm run plugin:build    # typecheck, tests, then both bundles. No deploy, no QA site needed.
 npm run plugin:check    # WordPress's own Plugin Check, the tool the review queue runs
-npm run plugin:package  # dist/lienzo.zip, plus dist/assets/ for the directory art
+npm run plugin:package  # dist/allterrain-photo-editor.zip, plus dist/assets/ for the directory art
 npm run plugin:release  # build, then check, then package — the gate. Needs wp-env running.
 ```
 
@@ -700,8 +700,8 @@ Plugin Check needs a running site, so `npm run env:start` first.
 `bin/ships.mjs` is the single list of what belongs in a distributed copy, imported by
 both the local deploy and the packager, because the two answering differently is how a
 zip ends up carrying `node_modules` or missing a file the QA site has been running for
-weeks. The zip contains one `lienzo/` folder so it unpacks to the right slug however it
-is installed, and it is staged into `dist/lienzo/` first so you can list and diff the
+weeks. The zip contains one `allterrain-photo-editor/` folder so it unpacks to the right slug however it
+is installed, and it is staged into `dist/allterrain-photo-editor/` first so you can list and diff the
 exact tree a reviewer will see.
 
 Nothing whose name begins with a dot ever ships, and that rule is blind on purpose. A
@@ -740,9 +740,9 @@ exit code. A gate wired to that exit code passes every time and catches nothing.
 | `plugin-check` | The same `npm run plugin:check` that runs locally |
 
 `.wp-env.json` mounts the sibling `../alcazaba-plugin` checkout so the QA site has a
-desktop shell to open Lienzo as a window in. That path does not exist on a runner and
+desktop shell to open AllTerrain Photo Editor as a window in. That path does not exist on a runner and
 wp-env treats a missing mapping as fatal, so the wp-env jobs write a
-`.wp-env.override.json` that replaces `mappings` with Lienzo alone. Nothing is lost —
+`.wp-env.override.json` that replaces `mappings` with AllTerrain Photo Editor alone. Nothing is lost —
 the PHPUnit bootstrap stubs the two shell functions the desktop integration is gated on,
 and everything else works without one anyway.
 
@@ -754,22 +754,22 @@ plugin is approved — see below.
 
 ### The first submission
 
-Lienzo is not in the plugin directory yet, so the first release is a manual upload
+AllTerrain Photo Editor is not in the plugin directory yet, so the first release is a manual upload
 rather than anything automated:
 
 ```bash
 npm run plugin:check    # must report "No errors found"
-npm run plugin:package  # writes dist/lienzo.zip
+npm run plugin:package  # writes dist/allterrain-photo-editor.zip
 ```
 
-Upload `dist/lienzo.zip` at <https://wordpress.org/plugins/developers/add/>. Only the
+Upload `dist/allterrain-photo-editor.zip` at <https://wordpress.org/plugins/developers/add/>. Only the
 zip goes in — there is nowhere to put `dist/assets/` yet. The directory art and the
 screenshots live in SVN under the plugin's own `assets/` path, which does not exist
 until the plugin is approved and commit access is granted.
 
 Review is done by humans and takes days to weeks. Nothing about the submission is
 scriptable, which is why there is no `npm run release` here yet: a tag-driven deploy
-pushes to `https://plugins.svn.wordpress.org/lienzo`, and that repository is created by
+pushes to `https://plugins.svn.wordpress.org/allterrain-photo-editor`, and that repository is created by
 the approval, not by us.
 
 ### Two sites, and why builds deploy themselves
@@ -782,25 +782,25 @@ the approval, not by us.
 The wp-env site mounts this repo directly, so a change is live the moment it is saved (PHP) or
 rebuilt (JS/CSS). The `:8889` QA site is a separate WordPress checkout that only mounts *its own*
 tree, so `bin/deploy.mjs` mirrors the plugin into
-`../wordpress-alcazaba/src/wp-content/plugins/lienzo` at the end of every build — no zip, no
+`../wordpress-alcazaba/src/wp-content/plugins/allterrain-photo-editor` at the end of every build — no zip, no
 WordPress upload screen, and it is live immediately because that checkout is itself bind-mounted
 into the container.
 
 The mirror copies only what runs in production; `src/`, `tests/`, `bin/`, `node_modules/` and the
 build config are excluded. It deletes files the source no longer has, so a renamed file cannot
 linger and mask a bug — and it therefore refuses to write into any directory that does not already
-contain `lienzo.php`. When no WordPress checkout is present it prints a note and exits zero rather
+contain `allterrain-photo-editor.php`. When no WordPress checkout is present it prints a note and exits zero rather
 than failing the build. Override with `LIENZO_DEPLOY_TARGET`, or skip with `LIENZO_SKIP_DEPLOY=1`.
 
 `npm run env:start` maps both plugins in but activates neither: wp-env's `plugins` list mounts a
-directory under its *own basename* as well, which would put a second copy of Lienzo on the site. The
-mappings put both at their correct slugs; activate them from the Plugins screen. Lienzo alone is a
+directory under its *own basename* as well, which would put a second copy of AllTerrain Photo Editor on the site. The
+mappings put both at their correct slugs; activate them from the Plugins screen. AllTerrain Photo Editor alone is a
 complete install — it is the desktop window that needs both.
 
 Lint PHP with `vendor/bin/phpcs` inside the container:
 
 ```bash
-npx wp-env run tests-cli --env-cwd=wp-content/plugins/lienzo vendor/bin/phpcs
+npx wp-env run tests-cli --env-cwd=wp-content/plugins/allterrain-photo-editor vendor/bin/phpcs
 ```
 
 ## What runs in how many passes
@@ -908,12 +908,12 @@ browser implementation gives you a slider that validates and then does nothing.
 
 ## Opening a post's photo
 
-Drag a WooCommerce product — or any post with a picture — onto the Lienzo icon and its image opens
+Drag a WooCommerce product — or any post with a picture — onto the AllTerrain Photo Editor icon and its image opens
 straight in the editor, skipping the picker. Dropping a photo does the same.
 
 The shell owns the drop target on every wallpaper tile, because a tile has to reject foreign
 payloads rather than let them fall through to the wallpaper underneath. Registering a target on the
-icon is therefore silently displaced; Lienzo cooperates with the claimant through
+icon is therefore silently displaced; AllTerrain Photo Editor cooperates with the claimant through
 `registerTilePayloadHandler` instead, scoped to its own icon so it cannot shadow another plugin's.
 
 Which image a post is "about" is a filterable chain rather than a featured-image read: featured
@@ -923,7 +923,7 @@ special case.
 
 Saving an image opened that way asks what to do with it. **Both answers are non-destructive**:
 "update the product" writes a new attachment and points the product at it, leaving the original in
-the library. Lienzo has no path that rewrites an original and this does not add one, which is what
+the library. AllTerrain Photo Editor has no path that rewrites an original and this does not add one, which is what
 makes the change reversible — the previous image is still there, and putting it back is one more
 repoint rather than a restore from backup. A gallery swap keeps its position.
 
@@ -951,7 +951,7 @@ Stated plainly, because each is better read here than discovered:
   where a physically correct pipeline would filter in linear too; the difference is small and the
   change is not.
 - **Asking the desktop from inside a chromeless iframe is a `postMessage`, and it can go unheard.**
-  The window manager only exists in the top frame, so "Edit with Lienzo" in the media modal posts its
+  The window manager only exists in the top frame, so "Edit with AllTerrain Photo Editor" in the media modal posts its
   request up. Being told the message was *forwarded* is not being told a window opened — so the frame
   now waits 600ms for the top frame to acknowledge, and opens the overlay itself if nothing does. A
   top frame running a stale cached bundle, one that hears the request but does not answer it, would
@@ -961,7 +961,7 @@ Stated plainly, because each is better read here than discovered:
   a full-resolution texture inside a `display: none` container. The item is registered and then
   removed from the menu, so the URL still answers — a bookmark, or the `editorUrl` in the config
   blob — and what it answers with is a sentence saying where the editor is and a button that opens
-  it. Lienzo lives in the dock and on the wallpaper there; `lienzo_desktop_owns_the_editor` is the
+  it. AllTerrain Photo Editor lives in the dock and on the wallpaper there; `lienzo_desktop_owns_the_editor` is the
   one filter that decides.
 - **A save from the classic-admin overlay does not always have somewhere to put the edit.** The block
   editor's image block is repointed, and so is the media modal: the copy joins the modal's library

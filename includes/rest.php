@@ -6,7 +6,7 @@
  * permission callbacks that guard it (`permissions`), and the handlers themselves,
  * grouped by what they act on (`presets`, `media`, `posts`, `render`).
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;

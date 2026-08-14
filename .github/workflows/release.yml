@@ -14,8 +14,8 @@ name: Release
 # tag's commit, so a deploy that fails for a workflow-level reason can never be
 # fixed by re-running it. Dispatching from main runs the current definition.
 #
-# NOTE: the WordPress.org step cannot succeed until Lienzo is approved and its
-# SVN repository exists at https://plugins.svn.wordpress.org/lienzo. Until then
+# NOTE: the WordPress.org step cannot succeed until AllTerrain Photo Editor is approved and its
+# SVN repository exists at https://plugins.svn.wordpress.org/allterrain-photo-editor. Until then
 # the first submission is a manual zip upload -- see README.md, "The first
 # submission". Everything before that step is useful from the first tag on.
 
@@ -65,8 +65,8 @@ jobs:
         run: |
           tag="${TAG#v}"
           pkg=$(node -p "require('./package.json').version")
-          header=$(awk '/^[[:space:]]*\*[[:space:]]*Version:/ { print $3; exit }' lienzo.php)
-          constant=$(awk -F"'" '/LIENZO_VERSION/ { print $4; exit }' lienzo.php)
+          header=$(awk '/^[[:space:]]*\*[[:space:]]*Version:/ { print $3; exit }' allterrain-photo-editor.php)
+          constant=$(awk -F"'" '/LIENZO_VERSION/ { print $4; exit }' allterrain-photo-editor.php)
           stable=$(awk '/^Stable tag:/ { print $3; exit }' readme.txt)
           if ! [[ "$tag" == "$pkg" && "$tag" == "$header" && "$tag" == "$constant" && "$tag" == "$stable" ]]; then
             echo "::error::Version mismatch — tag '$tag' vs package.json=$pkg header=$header LIENZO_VERSION=$constant readme.txt Stable tag=$stable"
@@ -90,7 +90,7 @@ jobs:
           cat > .wp-env.override.json <<'JSON'
           {
             "mappings": {
-              "wp-content/plugins/lienzo": "."
+              "wp-content/plugins/allterrain-photo-editor": "."
             }
           }
           JSON
@@ -121,7 +121,7 @@ jobs:
             --title "$TAG" \
             --generate-notes \
             "${flags[@]}" \
-            dist/lienzo.zip
+            dist/allterrain-photo-editor.zip
 
       # Prereleases (v1.0.0-rc1) stop at the GitHub Release: WordPress.org has
       # no concept of one, and pushing it would make it the live download.
@@ -133,13 +133,13 @@ jobs:
           SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
           # Set explicitly rather than left to default off the GitHub repo
           # name: this repository is called `daguerre` and the plugin is
-          # `lienzo`. The slug is the published SVN path and the install
+          # `allterrain-photo-editor`. The slug is the published SVN path and the install
           # directory, so it can never be allowed to drift.
-          SLUG: lienzo
+          SLUG: allterrain-photo-editor
           # `bin/package.mjs` stages both halves of an SVN commit: the plugin
           # tree the zip was built from, and the banner/icon art that belongs
           # in the directory's own assets/ path rather than in the download.
-          BUILD_DIR: ./dist/lienzo
+          BUILD_DIR: ./dist/allterrain-photo-editor
           ASSETS_DIR: ./dist/assets
           # VERSION comes from the verify step via $GITHUB_ENV -- see the note
           # there. Both it and SLUG default off a GitHub context that is only

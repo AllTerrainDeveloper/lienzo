@@ -111,7 +111,7 @@ describe( 'bootMediaModal', () => {
 		expect( renderInto( details, instance( undefined ) ) ).not.toBeNull();
 	} );
 
-	it( 'leaves an image Lienzo cannot open alone', () => {
+	it( 'leaves an image AllTerrain Photo Editor cannot open alone', () => {
 		const { details } = fakeMedia( null );
 
 		bootMediaModal();

@@ -2,7 +2,7 @@
 	"core": null,
 	"plugins": [],
 	"mappings": {
-		"wp-content/plugins/lienzo": ".",
+		"wp-content/plugins/allterrain-photo-editor": ".",
 		"wp-content/plugins/desktop-mode": "../alcazaba-plugin"
 	},
 	"config": {

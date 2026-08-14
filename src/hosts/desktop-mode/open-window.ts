@@ -131,7 +131,7 @@ export function openDesktopWindow(
  * own fallback on the strength of it -- so when the promise turns out to be empty, the
  * click has done nothing at all and the user is left staring at the button they
  * pressed. That is not hypothetical: with the listener in the top frame unregistered,
- * every "Edit with Lienzo" in the media modal behaved exactly that way.
+ * every "Edit with AllTerrain Photo Editor" in the media modal behaved exactly that way.
  *
  * The cost of the safety net is that a top frame running an older build -- one that
  * hears the request but does not answer it -- opens the window *and* the fallback
@@ -264,7 +264,7 @@ export async function openPostInDesktop( postId: number ): Promise< boolean > {
 		toast(
 			error instanceof Error
 				? error.message
-				: __( 'That post has no image Lienzo can open.' ),
+				: __( 'That post has no image AllTerrain Photo Editor can open.' ),
 			'error'
 		);
 

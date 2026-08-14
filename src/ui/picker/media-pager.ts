@@ -2,7 +2,7 @@
  * Walking the media library a page at a time.
  *
  * `wp/v2/media` is already paginated and already permission-checked per user, so the
- * picker reads core's own route rather than a Lienzo one. It reports the page count in
+ * picker reads core's own route rather than an AllTerrain Photo Editor one. It reports the page count in
  * `X-WP-TotalPages`, which is what tells the picker whether there is anything left to
  * offer.
  */
@@ -18,7 +18,7 @@ import type { MediaItem } from './types';
  *
  * The editable filter runs on the client -- `wp/v2/media` has no "one of these MIME
  * types" query, and the supported list is a plugin concern a server-side filter can
- * change at any time. So a page can come back full of images Lienzo cannot open, and
+ * change at any time. So a page can come back full of images AllTerrain Photo Editor cannot open, and
  * returning nothing would leave a Load more button that appears to do nothing. This
  * caps how long it will keep looking before handing control back.
  */
@@ -40,7 +40,7 @@ export class MediaPager {
 	private seen = 0;
 
 	/**
-	 * Images read and passed over because Lienzo cannot open them.
+	 * Images read and passed over because AllTerrain Photo Editor cannot open them.
 	 *
 	 * The filter below is silent, and silence is what makes a library of animated GIFs
 	 * indistinguishable from an empty one. Counting what was dropped costs a
@@ -100,7 +100,7 @@ export class MediaPager {
 	}
 
 	/**
-	 * Fetches one page and keeps only what Lienzo can open.
+	 * Fetches one page and keeps only what AllTerrain Photo Editor can open.
 	 *
 	 * @param page Page number, one-based.
 	 * @throws {Error} When the library could not be read.

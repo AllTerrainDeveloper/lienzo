@@ -269,7 +269,7 @@ function buildChrome( root: HTMLElement ): PickerChrome {
  * `lienzo_supported_mime_types` -- is dropped on its way through, and a picker that
  * counts only what survived reports a library smaller than the one the user knows they
  * have. Saying how many were passed over is the difference between "you have twelve
- * photos" and "you have twelve photos Lienzo can edit".
+ * photos" and "you have twelve photos AllTerrain Photo Editor can edit".
  *
  * @param shown   Photos rendered so far.
  * @param skipped Images passed over, of the pages read so far.
@@ -301,8 +301,8 @@ function countLabel( shown: number, skipped: number, hasMore: boolean ): string 
 	return `${ label } ${ sprintf(
 		/* translators: %d: number of images that cannot be edited. */
 		_n(
-			'Passing over %d image Lienzo cannot open.',
-			'Passing over %d images Lienzo cannot open.',
+			'Passing over %d image AllTerrain Photo Editor cannot open.',
+			'Passing over %d images AllTerrain Photo Editor cannot open.',
 			skipped
 		),
 		skipped
@@ -336,7 +336,7 @@ function fail( ui: PickerChrome, error: unknown ): void {
  * uploaded. So when images were passed over, the message says how many and why.
  *
  * @param ui      The picker's elements.
- * @param skipped Images in the library that Lienzo cannot open.
+ * @param skipped Images in the library that AllTerrain Photo Editor cannot open.
  */
 function showEmpty( ui: PickerChrome, skipped: number ): void {
 	ui.status.textContent =
@@ -344,8 +344,8 @@ function showEmpty( ui: PickerChrome, skipped: number ): void {
 			? sprintf(
 					/* translators: %d: number of images that cannot be edited. */
 					_n(
-						'Your library has %d image, and it is not one Lienzo can open. Lienzo edits JPEG, PNG, WebP and AVIF; an animated GIF is left alone because a canvas would flatten it to a single frame.',
-						'Your library has %d images, and none of them are ones Lienzo can open. Lienzo edits JPEG, PNG, WebP and AVIF; animated GIFs are left alone because a canvas would flatten them to a single frame.',
+						'Your library has %d image, and it is not one AllTerrain Photo Editor can open. AllTerrain Photo Editor edits JPEG, PNG, WebP and AVIF; an animated GIF is left alone because a canvas would flatten it to a single frame.',
+						'Your library has %d images, and none of them are ones AllTerrain Photo Editor can open. AllTerrain Photo Editor edits JPEG, PNG, WebP and AVIF; animated GIFs are left alone because a canvas would flatten them to a single frame.',
 						skipped
 					),
 					skipped
