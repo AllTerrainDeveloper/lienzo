@@ -96,6 +96,13 @@ export interface StageToolsOptions {
 	 * rather than stamping a string held elsewhere.
 	 */
 	onPlaceText: ( point: { x: number; y: number } ) => void;
+	/**
+	 * Optional. Ceiling on the magnetic lasso's edge field, in pixels.
+	 *
+	 * From `lienzo_max_edge_pixels`, by way of the config blob. Left out, the
+	 * detector's own default applies.
+	 */
+	maxEdgePixels?: number;
 }
 
 /** How much of a dab's width a retouching stroke advances before the next one. */

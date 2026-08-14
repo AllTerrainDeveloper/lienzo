@@ -173,7 +173,8 @@ export class MagneticTrace {
 			source.pixels,
 			source.width,
 			source.height,
-			brush.magneticContrast / 100
+			brush.magneticContrast / 100,
+			this.options.maxEdgePixels
 		);
 
 		if ( ! field ) {

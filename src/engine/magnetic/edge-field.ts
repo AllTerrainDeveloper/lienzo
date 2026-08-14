@@ -26,7 +26,15 @@
  *   `Selection` keeps could ever record.
  */
 
-/** The largest field the detector will build, in pixels. */
+/**
+ * The largest field the detector will build, in pixels.
+ *
+ * The default, not the rule: `lienzo_max_edge_pixels` moves it, and the editor hands
+ * whatever comes back to `buildEdgeField()`. A parameter rather than something written
+ * into this module at boot, because everything under `engine/` is pure -- it is handed
+ * pixels and asked for a field, and a pure function that reads a global is neither
+ * testable nor honest.
+ */
 export const MAX_FIELD_PIXELS = 2_000_000;
 
 /**
@@ -60,26 +68,32 @@ const PERCENTILE = 0.99;
 /**
  * Builds the edge field for a document.
  *
- * @param pixels   Composed document, RGBA.
- * @param width    Document width.
- * @param height   Document height.
- * @param contrast How strong an edge must be before it counts at all, 0..1. Raising it
- *                 tells the wire to ignore texture and hold out for real boundaries.
+ * @param pixels    Composed document, RGBA.
+ * @param width     Document width.
+ * @param height    Document height.
+ * @param contrast  How strong an edge must be before it counts at all, 0..1. Raising it
+ *                  tells the wire to ignore texture and hold out for real boundaries.
+ * @param maxPixels Optional. Ceiling on the field, from `lienzo_max_edge_pixels`.
+ *                  Defaults to two megapixels. Anything under one pixel is meaningless
+ *                  and is read as the default, so a filter returning zero cannot ask
+ *                  for a field with no pixels in it.
  * @return The field, or null when the document is too small to have edges.
  */
 export function buildEdgeField(
 	pixels: Uint8ClampedArray,
 	width: number,
 	height: number,
-	contrast = 0
+	contrast = 0,
+	maxPixels = MAX_FIELD_PIXELS
 ): EdgeField | null {
 	if ( width < 3 || height < 3 ) {
 		return null;
 	}
 
+	const ceiling = maxPixels >= 1 ? maxPixels : MAX_FIELD_PIXELS;
 	const step = Math.max(
 		1,
-		Math.ceil( Math.sqrt( ( width * height ) / MAX_FIELD_PIXELS ) )
+		Math.ceil( Math.sqrt( ( width * height ) / ceiling ) )
 	);
 	const fw = Math.floor( width / step );
 	const fh = Math.floor( height / step );

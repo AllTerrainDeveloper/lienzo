@@ -40,6 +40,15 @@ export class MediaPager {
 	private seen = 0;
 
 	/**
+	 * Images read and passed over because Lienzo cannot open them.
+	 *
+	 * The filter below is silent, and silence is what makes a library of animated GIFs
+	 * indistinguishable from an empty one. Counting what was dropped costs a
+	 * subtraction and lets the picker say so.
+	 */
+	private passed = 0;
+
+	/**
 	 * @param config Runtime configuration.
 	 */
 	constructor( config: LienzoConfig ) {
@@ -54,6 +63,17 @@ export class MediaPager {
 	/** How many editable images have been handed out so far. */
 	get count(): number {
 		return this.seen;
+	}
+
+	/**
+	 * How many images were read and passed over, of the pages fetched so far.
+	 *
+	 * Of the pages *fetched*, not of the library: with pages left this is a running
+	 * total and not a final one, which is why the picker phrases it as what it is
+	 * passing over rather than as what the library contains.
+	 */
+	get skipped(): number {
+		return this.passed;
 	}
 
 	/**
@@ -115,8 +135,12 @@ export class MediaPager {
 
 		const items = ( await response.json() ) as MediaItem[];
 
-		return items.filter( ( item ) =>
+		const editable = items.filter( ( item ) =>
 			this.config.supportedMimes.includes( item.mime_type )
 		);
+
+		this.passed += items.length - editable.length;
+
+		return editable;
 	}
 }

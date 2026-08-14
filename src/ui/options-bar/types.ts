@@ -16,6 +16,10 @@ export interface OptionsBarOptions {
 	hasSelection: () => boolean;
 	deselect: () => void;
 	selectAll: () => void;
+	/** Whether there is an earlier selection to go back to. */
+	canStepSelectionBack: () => boolean;
+	/** Puts the marquee back as it was before the last change. */
+	stepSelectionBack: () => void;
 	/** Whether the clone stamp has a sample point yet. */
 	hasCloneSource: () => boolean;
 	/** Forgets the clone sample point. */

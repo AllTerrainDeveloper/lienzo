@@ -95,6 +95,40 @@ describe( 'MediaPager', () => {
 		expect( items.map( ( item ) => item.id ) ).toEqual( [ 1 ] );
 	} );
 
+	it( 'counts the images it dropped', async () => {
+		request.mockResolvedValueOnce(
+			page(
+				[
+					JPEG,
+					{ id: 2, mime_type: 'image/svg+xml' },
+					{ id: 3, mime_type: 'image/gif' },
+				],
+				1
+			)
+		);
+
+		const pager = new MediaPager( CONFIG );
+
+		await pager.next();
+
+		expect( pager.count ).toBe( 1 );
+		expect( pager.skipped ).toBe( 2 );
+	} );
+
+	it( 'counts across every page it read, not only the last', async () => {
+		request
+			.mockResolvedValueOnce( page( [ { id: 9, mime_type: 'image/gif' } ], 3 ) )
+			.mockResolvedValueOnce(
+				page( [ JPEG, { id: 8, mime_type: 'image/gif' } ], 3 )
+			);
+
+		const pager = new MediaPager( CONFIG );
+
+		await pager.next();
+
+		expect( pager.skipped ).toBe( 2 );
+	} );
+
 	it( 'keeps reading past a page with nothing editable on it', async () => {
 		request
 			.mockResolvedValueOnce( page( [ { id: 9, mime_type: 'image/svg+xml' } ], 3 ) )

@@ -93,7 +93,7 @@ export function colourField(
 	bar.add( field, () => field.setValue( bar.brush.colour ) );
 }
 
-/** Select-all and deselect, shared by every selection tool. */
+/** Select-all, step-back and deselect, shared by every selection tool. */
 export function selectionButtons( bar: OptionsBuilder ): void {
 	bar.add(
 		createButton( {
@@ -102,6 +102,22 @@ export function selectionButtons( bar: OptionsBuilder ): void {
 			onClick: () => bar.options.selectAll(),
 		} )
 	);
+
+	// Next to the mode picker whose mistakes it undoes, which is the whole reason it is
+	// here rather than in a menu: an addition made in the wrong mode is noticed while
+	// looking at the four buttons that caused it.
+	const back = createButton( {
+		label: __( 'Step back' ),
+		title: __( 'Put the selection back as it was before the last change' ),
+		variant: 'ghost',
+		onClick: () => {
+			bar.options.stepSelectionBack();
+			bar.rebuild();
+		},
+	} );
+
+	back.setDisabled( ! bar.options.canStepSelectionBack() );
+	bar.add( back );
 
 	const deselect = createButton( {
 		label: __( 'Deselect' ),

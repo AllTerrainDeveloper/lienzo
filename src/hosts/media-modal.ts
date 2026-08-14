@@ -12,12 +12,22 @@
  *
  * `wp.media` has no hook registry -- extension is Backbone prototype patching --
  * so every step here is feature-detected and bails rather than throwing.
+ *
+ * The button also carries the answer back. A save writes a new attachment, and a modal
+ * that was not told about it inserts the photograph the user has just finished editing
+ * *as it was* -- so `returnEdit()` below puts the copy into the modal's library and
+ * makes it the selection.
  */
 
 import { __ } from '../i18n';
 import { openEditor } from './open';
 
-import type { BackboneView } from '../globals';
+import type {
+	BackboneCollectionLike,
+	BackboneModelLike,
+	BackboneView,
+} from '../globals';
+import type { SaveResult } from '../types';
 
 /** Marks views already patched, so a re-boot cannot double-wrap them. */
 const patched = new WeakSet< object >();
@@ -118,8 +128,86 @@ function addButton( view: Record< string, unknown > ): void {
 		event.preventDefault();
 		event.stopPropagation();
 
-		openEditor( id );
+		openEditor( id, {
+			onSave: ( result ) => returnEdit( view, id, result ),
+		} );
 	} );
 
 	host.appendChild( button );
+}
+
+/**
+ * Points the modal at the copy the editor just saved.
+ *
+ * A save writes a *new* attachment -- Lienzo never rewrites an original -- so a modal
+ * left alone goes on showing, and on inserting, the photograph as it was. Someone who
+ * opened the picker to insert an image, edited it, and pressed Insert got the version
+ * they had just finished changing.
+ *
+ * Two collections, because the modal keeps two different answers. The library is
+ * everything on offer, and an attachment it has never heard of cannot be selected, so
+ * that comes first -- it is also the whole of the answer in the grid modal, which has
+ * no insert button and where seeing the new file appear is what "saved" looks like.
+ * The selection is what Insert will use, and there the edited copy *replaces* the
+ * original rather than joining it: a picker set to one image would otherwise refuse
+ * the second, and a multi-select would insert the photograph twice.
+ *
+ * The model is fetched because `wp.media.attachment()` hands back whatever the store
+ * has, which for an id uploaded seconds ago by somebody else's REST call is an id and
+ * nothing else -- a tile with no URL, which renders as a broken thumbnail until
+ * something asks the server. Backbone re-renders when the answer arrives.
+ *
+ * Every step is optional and every step is guarded: `wp.media` is a Backbone app with
+ * no extension contract, and the worst thing this could do is throw inside a save
+ * handler and make a successful save look like a failed one.
+ *
+ * @param view     The details view the button was added to.
+ * @param sourceId The attachment that was opened.
+ * @param result   What the save produced.
+ */
+function returnEdit(
+	view: Record< string, unknown >,
+	sourceId: number,
+	result: SaveResult
+): void {
+	try {
+		const attachment = window.wp?.media?.attachment?.( result.id );
+
+		if ( ! attachment ) {
+			return;
+		}
+
+		attachment.fetch?.();
+
+		const controller = view.controller as
+			| { state?: () => { get?: ( key: string ) => unknown } | undefined }
+			| undefined;
+		const state = controller?.state?.();
+
+		( state?.get?.( 'library' ) as BackboneCollectionLike | undefined )?.add?.(
+			attachment
+		);
+
+		const selection = state?.get?.( 'selection' ) as
+			| BackboneCollectionLike
+			| undefined;
+
+		if ( ! selection?.add ) {
+			return;
+		}
+
+		const original = selection.get?.( sourceId ) as
+			| BackboneModelLike
+			| undefined;
+
+		if ( original ) {
+			selection.remove?.( original );
+		}
+
+		selection.add( attachment );
+	} catch {
+		// The same bargain as the button itself: a core change to the modal's shape
+		// means the edit is not carried back, never that the save reports a failure it
+		// did not have.
+	}
 }

@@ -44,12 +44,34 @@ export interface BackboneView {
 	extend: ( props: Record< string, unknown > ) => BackboneView;
 }
 
+/**
+ * A Backbone collection, as far as this plugin needs one.
+ *
+ * The modal's library and its selection are both one of these, and everything Lienzo
+ * asks of either is on this interface. Optional throughout: `wp.media` has no hook
+ * registry and no contract, so every call site feature-detects rather than trusting a
+ * shape core is free to change.
+ */
+export interface BackboneCollectionLike {
+	add?: ( model: unknown ) => unknown;
+	remove?: ( model: unknown ) => unknown;
+	get?: ( id: number ) => unknown;
+}
+
+/** A Backbone model, as far as this plugin needs one. */
+export interface BackboneModelLike {
+	get?: ( key: string ) => unknown;
+	fetch?: () => unknown;
+}
+
 export interface WpMediaLike {
 	view?: {
 		Attachment?: {
 			Details?: BackboneView & { TwoColumn?: BackboneView };
 		};
 	};
+	/** The store's model for an attachment id, created if it is not known yet. */
+	attachment?: ( id: number ) => BackboneModelLike | undefined;
 }
 
 /** The slices of the block editor packages Lienzo touches. */
@@ -79,6 +101,12 @@ export interface WpComponentsLike {
 /** The slice of `window.wp.i18n` Lienzo touches. */
 export interface WpI18nLike {
 	__: ( text: string, domain?: string ) => string;
+	_n?: (
+		single: string,
+		plural: string,
+		count: number,
+		domain?: string
+	) => string;
 	sprintf?: ( format: string, ...args: unknown[] ) => string;
 }
 

@@ -17,6 +17,25 @@ export function __( text: string ): string {
 }
 
 /**
+ * Picks the singular or the plural in the `lienzo` text domain.
+ *
+ * Both forms are passed to `wp.i18n` rather than chosen here, because which of them a
+ * language wants is a property of the language: English has two forms and picks on
+ * `1`, and several languages have three or more and pick on something else entirely.
+ * The fallback is the English rule, which is the right answer for untranslated text.
+ *
+ * @param single Untranslated singular.
+ * @param plural Untranslated plural.
+ * @param count  How many.
+ */
+export function _n( single: string, plural: string, count: number ): string {
+	return (
+		window.wp?.i18n?._n?.( single, plural, count, 'lienzo' ) ??
+		( 1 === count ? single : plural )
+	);
+}
+
+/**
  * Translates and interpolates.
  *
  * @param text Untranslated string containing printf placeholders.
