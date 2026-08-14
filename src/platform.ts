@@ -1,7 +1,7 @@
 /**
  * Host adapters.
  *
- * Lienzo runs in two worlds: a plain WordPress admin, and inside the shell that is
+ * AllTerrain Photo Editor runs in two worlds: a plain WordPress admin, and inside the shell that is
  * now called OpenStation. Rather than scatter `if ( shell )` through the codebase,
  * every capability that differs between the two is funnelled through this module.
  * The rest of the plugin imports from here and never asks which world it is in.
@@ -13,7 +13,7 @@
  * ## Two spellings of everything
  *
  * OpenStation 0.9.9 renamed the whole surface -- `wp.desktop` became `wp.os`,
- * `<wpd-*>` became `<os-*>`, and every event with it. Lienzo ships to sites running
+ * `<wpd-*>` became `<os-*>`, and every event with it. AllTerrain Photo Editor ships to sites running
  * either version and cannot know which, so it asks for capabilities by bare name and
  * this module resolves the spelling. That is why nothing outside here writes a
  * prefix: a hardcoded `wpd-button` is a control that silently renders as inert

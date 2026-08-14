@@ -5,7 +5,7 @@
  * A saved copy records the attachment it was edited from, so re-opening one edits the
  * original\'s pixels rather than a re-render of a re-render.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Resolves the attachment whose pixels should be loaded into the editor.
  *
- * Lienzo never edits already-rendered output. When an attachment carries a
+ * AllTerrain Photo Editor never edits already-rendered output. When an attachment carries a
  * `_lienzo_source` pointer it was produced by a previous save, so re-opening it
  * loads the *original* instead. That is what keeps repeated edits first-generation
  * rather than compounding quantisation loss on every round trip.
@@ -64,7 +64,7 @@ function lienzo_get_source_path( $attachment_id ) {
 	if ( ! $path || ! is_string( $path ) ) {
 		return new WP_Error(
 			'lienzo_no_source_file',
-			__( 'The original image file for this attachment could not be located.', 'lienzo' ),
+			__( 'The original image file for this attachment could not be located.', 'allterrain-photo-editor' ),
 			array( 'status' => 404 )
 		);
 	}
@@ -72,7 +72,7 @@ function lienzo_get_source_path( $attachment_id ) {
 	if ( ! file_exists( $path ) || ! is_readable( $path ) ) {
 		return new WP_Error(
 			'lienzo_source_unreadable',
-			__( 'The original image file exists in the database but is not readable on disk.', 'lienzo' ),
+			__( 'The original image file exists in the database but is not readable on disk.', 'allterrain-photo-editor' ),
 			array( 'status' => 404 )
 		);
 	}

@@ -6,7 +6,7 @@
  * that produced it, so it can be re-opened and the sliders restored -- and the
  * original is still there, untouched, if the edit was a mistake.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -22,9 +22,11 @@ defined( 'ABSPATH' ) || exit;
  * @return int|WP_Error New attachment ID, or an error.
  */
 function lienzo_store_render( $file, $source_id, $recipe ) {
+	// Sideloading runs from a REST request, where the admin includes are not loaded.
+	// Only the two files whose functions are called below: `wp_handle_sideload()` from
+	// file.php, and `wp_generate_attachment_metadata()` from image.php.
 	require_once ABSPATH . 'wp-admin/includes/file.php';
 	require_once ABSPATH . 'wp-admin/includes/image.php';
-	require_once ABSPATH . 'wp-admin/includes/media.php';
 
 	$source_path = lienzo_get_source_path( $source_id );
 
@@ -39,7 +41,7 @@ function lienzo_store_render( $file, $source_id, $recipe ) {
 			'lienzo_render_too_large',
 			sprintf(
 				/* translators: %s: maximum upload size, already formatted. */
-				__( 'The rendered image is larger than the %s limit for this site.', 'lienzo' ),
+				__( 'The rendered image is larger than the %s limit for this site.', 'allterrain-photo-editor' ),
 				size_format( $max )
 			),
 			array( 'status' => 413 )
@@ -75,7 +77,7 @@ function lienzo_store_render( $file, $source_id, $recipe ) {
 
 		return new WP_Error(
 			'lienzo_render_bad_type',
-			__( 'The rendered image was not a supported image type.', 'lienzo' ),
+			__( 'The rendered image was not a supported image type.', 'allterrain-photo-editor' ),
 			array( 'status' => 400 )
 		);
 	}
@@ -113,7 +115,7 @@ function lienzo_store_render( $file, $source_id, $recipe ) {
 	 * Filters the metadata of a freshly rendered image.
 	 *
 	 * Mirrors core's filter of the same name from its REST image editor, so a
-	 * plugin already listening for edited images sees Lienzo's output too.
+	 * plugin already listening for edited images sees AllTerrain Photo Editor's output too.
 	 *
 	 * @since 0.1.0
 	 *

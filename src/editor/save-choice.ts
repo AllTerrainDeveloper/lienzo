@@ -5,7 +5,7 @@
  * icon, say. Opening a photo from the picker has no post to update, so there is
  * nothing to ask and the save just runs.
  *
- * Both answers are non-destructive. Lienzo has no path that rewrites an original and
+ * Both answers are non-destructive. AllTerrain Photo Editor has no path that rewrites an original and
  * this does not add one: "update the product" writes a new attachment and points the
  * product at it, leaving the previous image in the library. That is what makes the
  * change reversible -- the old image is still there, and putting it back is one more

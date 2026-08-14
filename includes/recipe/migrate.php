@@ -6,7 +6,7 @@
  * older release has to open without losing an edit, so every version bump that
  * changes the shape gets a step here.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;

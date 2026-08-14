@@ -2,7 +2,7 @@
 /**
  * Which MIME types the uploader will accept from us.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;

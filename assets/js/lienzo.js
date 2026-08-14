@@ -3105,7 +3105,7 @@ fn mainFragment(
     if (!url) {
       return Promise.reject(
         new Error(
-          "Lienzo needs the desktop shell: PixiJS comes from it, and this page can reach neither its module registry nor its files."
+          "AllTerrain Photo Editor needs the desktop shell: PixiJS comes from it, and this page can reach neither its module registry nor its files."
         )
       );
     }
@@ -3670,10 +3670,10 @@ fn mainFragment(
     }
   }
   function __(text) {
-    return window.wp?.i18n?.__?.(text, "lienzo") ?? text;
+    return window.wp?.i18n?.__?.(text, "allterrain-photo-editor") ?? text;
   }
   function _n(single, plural, count) {
-    return window.wp?.i18n?._n?.(single, plural, count, "lienzo") ?? (1 === count ? single : plural);
+    return window.wp?.i18n?._n?.(single, plural, count, "allterrain-photo-editor") ?? (1 === count ? single : plural);
   }
   function sprintf(text, ...args) {
     const translated = __(text);
@@ -7020,7 +7020,7 @@ fn mainFragment(
     const config = window.lienzoConfig;
     if (!config) {
       throw new Error(
-        "Lienzo configuration is missing. The editor script was loaded without lienzo_enqueue_editor()."
+        "AllTerrain Photo Editor configuration is missing. The editor script was loaded without lienzo_enqueue_editor()."
       );
     }
     return config;
@@ -7126,7 +7126,7 @@ fn mainFragment(
       });
     } catch (error) {
       toast(
-        error instanceof Error ? error.message : __("That post has no image Lienzo can open."),
+        error instanceof Error ? error.message : __("That post has no image AllTerrain Photo Editor can open."),
         "error"
       );
       return false;
@@ -7139,7 +7139,7 @@ fn mainFragment(
     }
     files.registerOpener({
       id: "lienzo",
-      label: __("Edit in Lienzo"),
+      label: __("Edit in AllTerrain Photo Editor"),
       types: ["attachment"],
       isDefault: false,
       sort: 15,
@@ -7187,7 +7187,7 @@ fn mainFragment(
     const handler = {
       appliesTo: isLienzoIcon,
       accept: (data) => !!(attachmentFrom(data) || postFrom(data)),
-      acceptLabel: __("Open in Lienzo"),
+      acceptLabel: __("Open in AllTerrain Photo Editor"),
       onDrop: (session) => openDropped(session.payload.data ?? {})
     };
     for (const type of ACCEPTED) {
@@ -7245,7 +7245,7 @@ fn mainFragment(
       return [];
     }
     /**
-     * Fetches one page and keeps only what Lienzo can open.
+     * Fetches one page and keeps only what AllTerrain Photo Editor can open.
      *
      * @param page Page number, one-based.
      * @throws {Error} When the library could not be read.
@@ -7437,8 +7437,8 @@ fn mainFragment(
     return `${label} ${sprintf(
       /* translators: %d: number of images that cannot be edited. */
       _n(
-        "Passing over %d image Lienzo cannot open.",
-        "Passing over %d images Lienzo cannot open.",
+        "Passing over %d image AllTerrain Photo Editor cannot open.",
+        "Passing over %d images AllTerrain Photo Editor cannot open.",
         skipped
       ),
       skipped
@@ -7455,8 +7455,8 @@ fn mainFragment(
     ui.status.textContent = skipped > 0 ? sprintf(
       /* translators: %d: number of images that cannot be edited. */
       _n(
-        "Your library has %d image, and it is not one Lienzo can open. Lienzo edits JPEG, PNG, WebP and AVIF; an animated GIF is left alone because a canvas would flatten it to a single frame.",
-        "Your library has %d images, and none of them are ones Lienzo can open. Lienzo edits JPEG, PNG, WebP and AVIF; animated GIFs are left alone because a canvas would flatten them to a single frame.",
+        "Your library has %d image, and it is not one AllTerrain Photo Editor can open. AllTerrain Photo Editor edits JPEG, PNG, WebP and AVIF; an animated GIF is left alone because a canvas would flatten it to a single frame.",
+        "Your library has %d images, and none of them are ones AllTerrain Photo Editor can open. AllTerrain Photo Editor edits JPEG, PNG, WebP and AVIF; animated GIFs are left alone because a canvas would flatten them to a single frame.",
         skipped
       ),
       skipped
@@ -7634,7 +7634,7 @@ fn mainFragment(
       if (!dropped) {
         toast(
           sprintf(
-            __("That drag carried no image Lienzo could read (%s)."),
+            __("That drag carried no image AllTerrain Photo Editor could read (%s)."),
             Array.from(event.dataTransfer?.types ?? []).join(", ") || __("no data")
           ),
           "info"
@@ -13968,9 +13968,9 @@ fn mainFragment(
     notice.className = "lz-page-notice";
     const message = document.createElement("p");
     message.className = "lz-page-notice__text";
-    message.textContent = opened ? __("Lienzo opened in a window of its own on your desktop.") : __("Lienzo opens as a window on your desktop. Open it from the dock or its icon.");
+    message.textContent = opened ? __("AllTerrain Photo Editor opened in a window of its own on your desktop.") : __("AllTerrain Photo Editor opens as a window on your desktop. Open it from the dock or its icon.");
     const button = createButton({
-      label: opened ? __("Bring Lienzo to the front") : __("Open Lienzo"),
+      label: opened ? __("Bring AllTerrain Photo Editor to the front") : __("Open AllTerrain Photo Editor"),
       variant: "primary",
       onClick: () => openDesktopWindow(attachmentId)
     });
@@ -13980,7 +13980,7 @@ fn mainFragment(
   function showPicker(root) {
     const config = window.lienzoConfig;
     if (!config) {
-      root.textContent = __("Lienzo could not load its configuration.");
+      root.textContent = __("AllTerrain Photo Editor could not load its configuration.");
       return;
     }
     void renderPicker(root, config, (id) => open(root, id));
@@ -13996,7 +13996,7 @@ fn mainFragment(
     dialog.className = "lz-overlay__dialog";
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");
-    dialog.setAttribute("aria-label", __("Edit image with Lienzo"));
+    dialog.setAttribute("aria-label", __("Edit image with AllTerrain Photo Editor"));
     const mountPoint = document.createElement("div");
     mountPoint.className = "lz-overlay__editor";
     dialog.appendChild(mountPoint);
@@ -14116,8 +14116,8 @@ fn mainFragment(
             createElement(
               ToolbarButton,
               {
-                label: __("Edit with Lienzo"),
-                // A save writes a *new* attachment -- Lienzo never
+                label: __("Edit with AllTerrain Photo Editor"),
+                // A save writes a *new* attachment -- AllTerrain Photo Editor never
                 // rewrites an original -- so the block is pointed at
                 // it, or the post would go on showing the photograph
                 // as it was. The stored dimensions go with it: they
@@ -14134,7 +14134,7 @@ fn mainFragment(
                   })
                 })
               },
-              __("Lienzo")
+              __("AllTerrain Photo Editor")
             )
           )
         );
@@ -14190,7 +14190,7 @@ fn mainFragment(
     const button = document.createElement("button");
     button.type = "button";
     button.className = "button lz-modal-button";
-    button.textContent = __("Edit with Lienzo");
+    button.textContent = __("Edit with AllTerrain Photo Editor");
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();

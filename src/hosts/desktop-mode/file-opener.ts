@@ -7,7 +7,7 @@ import { desktop } from './desktop-api';
 import { openInDesktop } from './open-window';
 
 /**
- * Offers Lienzo as a way to open image files on the desktop.
+ * Offers AllTerrain Photo Editor as a way to open image files on the desktop.
  *
  * Registered with `isDefault: false` so it appears alongside the built-in media
  * editor rather than silently replacing it; a user who wants it as the default sets
@@ -23,7 +23,7 @@ export function registerFileOpener(): void {
 	// On the object, for the same reason the drop target is.
 	files.registerOpener( {
 		id: 'lienzo',
-		label: __( 'Edit in Lienzo' ),
+		label: __( 'Edit in AllTerrain Photo Editor' ),
 		types: [ 'attachment' ],
 		isDefault: false,
 		sort: 15,

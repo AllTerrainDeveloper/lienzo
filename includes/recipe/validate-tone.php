@@ -2,7 +2,7 @@
 /**
  * Validating the tone controls: curves and levels.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -35,7 +35,7 @@ function lienzo_validate_curves( $raw ) {
 					'lienzo_recipe_bad_curve',
 					sprintf(
 						/* translators: %s: curve channel name. */
-						__( 'Curve "%s" contains a malformed control point.', 'lienzo' ),
+						__( 'Curve "%s" contains a malformed control point.', 'allterrain-photo-editor' ),
 						$channel
 					),
 					array( 'status' => 400 )
@@ -50,7 +50,7 @@ function lienzo_validate_curves( $raw ) {
 					'lienzo_recipe_bad_curve',
 					sprintf(
 						/* translators: %s: curve channel name. */
-						__( 'Curve "%s" has a control point outside 0-255.', 'lienzo' ),
+						__( 'Curve "%s" has a control point outside 0-255.', 'allterrain-photo-editor' ),
 						$channel
 					),
 					array( 'status' => 400 )

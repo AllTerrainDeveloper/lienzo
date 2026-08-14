@@ -2,11 +2,11 @@
 /**
  * Shared helpers.
  *
- * This file is the loader: what Lienzo can open (`mime`), who may open it
+ * This file is the loader: what AllTerrain Photo Editor can open (`mime`), who may open it
  * (`capabilities`), where its pixels are (`source`), what this site will let us
  * allocate (`limits`), and how the stored meta is read (`meta`).
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;

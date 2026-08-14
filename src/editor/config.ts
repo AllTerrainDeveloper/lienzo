@@ -20,7 +20,7 @@ export function readConfig(): LienzoConfig {
 
 	if ( ! config ) {
 		throw new Error(
-			'Lienzo configuration is missing. The editor script was loaded without lienzo_enqueue_editor().'
+			'AllTerrain Photo Editor configuration is missing. The editor script was loaded without lienzo_enqueue_editor().'
 		);
 	}
 

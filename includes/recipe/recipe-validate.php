@@ -6,7 +6,7 @@
  * than something to silently drop or clamp: a recipe that quietly loses an op would
  * re-open showing sliders that do not match the pixels the user is looking at.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -30,7 +30,7 @@ function lienzo_validate_recipe( $raw ) {
 		if ( null === $raw ) {
 			return new WP_Error(
 				'lienzo_recipe_invalid_json',
-				__( 'The edit recipe was not valid JSON.', 'lienzo' ),
+				__( 'The edit recipe was not valid JSON.', 'allterrain-photo-editor' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -39,7 +39,7 @@ function lienzo_validate_recipe( $raw ) {
 	if ( ! is_array( $raw ) ) {
 		return new WP_Error(
 			'lienzo_recipe_not_object',
-			__( 'The edit recipe must be an object.', 'lienzo' ),
+			__( 'The edit recipe must be an object.', 'allterrain-photo-editor' ),
 			array( 'status' => 400 )
 		);
 	}
@@ -51,7 +51,7 @@ function lienzo_validate_recipe( $raw ) {
 			'lienzo_recipe_bad_version',
 			sprintf(
 				/* translators: 1: submitted schema version, 2: highest supported schema version. */
-				__( 'Unsupported recipe version %1$d. This site understands up to version %2$d.', 'lienzo' ),
+				__( 'Unsupported recipe version %1$d. This site understands up to version %2$d.', 'allterrain-photo-editor' ),
 				$version,
 				LIENZO_RECIPE_VERSION
 			),
@@ -66,7 +66,7 @@ function lienzo_validate_recipe( $raw ) {
 	if ( $source_id <= 0 ) {
 		return new WP_Error(
 			'lienzo_recipe_bad_source',
-			__( 'The edit recipe must name the attachment its pixels came from.', 'lienzo' ),
+			__( 'The edit recipe must name the attachment its pixels came from.', 'allterrain-photo-editor' ),
 			array( 'status' => 400 )
 		);
 	}

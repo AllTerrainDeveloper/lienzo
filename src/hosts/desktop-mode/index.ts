@@ -46,7 +46,7 @@ export function bootDesktopMode(): void {
 	// return`. On a shell page this bundle can be parsed before the shell publishes
 	// `wp.os`, and that single early return then meant no listener for the life of
 	// the page -- so every request posted up from a chromeless iframe went unheard.
-	// "Edit with Lienzo" in the media modal, and Media -> Edit Photos, both post
+	// "Edit with AllTerrain Photo Editor" in the media modal, and Media -> Edit Photos, both post
 	// exactly that request, and both did nothing at all.
 	listenForOpenRequests();
 
@@ -73,7 +73,7 @@ function registerShellIntegrations(): void {
 		registerIconDrop();
 	} catch ( error ) {
 		// An enhancement, not the feature. A shell without the tile-payload seam still
-		// opens Lienzo from the icon by double-clicking it.
+		// opens AllTerrain Photo Editor from the icon by double-clicking it.
 		// eslint-disable-next-line no-console
 		console.warn( '[lienzo] icon drop unavailable:', error );
 	}

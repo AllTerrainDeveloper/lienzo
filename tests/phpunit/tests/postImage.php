@@ -2,7 +2,7 @@
 /**
  * Tests for resolving a post to the image it is about.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 /**
@@ -73,7 +73,7 @@ class Tests_Lienzo_Post_Image extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A featured image Lienzo cannot open should not stop the gallery being tried.
+	 * A featured image AllTerrain Photo Editor cannot open should not stop the gallery being tried.
 	 *
 	 * @covers ::lienzo_post_image_id
 	 */

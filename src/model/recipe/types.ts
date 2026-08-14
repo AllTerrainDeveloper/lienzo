@@ -27,7 +27,7 @@ import type { Curves, Levels } from '../../engine/lut';
  */
 export const RECIPE_VERSION = 6;
 
-/** Every adjustment Lienzo understands. */
+/** Every adjustment AllTerrain Photo Editor understands. */
 export type OpType =
 	| 'exposure'
 	| 'contrast'

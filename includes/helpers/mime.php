@@ -1,14 +1,14 @@
 <?php
 /**
- * Which image types Lienzo can open.
+ * Which image types AllTerrain Photo Editor can open.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Returns the image MIME types Lienzo can open and write.
+ * Returns the image MIME types AllTerrain Photo Editor can open and write.
  *
  * The list is deliberately narrower than WordPress's own upload whitelist: every
  * entry here must be decodable by `Image.decode()` in a browser *and* encodable by
@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
  */
 function lienzo_supported_mime_types() {
 	/**
-	 * Filters the image MIME types Lienzo will open.
+	 * Filters the image MIME types AllTerrain Photo Editor will open.
 	 *
 	 * Adding a type here does not make the browser able to decode it. Only add
 	 * types you have verified round-trip through a canvas on your target browsers.
@@ -37,7 +37,7 @@ function lienzo_supported_mime_types() {
 }
 
 /**
- * Determines whether a MIME type is one Lienzo can edit.
+ * Determines whether a MIME type is one AllTerrain Photo Editor can edit.
  *
  * @since 0.1.0
  *

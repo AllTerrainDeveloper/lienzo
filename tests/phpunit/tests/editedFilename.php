@@ -2,7 +2,7 @@
 /**
  * Filename derivation for rendered images.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 /**

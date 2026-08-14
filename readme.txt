@@ -1,5 +1,5 @@
-=== Lienzo. ===
-Contributors: daniellopez
+=== AllTerrain Photo Editor for OpenStation ===
+Contributors: allterraindeveloper
 Tags: image editor, media, photo, layers, filters
 Requires at least: 6.0
 Requires Plugins: desktop-mode
@@ -13,7 +13,7 @@ A small painting studio inside WordPress. Brushes, layers and filters, straight 
 
 == Description ==
 
-WordPress has shipped the same image editor since 2008: rotate, flip, crop, scale. Lienzo adds everything that was missing.
+WordPress has shipped the same image editor since 2008: rotate, flip, crop, scale. AllTerrain Photo Editor adds everything that was missing.
 
 It is a real editor. You can adjust exposure and colour while watching a live histogram, paint with brushes that have shape and softness, select an area and paint only inside it, stack layers, drag a photo in from the Media Library, and type text directly onto the canvas.
 
@@ -57,9 +57,9 @@ Drag an image from the Media Library, from the desktop, or from your computer st
 
 = Open a product photo without hunting for it =
 
-Drag a WooCommerce product onto the Lienzo icon and its photo opens straight away, skipping the picker. Any post with a picture works the same way, and so does dropping a photo itself.
+Drag a WooCommerce product onto the AllTerrain Photo Editor icon and its photo opens straight away, skipping the picker. Any post with a picture works the same way, and so does dropping a photo itself.
 
-When you save, Lienzo asks whether the product should start using the edit. Either answer leaves your original where it is: choosing to update writes a new copy and points the product at it, so going back is a matter of pointing it at the old one again.
+When you save, AllTerrain Photo Editor asks whether the product should start using the edit. Either answer leaves your original where it is: choosing to update writes a new copy and points the product at it, so going back is a matter of pointing it at the old one again.
 
 = Your originals are never touched =
 
@@ -71,22 +71,22 @@ Adjustments are composed into a single GPU pass rather than chained one after an
 
 == Requires OpenStation ==
 
-Lienzo runs inside the OpenStation plugin (previously called Desktop Mode), which turns wp-admin into a desktop, and needs it installed. That is not decoration: the rendering engine is OpenStation's. Lienzo ships none of its own and borrows the desktop's, which is why this plugin is a few tens of kilobytes rather than the best part of a megabyte, and why your browser only ever downloads one copy.
+AllTerrain Photo Editor runs inside the OpenStation plugin (previously called Desktop Mode), which turns wp-admin into a desktop, and needs it installed. That is not decoration: the rendering engine is OpenStation's. AllTerrain Photo Editor ships none of its own and borrows the desktop's, which is why this plugin is a few tens of kilobytes rather than the best part of a megabyte, and why your browser only ever downloads one copy.
 
-Install and activate OpenStation first. Without it, Lienzo tells you what it needs and otherwise stays out of the way.
+Install and activate OpenStation first. Without it, AllTerrain Photo Editor tells you what it needs and otherwise stays out of the way.
 
 = Where it opens =
 
-With the desktop switched on, Lienzo is a real window: chrome you can move and resize, an icon on the wallpaper, and drag and drop between windows.
+With the desktop switched on, AllTerrain Photo Editor is a real window: chrome you can move and resize, an icon on the wallpaper, and drag and drop between windows.
 
-The desktop is a per-user preference, and with it switched off Lienzo still opens — under Media → Edit Photos, and over the top of whatever you were doing when you choose "Edit with Lienzo" in the Media Library, in the media picker or on an image block. Every tool is the same one. What you do not get is the window, the wallpaper icon and dragging photos between windows.
+The desktop is a per-user preference, and with it switched off AllTerrain Photo Editor still opens — under Media → Edit Photos, and over the top of whatever you were doing when you choose "Edit with AllTerrain Photo Editor" in the Media Library, in the media picker or on an image block. Every tool is the same one. What you do not get is the window, the wallpaper icon and dragging photos between windows.
 
 == Installation ==
 
 1. Install and activate the OpenStation plugin.
-2. Upload the `lienzo` folder to `/wp-content/plugins/`, or install it from the Plugins screen.
-3. Activate Lienzo through the Plugins menu.
-4. Open Lienzo from the dock or the desktop, or choose "Edit with Lienzo" on any image in the Media Library. With the desktop switched off, use Media → Edit Photos.
+2. Upload the `allterrain-photo-editor` folder to `/wp-content/plugins/`, or install it from the Plugins screen.
+3. Activate AllTerrain Photo Editor through the Plugins menu.
+4. Open AllTerrain Photo Editor from the dock or the desktop, or choose "Edit with AllTerrain Photo Editor" on any image in the Media Library. With the desktop switched off, use Media → Edit Photos.
 
 == Frequently Asked Questions ==
 
@@ -104,11 +104,11 @@ Any browser with WebGL 2, which is every current version of Chrome, Firefox, Saf
 
 = My images are served from a CDN. Will it work? =
 
-Yes. When a CDN does not send the CORS headers a GPU canvas requires, Lienzo streams the original through your own site instead.
+Yes. When a CDN does not send the CORS headers a GPU canvas requires, AllTerrain Photo Editor streams the original through your own site instead.
 
 = Why is GIF not supported? =
 
-Rendering an animated GIF through a canvas silently flattens it to a single frame. Rather than quietly destroy the animation, Lienzo does not offer to edit them. The photo picker leaves them out for the same reason, and tells you how many it left out, so a library of GIFs does not read as an empty one.
+Rendering an animated GIF through a canvas silently flattens it to a single frame. Rather than quietly destroy the animation, AllTerrain Photo Editor does not offer to edit them. The photo picker leaves them out for the same reason, and tells you how many it left out, so a library of GIFs does not read as an empty one.
 
 = Are brush strokes stored in the recipe? =
 
@@ -118,7 +118,7 @@ That makes a painted save its own original. Re-open it and you see exactly the p
 
 = Can I use it with the desktop switched off? =
 
-Yes. It opens under Media → Edit Photos, and as an overlay when you choose "Edit with Lienzo" from the Media Library, the media picker or an image block. Every tool is the same one; what you do not get is the movable window, the wallpaper icon and dragging photos between windows. OpenStation still has to be installed, because the rendering engine comes from it.
+Yes. It opens under Media → Edit Photos, and as an overlay when you choose "Edit with AllTerrain Photo Editor" from the Media Library, the media picker or an image block. Every tool is the same one; what you do not get is the movable window, the wallpaper icon and dragging photos between windows. OpenStation still has to be installed, because the rendering engine comes from it.
 
 = Does it edit in real colour? =
 
@@ -135,7 +135,7 @@ There is a Light switch at the top of the Adjustments panel. Left on sRGB it beh
 
 This plugin bundles no third-party libraries and makes no external or CDN requests.
 
-Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and served from your own server. Lienzo asks OpenStation for it rather than shipping a second copy: that keeps this plugin small, and two instances of the same rendering library on one page share GPU resources through globals, where tearing one down can break the other.
+Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and served from your own server. AllTerrain Photo Editor asks OpenStation for it rather than shipping a second copy: that keeps this plugin small, and two instances of the same rendering library on one page share GPU resources through globals, where tearing one down can break the other.
 
 == Changelog ==
 
@@ -167,8 +167,8 @@ Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and serv
 * The tool rail and the sidebar meet the top bar, instead of sitting below a strip of background.
 * The top bar is the same height for every tool, so switching tools no longer shifts the picture.
 * Dragging a curve point and letting go outside the graph now drops it, instead of leaving it stuck to the pointer.
-* Fixed "Edit with Lienzo" in the media modal doing nothing inside the desktop: the shell was not listening for the request.
-* Media → Edit Photos is no longer offered while the desktop is running, where it could only ever lead to a page saying the editor is elsewhere. Open Lienzo from the dock or its desktop icon.
+* Fixed "Edit with AllTerrain Photo Editor" in the media modal doing nothing inside the desktop: the shell was not listening for the request.
+* Media → Edit Photos is no longer offered while the desktop is running, where it could only ever lead to a page saying the editor is elsewhere. Open AllTerrain Photo Editor from the dock or its desktop icon.
 * Brushes, eraser, paint bucket, gradient, shapes, paths and text typed on the canvas.
 * Retouching: blur, sharpen, smudge, heal and clone stamp.
 * Dodge, burn, desaturate and saturate.

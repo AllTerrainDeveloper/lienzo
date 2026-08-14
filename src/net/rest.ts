@@ -59,7 +59,7 @@ async function toError( response: Response ): Promise< RestError > {
 }
 
 /**
- * Client for Lienzo's REST routes.
+ * Client for AllTerrain Photo Editor's REST routes.
  */
 export class RestClient {
 	private config: LienzoConfig;

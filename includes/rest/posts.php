@@ -2,7 +2,7 @@
 /**
  * The post endpoints: what image a post is about, and putting an edit back on it.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -25,7 +25,7 @@ function lienzo_rest_post_permission( $request ) {
 	if ( ! get_post( $post_id ) ) {
 		return new WP_Error(
 			'lienzo_no_post',
-			__( 'That post no longer exists.', 'lienzo' ),
+			__( 'That post no longer exists.', 'allterrain-photo-editor' ),
 			array( 'status' => 404 )
 		);
 	}
@@ -33,7 +33,7 @@ function lienzo_rest_post_permission( $request ) {
 	if ( ! lienzo_can_attach_to_post( $post_id ) ) {
 		return new WP_Error(
 			'lienzo_cannot_edit_post',
-			__( 'You are not allowed to edit that post.', 'lienzo' ),
+			__( 'You are not allowed to edit that post.', 'allterrain-photo-editor' ),
 			array( 'status' => rest_authorization_required_code() )
 		);
 	}
@@ -57,7 +57,7 @@ function lienzo_rest_get_post_image( $request ) {
 	if ( ! $attachment_id ) {
 		return new WP_Error(
 			'lienzo_post_no_image',
-			__( 'That post has no image Lienzo can open.', 'lienzo' ),
+			__( 'That post has no image AllTerrain Photo Editor can open.', 'allterrain-photo-editor' ),
 			array( 'status' => 404 )
 		);
 	}

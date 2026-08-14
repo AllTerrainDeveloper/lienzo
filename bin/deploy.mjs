@@ -3,7 +3,7 @@
  *
  * The manual-QA site at http://localhost:8889 is the `wordpress-alcazaba`
  * docker-compose project. It bind-mounts its own checkout at /var/www, so anything
- * written into `<checkout>/src/wp-content/plugins/lienzo` is live in the container
+ * written into `<checkout>/src/wp-content/plugins/allterrain-photo-editor` is live in the container
  * immediately -- no container restart, no WordPress upload screen.
  *
  * This runs as part of `npm run build`, so every change reaches the site without a
@@ -31,12 +31,12 @@ const root = resolve( dirname( fileURLToPath( import.meta.url ) ), '..' );
 
 
 /**
- * Marker proving a directory is a Lienzo install rather than something else.
+ * Marker proving a directory is an AllTerrain Photo Editor install rather than something else.
  *
  * The sync deletes files the source no longer has, so it must never be pointed at a
  * directory it does not own. Refusing unless this file is present is the guard.
  */
-const OWNERSHIP_MARKER = 'lienzo.php';
+const OWNERSHIP_MARKER = 'allterrain-photo-editor.php';
 
 /** Resolves the plugin directory to write to, or null when there is nothing to do. */
 function resolveTarget() {
@@ -56,7 +56,7 @@ function resolveTarget() {
 
 	for ( const plugins of candidates ) {
 		if ( existsSync( plugins ) ) {
-			return join( plugins, 'lienzo' );
+			return join( plugins, 'allterrain-photo-editor' );
 		}
 	}
 
@@ -125,7 +125,7 @@ const target = resolveTarget();
 
 if ( ! target ) {
 	console.log(
-		'[lienzo] No local WordPress checkout found — skipping deploy. ' +
+		'[allterrain-photo-editor] No local WordPress checkout found — skipping deploy. ' +
 			'Set LIENZO_DEPLOY_TARGET to override.'
 	);
 	process.exit( 0 );
@@ -133,15 +133,15 @@ if ( ! target ) {
 
 if ( existsSync( target ) && ! existsSync( join( target, OWNERSHIP_MARKER ) ) ) {
 	console.error(
-		`[lienzo] Refusing to sync into ${ target }: it exists but has no ${ OWNERSHIP_MARKER }.\n` +
-			'That directory does not look like a Lienzo install, and syncing removes files.'
+		`[allterrain-photo-editor] Refusing to sync into ${ target }: it exists but has no ${ OWNERSHIP_MARKER }.\n` +
+			'That directory does not look like an AllTerrain Photo Editor install, and syncing removes files.'
 	);
 	process.exit( 1 );
 }
 
 if ( ! existsSync( join( root, 'assets/js/lienzo.min.js' ) ) ) {
 	console.error(
-		'[lienzo] assets/js/lienzo.min.js is missing. Run `npm run build` rather than deploying alone.'
+		'[allterrain-photo-editor] assets/js/lienzo.min.js is missing. Run `npm run build` rather than deploying alone.'
 	);
 	process.exit( 1 );
 }
@@ -149,6 +149,6 @@ if ( ! existsSync( join( root, 'assets/js/lienzo.min.js' ) ) ) {
 const { written, removed } = mirror( root, target, true );
 
 console.log(
-	`[lienzo] Deployed to ${ target } (${ written } file${ written === 1 ? '' : 's' } updated` +
+	`[allterrain-photo-editor] Deployed to ${ target } (${ written } file${ written === 1 ? '' : 's' } updated` +
 		`${ removed ? `, ${ removed } removed` : '' }).`
 );

@@ -55,7 +55,7 @@ describe( 'bootDesktopMode', () => {
 	it( 'hears a frame even when the shell was not up at boot', () => {
 		// The bug, exactly. This bundle is parsed on the shell page before the shell
 		// publishes `wp.os`, and the listener sat behind an early return that never ran
-		// again -- so every "Edit with Lienzo" posted up from the media modal, and every
+		// again -- so every "Edit with AllTerrain Photo Editor" posted up from the media modal, and every
 		// Media -> Edit Photos, went unheard for the life of the page.
 		bootDesktopMode();
 

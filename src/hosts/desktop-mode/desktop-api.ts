@@ -1,8 +1,8 @@
 /**
- * The shell API, as Lienzo uses it.
+ * The shell API, as AllTerrain Photo Editor uses it.
  *
  * These types are hand-written on purpose. Taking the `desktop-mode` npm package as a
- * dependency would mean Lienzo could not build with OpenStation absent from disk, and
+ * dependency would mean AllTerrain Photo Editor could not build with OpenStation absent from disk, and
  * a standalone plugin has to.
  *
  * Everything here is feature-detected. This module also loads on plain WordPress admin
@@ -19,7 +19,7 @@ export const WINDOW_ID = 'lienzo';
 /**
  * The parts of the shell's native render context this file uses.
  *
- * Declared here rather than imported: Lienzo builds without OpenStation present on
+ * Declared here rather than imported: AllTerrain Photo Editor builds without OpenStation present on
  * disk, so its types are described narrowly at the point of use.
  */
 export interface NativeRenderContext {
@@ -130,7 +130,7 @@ export interface TilePayloadHandler {
  */
 export function shellApi(): DesktopApi | undefined {
 	// `os` is the current name and `desktop` the one it had before the rename. Both
-	// are read, current first, because Lienzo ships to sites running either version.
+	// are read, current first, because AllTerrain Photo Editor ships to sites running either version.
 	const wp = window.wp as
 		| { os?: DesktopApi; desktop?: DesktopApi }
 		| undefined;

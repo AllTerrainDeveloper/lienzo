@@ -2,7 +2,7 @@
 /**
  * Tests for resolving the shell's renamed API.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 /**

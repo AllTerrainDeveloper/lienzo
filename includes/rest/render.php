@@ -2,7 +2,7 @@
 /**
  * The render endpoint: turning an uploaded render into a new attachment.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -40,7 +40,7 @@ function lienzo_rest_render( $request ) {
 	if ( $recipe['source'] !== $source_id ) {
 		return new WP_Error(
 			'lienzo_recipe_source_mismatch',
-			__( 'The edit recipe does not belong to this image.', 'lienzo' ),
+			__( 'The edit recipe does not belong to this image.', 'allterrain-photo-editor' ),
 			array( 'status' => 400 )
 		);
 	}
@@ -50,7 +50,7 @@ function lienzo_rest_render( $request ) {
 	if ( empty( $files['file'] ) ) {
 		return new WP_Error(
 			'lienzo_render_missing_file',
-			__( 'No rendered image was uploaded.', 'lienzo' ),
+			__( 'No rendered image was uploaded.', 'allterrain-photo-editor' ),
 			array( 'status' => 400 )
 		);
 	}

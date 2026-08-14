@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { ships } from './ships.mjs';
 
 const root = resolve( dirname( fileURLToPath( import.meta.url ) ), '..' );
-const slug = 'lienzo';
+const slug = 'allterrain-photo-editor';
 
 /**
  * Splits the repository root into what ships and what does not.

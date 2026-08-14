@@ -2,7 +2,7 @@
 /**
  * Media Library entry points.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 /**
@@ -118,7 +118,7 @@ class Tests_Lienzo_Media_Actions extends WP_UnitTestCase {
 	 * @covers ::lienzo_editor_page_url
 	 */
 	public function test_editor_page_url() {
-		$this->assertStringContainsString( 'page=lienzo', lienzo_editor_page_url() );
+		$this->assertStringContainsString( 'page=' . LIENZO_PAGE_SLUG, lienzo_editor_page_url() );
 		$this->assertStringNotContainsString( 'attachment=', lienzo_editor_page_url() );
 		$this->assertStringContainsString( 'attachment=7', lienzo_editor_page_url( 7 ) );
 	}
@@ -128,7 +128,7 @@ class Tests_Lienzo_Media_Actions extends WP_UnitTestCase {
 	 *
 	 * Both are what makes an editor possible with no shell on the page: one is where a
 	 * control points when there is no window to open, the other is OpenStation's own
-	 * Pixi, which is the only Pixi there is -- Lienzo ships none.
+	 * Pixi, which is the only Pixi there is -- AllTerrain Photo Editor ships none.
 	 *
 	 * @covers ::lienzo_get_config
 	 * @covers ::lienzo_pixi_url
@@ -142,7 +142,7 @@ class Tests_Lienzo_Media_Actions extends WP_UnitTestCase {
 
 		remove_all_filters( 'lienzo_pixi_url' );
 
-		$this->assertStringContainsString( 'page=lienzo', $config['editorUrl'] );
+		$this->assertStringContainsString( 'page=' . LIENZO_PAGE_SLUG, $config['editorUrl'] );
 		$this->assertStringContainsString( 'pixi.min.js', $config['pixiUrl'] );
 		$this->assertSame( 'webgl', $config['renderer'] );
 	}

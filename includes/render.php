@@ -5,7 +5,7 @@
  * This file is the loader: naming (`filenames`), the upload MIME allow-list (`mime`),
  * and the attachment write itself (`store`).
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;

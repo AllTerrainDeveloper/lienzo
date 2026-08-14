@@ -10,7 +10,7 @@
  * Stored as user meta rather than a custom table. Presets are per-user, small, and
  * only ever read all at once, which is exactly what user meta is for.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -116,7 +116,7 @@ function lienzo_save_preset( $name, $recipe ) {
 	if ( ! $user_id ) {
 		return new WP_Error(
 			'lienzo_not_logged_in',
-			__( 'You must be logged in to save a preset.', 'lienzo' ),
+			__( 'You must be logged in to save a preset.', 'allterrain-photo-editor' ),
 			array( 'status' => 401 )
 		);
 	}
@@ -126,7 +126,7 @@ function lienzo_save_preset( $name, $recipe ) {
 	if ( '' === $name ) {
 		return new WP_Error(
 			'lienzo_preset_no_name',
-			__( 'A preset needs a name.', 'lienzo' ),
+			__( 'A preset needs a name.', 'allterrain-photo-editor' ),
 			array( 'status' => 400 )
 		);
 	}
@@ -136,7 +136,7 @@ function lienzo_save_preset( $name, $recipe ) {
 	if ( count( $presets ) >= lienzo_max_presets() ) {
 		return new WP_Error(
 			'lienzo_too_many_presets',
-			__( 'You have reached the maximum number of presets. Delete one first.', 'lienzo' ),
+			__( 'You have reached the maximum number of presets. Delete one first.', 'allterrain-photo-editor' ),
 			array( 'status' => 400 )
 		);
 	}
@@ -188,7 +188,7 @@ function lienzo_delete_preset( $preset_id ) {
 	if ( count( $remaining ) === count( $presets ) ) {
 		return new WP_Error(
 			'lienzo_preset_not_found',
-			__( 'That preset no longer exists.', 'lienzo' ),
+			__( 'That preset no longer exists.', 'allterrain-photo-editor' ),
 			array( 'status' => 404 )
 		);
 	}

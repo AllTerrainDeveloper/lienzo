@@ -2,12 +2,12 @@
 /**
  * PHPUnit bootstrap.
  *
- * Locates a WordPress test library, then loads Lienzo as a must-use plugin so its
+ * Locates a WordPress test library, then loads AllTerrain Photo Editor as a must-use plugin so its
  * hooks are registered before the test suite's own `init` runs.
  *
  * The desktop shell's two entry points are stubbed here so the integration behind them
  * is exercised rather than skipped. Stubbing rather than installing the shell is
- * deliberate: these tests are about Lienzo's PHP, and the plugin checks for
+ * deliberate: these tests are about AllTerrain Photo Editor's PHP, and the plugin checks for
  * *capability* -- do the functions I am about to call exist -- rather than for a plugin
  * slug, so satisfying the check honestly means defining them.
  *
@@ -17,7 +17,7 @@
  * Point WP_TESTS_DIR (or WP_PHPUNIT__DIR) at a WordPress develop checkout's
  * tests/phpunit directory before running.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 $lienzo_tests_dir = getenv( 'WP_TESTS_DIR' );
@@ -50,7 +50,7 @@ if ( ! $lienzo_tests_dir || ! file_exists( $lienzo_tests_dir . '/includes/functi
 require_once $lienzo_tests_dir . '/includes/functions.php';
 
 /*
- * Stand-ins for the parts of OpenStation that Lienzo requires.
+ * Stand-ins for the parts of OpenStation that AllTerrain Photo Editor requires.
  *
  * Declared at file scope so they exist before the plugin loads, and deliberately
  * unprefixed: they impersonate another plugin's public API, and prefixing them would
@@ -96,7 +96,7 @@ if ( ! function_exists( 'desktop_mode_is_enabled' ) ) {
  * @return void
  */
 function lienzo_manually_load_plugin() {
-	require dirname( __DIR__, 2 ) . '/lienzo.php';
+	require dirname( __DIR__, 2 ) . '/allterrain-photo-editor.php';
 }
 
 tests_add_filter( 'muplugins_loaded', 'lienzo_manually_load_plugin' );

@@ -1,19 +1,19 @@
 /**
- * Ambient globals Lienzo reads off the page.
+ * Ambient globals AllTerrain Photo Editor reads off the page.
  *
  * Declared once, here, rather than beside each consumer: TypeScript merges
  * `declare global` blocks by name, so two modules each augmenting `Window.wp` with
  * their own slice conflict rather than combining.
  *
  * None of these are dependencies. Every one is feature-detected at the point of
- * use, because Lienzo has to run on a plain WordPress admin where `wp.desktop`
+ * use, because AllTerrain Photo Editor has to run on a plain WordPress admin where `wp.desktop`
  * does not exist and `wp.i18n` may not have been enqueued.
  */
 
 import type { LienzoConfig } from './types';
 import type { Pixi } from './engine/pixi-loader';
 
-/** The slice of the shell API Lienzo touches. */
+/** The slice of the shell API AllTerrain Photo Editor touches. */
 export interface WpDesktopLike {
 	isActive?: () => boolean;
 	fetch?: (
@@ -35,7 +35,7 @@ export interface WpDesktopLike {
 	} ) => Promise< boolean >;
 }
 
-/** The slice of `window.wp.media` Lienzo touches. Backbone ships no types. */
+/** The slice of `window.wp.media` AllTerrain Photo Editor touches. Backbone ships no types. */
 export interface BackboneView {
 	prototype: {
 		render: ( ...args: unknown[] ) => unknown;
@@ -47,7 +47,7 @@ export interface BackboneView {
 /**
  * A Backbone collection, as far as this plugin needs one.
  *
- * The modal's library and its selection are both one of these, and everything Lienzo
+ * The modal's library and its selection are both one of these, and everything AllTerrain Photo Editor
  * asks of either is on this interface. Optional throughout: `wp.media` has no hook
  * registry and no contract, so every call site feature-detects rather than trusting a
  * shape core is free to change.
@@ -74,7 +74,7 @@ export interface WpMediaLike {
 	attachment?: ( id: number ) => BackboneModelLike | undefined;
 }
 
-/** The slices of the block editor packages Lienzo touches. */
+/** The slices of the block editor packages AllTerrain Photo Editor touches. */
 export interface WpElementLike {
 	createElement: ( type: unknown, props?: unknown, ...children: unknown[] ) => unknown;
 	Fragment: unknown;
@@ -98,7 +98,7 @@ export interface WpComponentsLike {
 	ToolbarButton?: unknown;
 }
 
-/** The slice of `window.wp.i18n` Lienzo touches. */
+/** The slice of `window.wp.i18n` AllTerrain Photo Editor touches. */
 export interface WpI18nLike {
 	__: ( text: string, domain?: string ) => string;
 	_n?: (
@@ -117,7 +117,7 @@ declare global {
 			 * The shell, under the name OpenStation uses.
 			 *
 			 * `desktop` is the same object under the name the shell had before the
-			 * rename. Both are optional and both are read, because Lienzo ships to
+			 * rename. Both are optional and both are read, because AllTerrain Photo Editor ships to
 			 * sites running either version.
 			 */
 			os?: WpDesktopLike;

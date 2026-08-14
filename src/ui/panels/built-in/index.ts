@@ -1,5 +1,5 @@
 /**
- * The panels Lienzo ships with.
+ * The panels AllTerrain Photo Editor ships with.
  *
  * These use exactly the public `registerPanel()` API a third party would use --
  * there is no privileged path for built-ins. If Layers or Curves cannot be built

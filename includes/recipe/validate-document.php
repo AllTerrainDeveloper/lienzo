@@ -2,7 +2,7 @@
 /**
  * Validating the document: its canvas and its layer stack.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;

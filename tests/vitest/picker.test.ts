@@ -149,7 +149,7 @@ describe( 'renderPicker', () => {
 		await renderPicker( root, CONFIG );
 
 		expect( root.querySelector( '.lz-picker__count' )?.textContent ).toBe(
-			'Showing all 1 photos. Passing over 2 images Lienzo cannot open.'
+			'Showing all 1 photos. Passing over 2 images AllTerrain Photo Editor cannot open.'
 		);
 	} );
 
@@ -159,7 +159,7 @@ describe( 'renderPicker', () => {
 		await renderPicker( root, CONFIG );
 
 		expect( root.querySelector( '.lz-picker__count' )?.textContent ).toContain(
-			'Passing over 1 image Lienzo cannot open.'
+			'Passing over 1 image AllTerrain Photo Editor cannot open.'
 		);
 	} );
 

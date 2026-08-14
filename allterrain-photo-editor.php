@@ -1,7 +1,7 @@
 <?php
 /**
- * Plugin Name:       Lienzo.
- * Plugin URI:        https://github.com/AllTerrainDeveloper/lienzo
+ * Plugin Name:       AllTerrain Photo Editor for OpenStation
+ * Plugin URI:        https://github.com/AllTerrainDeveloper/allterrain-photo-editor
  * Description:       A modern, non-destructive image editor for the WordPress media library. Exposure, colour and tone adjustments rendered on the GPU, in the browser.
  * Version:           0.1.0
  * Requires at least: 6.0
@@ -9,11 +9,11 @@
  * Author:            Daniel Lopez
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain:       lienzo
+ * Text Domain:       allterrain-photo-editor
  * Requires Plugins:  desktop-mode
  *
- * Lienzo is an OpenStation application and requires it. That is not a formality: the
- * rendering library is OpenStation's. Lienzo ships no PixiJS at all and borrows the
+ * AllTerrain Photo Editor is an OpenStation application and requires it. That is not a formality: the
+ * rendering library is OpenStation's. AllTerrain Photo Editor ships no PixiJS at all and borrows the
  * shell's, which keeps this plugin a few tens of kilobytes rather than eight hundred,
  * and keeps exactly one Pixi on the page -- two Pixi 8 instances share GPU resource
  * registries through globals, so one copy is not merely smaller but safer.
@@ -32,7 +32,7 @@
  * With OpenStation absent altogether there is no PixiJS, so nothing loads but the
  * notice on the plugins screen explaining what is missing.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -78,7 +78,7 @@ add_action( 'plugins_loaded', 'lienzo_boot', 5 );
  * Loads the plugin, once it is known that OpenStation is there to render with.
  *
  * On `plugins_loaded` rather than at file scope, and that is not a detail: plugins are
- * loaded in alphabetical order, so `lienzo` runs *before* `desktop-mode` and none of
+ * loaded in alphabetical order, so `allterrain-photo-editor` runs *before* `desktop-mode` and none of
  * its functions exist yet when this file is first read. Checking then would fail on
  * every site, every time, and the plugin would silently never load.
  * `Requires Plugins:` governs activation, not load order.

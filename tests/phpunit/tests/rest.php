@@ -2,7 +2,7 @@
 /**
  * REST routes under lienzo/v1.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 /**
@@ -217,7 +217,7 @@ class Tests_Lienzo_Rest extends WP_UnitTestCase {
 		$this->assertNotEmpty( $config['restNonce'] );
 		// A key that is always present and often empty. The loader asks OpenStation's
 		// module registry first and only falls back to this URL when nothing has put
-		// Pixi on the page -- and Lienzo has no copy of its own to offer, so when
+		// Pixi on the page -- and AllTerrain Photo Editor has no copy of its own to offer, so when
 		// OpenStation cannot be located there is honestly nothing to point at.
 		$this->assertArrayHasKey( 'pixiUrl', $config );
 		$this->assertTrue( $config['desktopMode'] );

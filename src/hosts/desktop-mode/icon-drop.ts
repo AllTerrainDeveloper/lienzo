@@ -1,5 +1,5 @@
 /**
- * Dropping something onto the Lienzo icon.
+ * Dropping something onto the AllTerrain Photo Editor icon.
  *
  * Drag a photo -- or a product, or any post with a picture -- onto the wallpaper icon
  * and it opens straight in the editor. That is the whole point: someone who already
@@ -93,7 +93,7 @@ function openDropped( data: Record< string, unknown > ): void {
 }
 
 /**
- * Lets the Lienzo icon accept photos and posts.
+ * Lets the AllTerrain Photo Editor icon accept photos and posts.
  *
  * Idempotent: registering twice would put two handlers on the same tile for the same
  * payload type, and the first would win every time while the second leaked.
@@ -112,7 +112,7 @@ export function registerIconDrop(): void {
 		appliesTo: isLienzoIcon,
 		accept: ( data: Record< string, unknown > ) =>
 			!! ( attachmentFrom( data ) || postFrom( data ) ),
-		acceptLabel: __( 'Open in Lienzo' ),
+		acceptLabel: __( 'Open in AllTerrain Photo Editor' ),
 		onDrop: ( session: { payload: { data?: Record< string, unknown > } } ) =>
 			openDropped( session.payload.data ?? {} ),
 	};

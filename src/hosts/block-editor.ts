@@ -1,7 +1,7 @@
 /**
  * The block editor host.
  *
- * Adds an "Edit with Lienzo" item to the toolbar of `core/image` blocks.
+ * Adds an "Edit with AllTerrain Photo Editor" item to the toolbar of `core/image` blocks.
  *
  * This *adds* an entry point; it does not replace core's own cropper. Core wires
  * its image-editing save handler through a `Symbol`-keyed private editor setting
@@ -86,8 +86,8 @@ export function bootBlockEditor(): void {
 						createElement(
 							ToolbarButton,
 							{
-								label: __( 'Edit with Lienzo' ),
-								// A save writes a *new* attachment -- Lienzo never
+								label: __( 'Edit with AllTerrain Photo Editor' ),
+								// A save writes a *new* attachment -- AllTerrain Photo Editor never
 								// rewrites an original -- so the block is pointed at
 								// it, or the post would go on showing the photograph
 								// as it was. The stored dimensions go with it: they
@@ -106,7 +106,7 @@ export function bootBlockEditor(): void {
 											} ),
 									} ),
 							},
-							__( 'Lienzo' )
+							__( 'AllTerrain Photo Editor' )
 						)
 					)
 				);

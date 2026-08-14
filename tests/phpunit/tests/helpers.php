@@ -2,7 +2,7 @@
 /**
  * Capability and source-resolution helpers.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 /**

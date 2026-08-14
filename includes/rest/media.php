@@ -6,7 +6,7 @@
  * tainted canvas cannot be read back -- so every later save would fail. Serving the
  * bytes same-origin is what keeps a CDN from breaking the editor entirely.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
  * Returns everything the editor needs to open an image: where to fetch the pixels,
  * how big they are, and any recipe from a previous edit.
  *
- * When the requested attachment was itself produced by Lienzo, the response
+ * When the requested attachment was itself produced by AllTerrain Photo Editor, the response
  * points at the *original* it was derived from. That is what makes a re-edit
  * first-generation rather than a re-render of already-baked pixels.
  *
@@ -47,7 +47,7 @@ function lienzo_rest_get_media( $request ) {
 	if ( ! $dimensions ) {
 		return new WP_Error(
 			'lienzo_unreadable_image',
-			__( 'The image dimensions could not be read. The file may be corrupt.', 'lienzo' ),
+			__( 'The image dimensions could not be read. The file may be corrupt.', 'allterrain-photo-editor' ),
 			array( 'status' => 422 )
 		);
 	}

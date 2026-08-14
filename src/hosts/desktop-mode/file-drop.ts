@@ -116,7 +116,7 @@ export function attachFileDrop(
 			// the Media Library case went unnoticed.
 			toast(
 				sprintf(
-					__( 'That drag carried no image Lienzo could read (%s).' ),
+					__( 'That drag carried no image AllTerrain Photo Editor could read (%s).' ),
 					Array.from( event.dataTransfer?.types ?? [] ).join( ', ' ) ||
 						__( 'no data' )
 				),

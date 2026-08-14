@@ -3,7 +3,7 @@
  *
  * Inside OpenStation the shell registers a kit of web components that
  * carry the desktop's theming, spacing and dark-mode handling. Using them makes
- * Lienzo look like it belongs. Outside OpenStation they do not exist, so every
+ * AllTerrain Photo Editor look like it belongs. Outside OpenStation they do not exist, so every
  * factory here builds a plain-DOM equivalent instead.
  *
  * Detection is per tag and happens at build time rather than being inferred from

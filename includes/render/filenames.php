@@ -5,7 +5,7 @@
  * A saved copy sits next to its original in the uploads directory, so the name has to
  * say what it is without colliding with anything already there.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;

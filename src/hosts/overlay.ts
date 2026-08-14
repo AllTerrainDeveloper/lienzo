@@ -1,7 +1,7 @@
 /**
  * A full-screen overlay host for the editor.
  *
- * What "Edit with Lienzo" does when there is no desktop shell to open a window in.
+ * What "Edit with AllTerrain Photo Editor" does when there is no desktop shell to open a window in.
  * The media list, the grid modal and the block editor all reach it, and all three want
  * the same thing: the editor on screen over whatever the user was already doing,
  * without navigating away from a post that may have unsaved changes.
@@ -52,7 +52,7 @@ export function openEditorOverlay( options: OverlayOptions ): { close: () => voi
 	dialog.className = 'lz-overlay__dialog';
 	dialog.setAttribute( 'role', 'dialog' );
 	dialog.setAttribute( 'aria-modal', 'true' );
-	dialog.setAttribute( 'aria-label', __( 'Edit image with Lienzo' ) );
+	dialog.setAttribute( 'aria-label', __( 'Edit image with AllTerrain Photo Editor' ) );
 
 	const mountPoint = document.createElement( 'div' );
 	mountPoint.className = 'lz-overlay__editor';

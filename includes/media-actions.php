@@ -18,7 +18,7 @@
  * image toolbar -- patch Backbone views and register a block filter from JavaScript,
  * and end up in the same place.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -90,9 +90,9 @@ function lienzo_enqueue_for_block_editor() {
 }
 
 /**
- * Adds "Edit with Lienzo" to the Media Library list-table row actions.
+ * Adds "Edit with AllTerrain Photo Editor" to the Media Library list-table row actions.
  *
- * Only appears for images Lienzo can actually open, so the link is never a
+ * Only appears for images AllTerrain Photo Editor can actually open, so the link is never a
  * promise the editor cannot keep.
  *
  * @since 0.1.0
@@ -110,14 +110,14 @@ function lienzo_media_row_action( $actions, $post ) {
 		'<a href="%1$s" data-lienzo-open="%2$d">%3$s</a>',
 		esc_url( lienzo_editor_page_url( $post->ID ) ),
 		(int) $post->ID,
-		esc_html__( 'Edit with Lienzo', 'lienzo' )
+		esc_html__( 'Edit with AllTerrain Photo Editor', 'allterrain-photo-editor' )
 	);
 
 	return $actions;
 }
 
 /**
- * Adds an "Edit with Lienzo" button to the attachment edit screen.
+ * Adds an "Edit with AllTerrain Photo Editor" button to the attachment edit screen.
  *
  * Sits in the Publish box beside core's own actions, which is where someone
  * already looking at a single attachment expects to find things to do to it.
@@ -136,6 +136,6 @@ function lienzo_attachment_edit_button( $post ) {
 		'<div class="misc-pub-section misc-pub-lienzo"><a class="button" href="%1$s" data-lienzo-open="%2$d">%3$s</a></div>',
 		esc_url( lienzo_editor_page_url( $post->ID ) ),
 		(int) $post->ID,
-		esc_html__( 'Edit with Lienzo', 'lienzo' )
+		esc_html__( 'Edit with AllTerrain Photo Editor', 'allterrain-photo-editor' )
 	);
 }

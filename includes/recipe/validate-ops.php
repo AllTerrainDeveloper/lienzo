@@ -7,7 +7,7 @@
  * loses an op would re-open showing sliders that do not match the pixels the user is
  * looking at.
  *
- * @package Lienzo
+ * @package AllTerrain_Photo_Editor
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -27,7 +27,7 @@ function lienzo_validate_ops( $raw ) {
 	if ( ! is_array( $raw ) ) {
 		return new WP_Error(
 			'lienzo_recipe_bad_ops',
-			__( 'The edit recipe operations must be a list.', 'lienzo' ),
+			__( 'The edit recipe operations must be a list.', 'allterrain-photo-editor' ),
 			array( 'status' => 400 )
 		);
 	}
@@ -40,7 +40,7 @@ function lienzo_validate_ops( $raw ) {
 		if ( ! is_array( $op ) || ! isset( $op['type'] ) || ! is_string( $op['type'] ) ) {
 			return new WP_Error(
 				'lienzo_recipe_bad_op',
-				__( 'Every recipe operation must be an object with a type.', 'lienzo' ),
+				__( 'Every recipe operation must be an object with a type.', 'allterrain-photo-editor' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -52,7 +52,7 @@ function lienzo_validate_ops( $raw ) {
 				'lienzo_recipe_unknown_op',
 				sprintf(
 					/* translators: %s: the unrecognised operation type. */
-					__( 'Unknown recipe operation "%s".', 'lienzo' ),
+					__( 'Unknown recipe operation "%s".', 'allterrain-photo-editor' ),
 					$type
 				),
 				array(
@@ -67,7 +67,7 @@ function lienzo_validate_ops( $raw ) {
 				'lienzo_recipe_duplicate_op',
 				sprintf(
 					/* translators: %s: the duplicated operation type. */
-					__( 'Recipe operation "%s" appears more than once.', 'lienzo' ),
+					__( 'Recipe operation "%s" appears more than once.', 'allterrain-photo-editor' ),
 					$type
 				),
 				array(
@@ -82,7 +82,7 @@ function lienzo_validate_ops( $raw ) {
 				'lienzo_recipe_bad_value',
 				sprintf(
 					/* translators: %s: the operation type missing a value. */
-					__( 'Recipe operation "%s" is missing a numeric value.', 'lienzo' ),
+					__( 'Recipe operation "%s" is missing a numeric value.', 'allterrain-photo-editor' ),
 					$type
 				),
 				array(
@@ -99,7 +99,7 @@ function lienzo_validate_ops( $raw ) {
 				'lienzo_recipe_value_out_of_range',
 				sprintf(
 					/* translators: 1: operation type, 2: minimum allowed value, 3: maximum allowed value. */
-					__( 'Recipe operation "%1$s" must be between %2$s and %3$s.', 'lienzo' ),
+					__( 'Recipe operation "%1$s" must be between %2$s and %3$s.', 'allterrain-photo-editor' ),
 					$type,
 					$schema[ $type ]['min'],
 					$schema[ $type ]['max']
@@ -145,7 +145,7 @@ function lienzo_validate_output( $raw ) {
 			'lienzo_recipe_bad_format',
 			sprintf(
 				/* translators: %s: the unsupported output MIME type. */
-				__( 'Unsupported output format "%s".', 'lienzo' ),
+				__( 'Unsupported output format "%s".', 'allterrain-photo-editor' ),
 				$format
 			),
 			array( 'status' => 400 )
@@ -155,7 +155,7 @@ function lienzo_validate_output( $raw ) {
 	if ( ! is_finite( $quality ) || $quality < 0.1 || $quality > 1.0 ) {
 		return new WP_Error(
 			'lienzo_recipe_bad_quality',
-			__( 'Output quality must be between 0.1 and 1.0.', 'lienzo' ),
+			__( 'Output quality must be between 0.1 and 1.0.', 'allterrain-photo-editor' ),
 			array( 'status' => 400 )
 		);
 	}
