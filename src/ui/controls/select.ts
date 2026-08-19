@@ -15,6 +15,14 @@ export interface SelectOptions {
 	label: string;
 	value: string;
 	options: ControlOption[];
+	/**
+	 * Builds the dropdown from a plain `<select>` rather than the shell's component.
+	 *
+	 * For the options bar. The shell's select is a panel control: 8px of padding around
+	 * a 1.5 line-height puts its trigger at 38px, and the bar is 31px tall. See
+	 * createNumberField() for why the height cannot be taken back from outside.
+	 */
+	compact?: boolean;
 	onChange: ( value: string ) => void;
 }
 
@@ -29,11 +37,13 @@ export interface SelectOptions {
  * @param options Select configuration.
  */
 export function createSelect( options: SelectOptions ): SelectHandle {
-	const tag = componentTag( 'select' );
+	const tag = options.compact ? null : componentTag( 'select' );
 	const useWpd = null !== tag;
 
 	const wrap = document.createElement( 'div' );
-	wrap.className = 'lz-field';
+	wrap.className = options.compact
+		? 'lz-field lz-field--compact'
+		: 'lz-field';
 
 	const label = document.createElement( 'label' );
 	label.className = 'lz-field__label';

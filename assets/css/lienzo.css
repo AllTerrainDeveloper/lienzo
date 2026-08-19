@@ -329,12 +329,16 @@
  * number fields and a swatch, text a font name and a size, the wand one number -- and
  * a native `<input>` is a good deal taller than 24px until it is told otherwise.
  *
- * Both component prefixes are named because the shell resolves either at runtime, and
- * a rule that knows only one of them silently misses every other install.
+ * Only native controls are named, and that is the point rather than an omission. The
+ * shell's field components were here once and had to go: their height is decided
+ * inside a shadow root, by padding and a line-height nothing out here can reach, and a
+ * height set on the host does not travel inwards. The host shrank to 24px, its input
+ * stayed 32 and its select trigger 38, and both hung out of the bottom of the bar --
+ * which is precisely what the `overflow-y: hidden` above was seen clipping. So the bar
+ * builds its fields from plain controls, which these rules can actually size, and the
+ * components keep the panels they were drawn for. See createNumberField().
  */
-.lz-topbar :is( input, select, textarea ),
-.lz-topbar :is( wpd-number-field, wpd-text-field, wpd-color-field, wpd-select ),
-.lz-topbar :is( os-number-field, os-text-field, os-color-field, os-select ) {
+.lz-topbar :is( input, select, textarea ) {
 	box-sizing: border-box;
 	block-size: var( --lz-bar-control );
 	min-block-size: 0;
@@ -1622,7 +1626,13 @@ input.lz-field__control {
 .lz-swatch-popover {
 	/* Placed by positionFloating(); z-index has to clear a Desktop Mode window. */
 	z-index: 100001;
-	inline-size: 208px;
+
+	/*
+	 * Sized around the palette rather than guessed: six 32px chips and the five 6px
+	 * gaps between them come to 222px, plus this box's own 10px of padding either
+	 * side. The old 208px held 188px of content and cut the sixth column off.
+	 */
+	inline-size: 248px;
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
@@ -1631,25 +1641,6 @@ input.lz-field__control {
 	border: 1px solid var( --lz-border );
 	border-radius: var( --lz-radius );
 	box-shadow: 0 8px 24px rgba( 0, 0, 0, 0.45 );
-}
-
-.lz-swatch-popover__palette {
-	display: grid;
-	grid-template-columns: repeat( 6, 1fr );
-	gap: 4px;
-}
-
-.lz-swatch-popover__chip {
-	appearance: none;
-	block-size: 22px;
-	padding: 0;
-	border: 1px solid var( --lz-border );
-	border-radius: 3px;
-	cursor: pointer;
-}
-
-.lz-swatch-popover__chip:hover {
-	transform: scale( 1.12 );
 }
 
 /* -- Drag preview ----------------------------------------------------------- */
@@ -1913,21 +1904,36 @@ input.lz-colour {
 	inline-size: auto;
 }
 
+/*
+ * Sized for the values that actually go in: a brush is at most three digits, a
+ * percentage two.
+ */
 .lz-options input[ type='number' ].lz-field__control {
 	inline-size: 64px;
 }
 
 /*
- * Sized for the values that actually go in: a brush is at most three digits, a
- * percentage two. The Desktop Mode field is a flex column whose input is 100% of the
- * host, so constraining the host is the only lever -- and it only produces a
- * *consistent* width once the label is outside the component, which is what
- * `compact` does. Left inside, "Hardness" would eat 30px more of the box than "Size".
+ * The unit, beside the number rather than inside it.
+ *
+ * The shell's field drew this within its own box; a plain input has nowhere to put it,
+ * so it is a span of its own. Muted and the label's size, because "px" is the least
+ * of the three things in "Size 72 px" and should not read as loudly as either.
  */
-.lz-options .lz-field--narrow wpd-text-field,
-.lz-options .lz-field--narrow wpd-number-field {
-	flex: 0 0 auto;
-	inline-size: 92px;
+.lz-options .lz-field__suffix {
+	color: var( --lz-fg-muted );
+	font-size: 11px;
+	margin-inline-start: -2px;
+}
+
+/*
+ * A dropdown in the bar is as wide as the name it is showing, up to a limit. The panel
+ * rule above it says 100%, which in a row of `flex: 0 0 auto` fields resolves against a
+ * width that is itself content-derived -- so a long font stack could push Save a copy
+ * off the end rather than truncating.
+ */
+.lz-options select.lz-field__control {
+	inline-size: auto;
+	max-inline-size: 150px;
 }
 
 .lz-options input[ type='text' ].lz-field__control {
@@ -2207,26 +2213,53 @@ svg.lz-selection {
 
 /* -- Palette --------------------------------------------------------------- */
 
-.lz-palette {
+/*
+ * Two kinds of element wear these classes, and only one of them wants the rules.
+ *
+ * With OpenStation on the page the palette is an `<os-swatch-grid>` of `<os-swatch>`
+ * chips, and every declaration below is one the component already has its own answer
+ * for. Ours did not layer harmlessly on top of it -- it broke the shape. A small
+ * swatch is a 32px circle drawn by an inner button at 100% of its host, so pinning the
+ * host to 22px made a 32x22 ellipse of it, and the border and the selected outline
+ * drew a rounded rectangle around the circle. Six `1fr` tracks over a 32px minimum ask
+ * for 212px where the popover offered 188, so the last colour in each row was cut off
+ * by the popover's edge.
+ *
+ * So the rules name our own tags. The component keeps the shape it came with, and
+ * `createSwatchGrid()` puts it in `mode="row"` -- its flex-wrap variant, which the
+ * shell documents for exactly this: a row of small circles to pick one of.
+ */
+div.lz-palette {
 	display: grid;
-	grid-template-columns: repeat( 6, 1fr );
-	gap: 4px;
+	grid-template-columns: repeat( 6, 32px );
+	gap: 6px;
 }
 
-.lz-palette__chip {
+/*
+ * The component's own row gap is 10px, a settings-panel measure. Six chips with five
+ * of those want 242px of popover; at 6px they want 222, which is what the grid above
+ * asks for and what the popover is sized around. One number for both paths.
+ */
+wpd-swatch-grid.lz-palette,
+os-swatch-grid.lz-palette {
+	gap: 6px;
+}
+
+button.lz-palette__chip {
 	appearance: none;
-	block-size: 22px;
+	inline-size: 32px;
+	block-size: 32px;
 	padding: 0;
 	border: 1px solid var( --lz-border );
-	border-radius: 3px;
+	border-radius: 4px;
 	cursor: pointer;
 }
 
-.lz-palette__chip:hover {
+button.lz-palette__chip:hover {
 	transform: scale( 1.12 );
 }
 
-.lz-palette__chip.is-selected {
+button.lz-palette__chip.is-selected {
 	outline: 2px solid var( --lz-accent );
 	outline-offset: 1px;
 }

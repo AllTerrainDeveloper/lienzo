@@ -40,7 +40,14 @@ export function createSwatchGrid( options: SwatchGridOptions ): SwatchGridHandle
 	el.classList.add( 'lz-palette' );
 	el.setAttribute( 'aria-label', options.label );
 
-	if ( ! useWpd ) {
+	if ( useWpd ) {
+		// Row mode: a flex wrap of chips at the size they were drawn to be. The
+		// component's default is a grid of `1fr` columns, which stretches each 32px
+		// circle into an ellipse as wide as its track -- and six such tracks do not fit
+		// the popover, so the last colour of every row was clipped by its edge. The
+		// shell documents this mode for precisely this case.
+		el.setAttribute( 'mode', 'row' );
+	} else {
 		el.setAttribute( 'role', 'group' );
 	}
 

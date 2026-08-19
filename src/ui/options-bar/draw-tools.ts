@@ -99,6 +99,7 @@ export function renderGradientOptions( bar: OptionsBuilder ): void {
 
 	if ( ! bar.brush.gradientFade ) {
 		const to = createColourField( {
+			compact: true,
 			label: __( 'To' ),
 			value: bar.brush.background,
 			onChange: ( value ) => bar.setBrush( { background: value } ),
@@ -128,6 +129,7 @@ export function renderGradientOptions( bar: OptionsBuilder ): void {
 export function renderShapeOptions( bar: OptionsBuilder ): void {
 	bar.add(
 		createSelect( {
+			compact: true,
 			label: __( 'Shape' ),
 			value: bar.brush.shapeKind,
 			options: SHAPE_KINDS.map( ( entry ) => ( {

@@ -3882,7 +3882,7 @@ fn mainFragment(
     };
   }
   function createColourField(options) {
-    const tag = componentTag("color-field");
+    const tag = options.compact ? null : componentTag("color-field");
     if (tag) {
       const field = document.createElement(tag);
       field.setAttribute("label", options.label);
@@ -4006,7 +4006,7 @@ fn mainFragment(
     };
   }
   function createNumberField(options) {
-    const tag = pickComponent(["number-field", "text-field"]);
+    const tag = options.compact ? null : pickComponent(["number-field", "text-field"]);
     return tag ? componentField(tag, options) : nativeField(options);
   }
   function componentField(tag, options) {
@@ -4086,6 +4086,13 @@ fn mainFragment(
     };
     input.addEventListener("input", onInput);
     wrap.append(text, input);
+    if (options.suffix) {
+      const suffix = document.createElement("span");
+      suffix.className = "lz-field__suffix";
+      suffix.textContent = options.suffix;
+      suffix.setAttribute("aria-hidden", "true");
+      wrap.append(suffix);
+    }
     return {
       el: wrap,
       setValue: (value) => {
@@ -4195,10 +4202,10 @@ fn mainFragment(
     };
   }
   function createSelect(options) {
-    const tag = componentTag("select");
+    const tag = options.compact ? null : componentTag("select");
     const useWpd = null !== tag;
     const wrap = document.createElement("div");
-    wrap.className = "lz-field";
+    wrap.className = options.compact ? "lz-field lz-field--compact" : "lz-field";
     const label = document.createElement("label");
     label.className = "lz-field__label";
     label.textContent = options.label;
@@ -4354,7 +4361,9 @@ fn mainFragment(
     const listeners2 = [];
     el.classList.add("lz-palette");
     el.setAttribute("aria-label", options.label);
-    if (!useWpd) {
+    if (useWpd) {
+      el.setAttribute("mode", "row");
+    } else {
       el.setAttribute("role", "group");
     }
     const chips = /* @__PURE__ */ new Map();
@@ -9001,6 +9010,7 @@ fn mainFragment(
   }
   function colourField(bar, label = __("Colour")) {
     const field = createColourField({
+      compact: true,
       label,
       value: bar.brush.colour,
       onChange: (value) => bar.setBrush({ colour: value })
@@ -9393,6 +9403,7 @@ fn mainFragment(
     colourField(bar);
     if (!bar.brush.gradientFade) {
       const to = createColourField({
+        compact: true,
         label: __("To"),
         value: bar.brush.background,
         onChange: (value) => bar.setBrush({ background: value })
@@ -9413,6 +9424,7 @@ fn mainFragment(
   function renderShapeOptions(bar) {
     bar.add(
       createSelect({
+        compact: true,
         label: __("Shape"),
         value: bar.brush.shapeKind,
         options: SHAPE_KINDS.map((entry) => ({
@@ -9553,6 +9565,7 @@ fn mainFragment(
   function renderTextOptions(bar) {
     bar.add(
       createSelect({
+        compact: true,
         label: __("Font"),
         value: bar.brush.fontFamily,
         options: FONT_STACKS.map((entry) => ({

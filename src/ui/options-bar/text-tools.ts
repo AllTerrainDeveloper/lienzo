@@ -21,6 +21,7 @@ import type { OptionsBuilder } from './builder';
 export function renderTextOptions( bar: OptionsBuilder ): void {
 	bar.add(
 		createSelect( {
+			compact: true,
 			label: __( 'Font' ),
 			value: bar.brush.fontFamily,
 			options: FONT_STACKS.map( ( entry ) => ( {

@@ -126,10 +126,10 @@ There is a Light switch at the top of the Adjustments panel. Left on sRGB it beh
 
 == Screenshots ==
 
-1. The editor open as a desktop window, with the tool rail, the layer stack and a live histogram.
-2. Adjusting exposure and colour while the histogram follows.
-3. Painting inside a selection, with the brush cursor showing the real size of the brush.
-4. Text typed directly onto the canvas, as a layer of its own.
+1. The editor as a desktop window: the tool rail on the left, the layer stack, a live histogram and every adjustment on the right, and the magnetic lasso following the edge of a plate.
+2. Text typed straight onto the canvas, as a layer of its own, with a transform box to move, scale and rotate it.
+3. Curves, on RGB or on one channel at a time, against the photo being graded — the editor in its own window on the OpenStation desktop.
+4. A soft round brush, its size, hardness and opacity on the options bar, over levels, sharpening, vignette and grain.
 
 == Third-party libraries ==
 
@@ -139,7 +139,7 @@ Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and serv
 
 == Changelog ==
 
-= 0.1.0 =
+= 1.0.0 =
 * First release.
 * The photo picker loads as you scroll, instead of waiting for a Load more button.
 * The picker says how many images it cannot open, so a library of animated GIFs no longer reads as an empty one.
@@ -166,6 +166,8 @@ Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and serv
 * The picture no longer flickers while a window is being resized.
 * The tool rail and the sidebar meet the top bar, instead of sitting below a strip of background.
 * The top bar is the same height for every tool, so switching tools no longer shifts the picture.
+* The fields in the top bar sit inside it, instead of hanging out of the bottom and being clipped by its edge.
+* The colour palette's swatches are round again, and all six of a row fit the popover rather than the last falling off its edge.
 * Dragging a curve point and letting go outside the graph now drops it, instead of leaving it stuck to the pointer.
 * Fixed "Edit with AllTerrain Photo Editor" in the media modal doing nothing inside the desktop: the shell was not listening for the request.
 * Media → Edit Photos is no longer offered while the desktop is running, where it could only ever lead to a page saying the editor is elsewhere. Open AllTerrain Photo Editor from the dock or its desktop icon.

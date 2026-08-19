@@ -14,13 +14,16 @@ export interface NumberFieldOptions {
 	step?: number;
 	suffix?: string;
 	/**
-	 * Renders the label beside the control rather than inside it, and narrows the
-	 * control to a few digits.
+	 * Renders the label beside the control rather than inside it, narrows the control
+	 * to a few digits, and builds it from a plain `<input>` rather than the shell's
+	 * field component.
 	 *
 	 * For the options bar, where the values are two or three digits and the fields sit
 	 * in a row. Letting the component own the label there makes every field a different
 	 * width -- the label is inside the same box -- so "Hardness" ends up with a visibly
 	 * narrower input than "Size", and all of them far wider than any value they hold.
+	 *
+	 * The plain input is the same judgement about height. See createNumberField().
 	 */
 	compact?: boolean;
 	onChange: ( value: number ) => void;
@@ -36,10 +39,22 @@ export interface NumberFieldOptions {
  * styling, and only the parsing has to be done here. A bare `<input type="number">` is
  * the last resort, for a page with no OpenStation at all.
  *
+ * Except in `compact`, which is the options bar, and there the plain input is not a
+ * last resort but the right control. The shell's fields are panel controls and carry a
+ * panel's metrics in a shadow root nothing outside can reach: 7px of padding around a
+ * 13px line for the number field, 8px around a 1.5 line-height for the select, which
+ * is 32px and 38px of height against a bar built for 24. Setting the host's height did
+ * not shrink them, because the height a shadow root's contents take is not the host's
+ * to give -- the host obeyed and the input hung out of the bottom of it, which is what
+ * the bar was clipping. So the bar keeps its own controls, which it already has rules
+ * for, and the shell's components keep the panels they were drawn for.
+ *
  * @param options Field configuration.
  */
 export function createNumberField( options: NumberFieldOptions ): FieldHandle {
-	const tag = pickComponent( [ 'number-field', 'text-field' ] );
+	const tag = options.compact
+		? null
+		: pickComponent( [ 'number-field', 'text-field' ] );
 
 	return tag ? componentField( tag, options ) : nativeField( options );
 }
@@ -159,6 +174,22 @@ function nativeField( options: NumberFieldOptions ): FieldHandle {
 
 	input.addEventListener( 'input', onInput );
 	wrap.append( text, input );
+
+	// The unit, which the component drew inside its own box and this has to draw for
+	// itself. Without it the options bar reads "Size 72" and "Opacity 100", and a
+	// brush diameter and a percentage stop being tellable apart at a glance.
+	if ( options.suffix ) {
+		const suffix = document.createElement( 'span' );
+
+		suffix.className = 'lz-field__suffix';
+		suffix.textContent = options.suffix;
+
+		// Decoration beside a control that already announces its own value: read aloud
+		// it would only ever interrupt the number it belongs to.
+		suffix.setAttribute( 'aria-hidden', 'true' );
+
+		wrap.append( suffix );
+	}
 
 	return {
 		el: wrap,

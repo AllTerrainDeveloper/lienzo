@@ -9,6 +9,14 @@ import type { FieldHandle } from './types';
 export interface ColourFieldOptions {
 	label: string;
 	value: string;
+	/**
+	 * Builds the swatch from a plain `<input type="color">` rather than the shell's
+	 * component.
+	 *
+	 * For the options bar, whose controls are 24px and whose rules for this one are
+	 * already written. See createNumberField() for the whole of the reasoning.
+	 */
+	compact?: boolean;
 	onChange: ( value: string ) => void;
 }
 
@@ -18,7 +26,7 @@ export interface ColourFieldOptions {
  * @param options Field configuration.
  */
 export function createColourField( options: ColourFieldOptions ): FieldHandle {
-	const tag = componentTag( 'color-field' );
+	const tag = options.compact ? null : componentTag( 'color-field' );
 
 	if ( tag ) {
 		const field = document.createElement( tag );

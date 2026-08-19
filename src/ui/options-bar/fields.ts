@@ -84,6 +84,7 @@ export function colourField(
 	label = __( 'Colour' )
 ): void {
 	const field = createColourField( {
+		compact: true,
 		label,
 		value: bar.brush.colour,
 		onChange: ( value ) => bar.setBrush( { colour: value } ),
