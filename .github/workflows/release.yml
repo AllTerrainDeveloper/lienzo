@@ -14,10 +14,14 @@ name: Release
 # tag's commit, so a deploy that fails for a workflow-level reason can never be
 # fixed by re-running it. Dispatching from main runs the current definition.
 #
-# NOTE: the WordPress.org step cannot succeed until AllTerrain Photo Editor is approved and its
-# SVN repository exists at https://plugins.svn.wordpress.org/allterrain-photo-editor. Until then
-# the first submission is a manual zip upload -- see README.md, "The first
-# submission". Everything before that step is useful from the first tag on.
+# The tag this waits for is normally pushed by `./bin/release.sh`, which bumps
+# the version everywhere, gets the changelog confirmed, and waits for CI before
+# it tags. Pushing a tag by hand works and runs exactly this, but skips all of
+# that -- see README.md, "Releasing".
+#
+# The WordPress.org step deploys to https://plugins.svn.wordpress.org/allterrain-photo-editor,
+# which exists: the plugin was approved on 19 August 2026. It needs the
+# SVN_USERNAME and SVN_PASSWORD repository secrets to be set.
 
 on:
   push:

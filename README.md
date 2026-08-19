@@ -749,28 +749,44 @@ and everything else works without one anyway.
 `.github/workflows/release.yml` fires on a `vX.Y.Z` tag: it verifies the tag against all
 four places the version is written, builds, **runs Plugin Check as a hard gate**, creates
 a GitHub Release with the zip attached, and then deploys to WordPress.org. The last step
-needs `SVN_USERNAME` and `SVN_PASSWORD` repository secrets, and cannot succeed until the
-plugin is approved — see below.
+needs `SVN_USERNAME` and `SVN_PASSWORD` repository secrets.
 
-### The first submission
+### Releasing
 
-AllTerrain Photo Editor is not in the plugin directory yet, so the first release is a manual upload
-rather than anything automated:
+The plugin was approved for the directory on 19 August 2026 and its SVN repository is
+<https://plugins.svn.wordpress.org/allterrain-photo-editor>. Nothing is uploaded by hand any
+more — `svn` is never run from here. A tag is the whole release, and `bin/release.sh`
+is what produces one:
 
 ```bash
-npm run plugin:check    # must report "No errors found"
-npm run plugin:package  # writes dist/allterrain-photo-editor.zip
+./bin/release.sh 1.0.1
 ```
 
-Upload `dist/allterrain-photo-editor.zip` at <https://wordpress.org/plugins/developers/add/>. Only the
-zip goes in — there is nowhere to put `dist/assets/` yet. The directory art and the
-screenshots live in SVN under the plugin's own `assets/` path, which does not exist
-until the plugin is approved and commit access is granted.
+It is the same script the OpenStation plugin releases with, minus the parts this
+repository has no use for. In order it: refuses to run off `main`, off a dirty tree, or
+out of sync with `origin`; refuses a tag that already exists; writes the new version to
+all four places via `bin/bump-version.sh`; drafts a `readme.txt` changelog block from
+GitHub's generated release notes and **stops for you to confirm it** — the one
+interactive gate, and the last point at which stopping is free; commits and pushes the
+bump; waits for CI to go green; and only then tags and pushes the tag, which is what
+sets `release.yml` running.
 
-Review is done by humans and takes days to weeks. Nothing about the submission is
-scriptable, which is why there is no `npm run release` here yet: a tag-driven deploy
-pushes to `https://plugins.svn.wordpress.org/allterrain-photo-editor`, and that repository is created by
-the approval, not by us.
+It is idempotent. A run that dies halfway — or that you stop at the changelog prompt —
+is resumed by running the same command again; it works out how far it got from the four
+version strings and whether the bump was committed, rather than from anything it wrote
+down.
+
+Two flags: `--dry-run-changelog` prints the draft it would insert and exits without
+touching a file, and `--skip-changelog` leaves a hand-written block alone. The
+confirmation gate runs either way.
+
+```bash
+./bin/bump-version.sh 1.0.1   # just the four version strings, no commit, no tag
+```
+
+Prereleases are understood: `./bin/release.sh 1.1.0-rc1` produces a GitHub Release
+marked as a prerelease and stops there. WordPress.org has no concept of one, and
+pushing it would make it the live download.
 
 ### Two sites, and why builds deploy themselves
 
