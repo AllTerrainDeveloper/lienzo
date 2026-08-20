@@ -107,6 +107,8 @@ export class StageToolset {
 			getCanvas: frame.getCanvas,
 			getTool: frame.getTool,
 			getBrush: frame.getBrush,
+			getCloneSource: () => this.tools.getCloneSource(),
+			getCloneOffset: () => this.tools.getCloneOffset(),
 		} );
 	}
 

@@ -158,7 +158,11 @@ export function buildStageToolset( editor: Editor ): StageToolset {
 			commitSelection: ( next, mode ) => selection.combine( next, mode ),
 			pan: ( dx, dy ) => renderer.view.pan( dx, dy ),
 			zoomAt: ( factor, x, y ) => renderer.view.zoomAt( factor, x, y ),
-			onToolStateChange: () => toolset.optionsBar.render(),
+			// The clone sample marker reads the same state, so it redraws here too.
+			onToolStateChange: () => {
+				toolset.optionsBar.render();
+				toolset.cursor.draw();
+			},
 			// `place()` rather than `open()`: a press that finishes one piece of text
 			// does not also begin the next one.
 			onPlaceText: ( point ) => toolset.text.place( point ),

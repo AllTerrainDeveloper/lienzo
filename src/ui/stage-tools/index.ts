@@ -264,6 +264,11 @@ export class StageTools {
 		return this.gesture.cloneSource;
 	}
 
+	/** Offset from the stroke to the clone sample point, once a stroke fixed one. */
+	getCloneOffset(): Point | null {
+		return this.gesture.stroke.getCloneOffset();
+	}
+
 	/** Forgets the clone sample point. */
 	clearCloneSource(): void {
 		this.gesture.cloneSource = null;

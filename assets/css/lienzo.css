@@ -1545,6 +1545,17 @@ input.lz-field__control {
 .lz-stage[ data-tool='history' ] { cursor: none; }
 .lz-stage[ data-tool='fill' ],
 .lz-stage[ data-tool='wand' ] { cursor: cell; }
+
+/*
+ * Alt over the clone stamp means "pick a source", and the cursor is what says so: the
+ * ring goes away and a target takes its place, in the same white-over-halo style as the
+ * crosshair, for the same reason -- the point being aimed at is on a photograph.
+ */
+.lz-stage[ data-tool='clone' ].is-sampling {
+	cursor: url( "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26'><g fill='none' stroke='%23000' stroke-width='3.25' stroke-linecap='round' opacity='.5'><circle cx='13' cy='13' r='5.5'/><path d='M13 2.5v5M13 18.5v5M2.5 13h5M18.5 13h5'/></g><g fill='none' stroke='%23fff' stroke-width='1.4' stroke-linecap='round'><circle cx='13' cy='13' r='5.5'/><path d='M13 2.5v5M13 18.5v5M2.5 13h5M18.5 13h5'/></g><circle cx='13' cy='13' r='1.4' fill='%23fff' stroke='%23000' stroke-width='.7'/></svg>" )
+			13 13,
+		crosshair;
+}
 .lz-stage[ data-tool='eyedropper' ] { cursor: copy; }
 .lz-stage[ data-tool='text' ] { cursor: text; }
 .lz-stage[ data-tool='zoom' ] { cursor: zoom-in; }
@@ -2393,6 +2404,22 @@ button.lz-palette__chip.is-selected {
  * stroke does not have. */
 .lz-brush-cursor.is-soft {
 	border-style: dashed;
+}
+
+/*
+ * The clone stamp's sample point, marked where the pixels are actually read from.
+ * The same target the Alt picker draws, so setting the source and seeing it are
+ * visibly the same thing.
+ */
+.lz-clone-source {
+	position: absolute;
+	z-index: 5;
+	inline-size: 22px;
+	block-size: 22px;
+	translate: -50% -50%;
+	pointer-events: none;
+	background: url( "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22'><g fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' opacity='.5'><circle cx='11' cy='11' r='5'/><path d='M11 1.5v4M11 16.5v4M1.5 11h4M16.5 11h4'/></g><g fill='none' stroke='%23fff' stroke-width='1.4' stroke-linecap='round'><circle cx='11' cy='11' r='5'/><path d='M11 1.5v4M11 16.5v4M1.5 11h4M16.5 11h4'/></g><circle cx='11' cy='11' r='1.2' fill='%23fff' stroke='%23000' stroke-width='.7'/></svg>" )
+		center / contain no-repeat;
 }
 
 /* -- On-canvas text --------------------------------------------------------- */

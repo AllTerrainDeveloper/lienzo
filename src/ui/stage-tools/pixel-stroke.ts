@@ -64,6 +64,15 @@ export class PixelStroke {
 	}
 
 	/**
+	 * Where the clone stamp copies from, relative to the stroke.
+	 *
+	 * @return The fixed offset, or null before any stroke has fixed one.
+	 */
+	getCloneOffset(): Point | null {
+		return this.offset;
+	}
+
+	/**
 	 * Prepares a stroke.
 	 *
 	 * @param tool Active tool.

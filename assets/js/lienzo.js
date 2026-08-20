@@ -8844,6 +8844,7 @@ fn mainFragment(
   class BrushCursor {
     constructor(options) {
       this.at = null;
+      this.altDown = false;
       this.onMove = (event) => {
         const rect = this.options.stage.getBoundingClientRect();
         this.at = { x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -8852,12 +8853,34 @@ fn mainFragment(
       this.onLeave = () => {
         this.at = null;
         this.el.style.display = "none";
+        this.draw();
+      };
+      this.onKey = (event) => {
+        if ("Alt" !== event.key) {
+          return;
+        }
+        const down = "keydown" === event.type;
+        if (down === this.altDown) {
+          return;
+        }
+        this.altDown = down;
+        this.draw();
+      };
+      this.onBlur = () => {
+        if (!this.altDown) {
+          return;
+        }
+        this.altDown = false;
+        this.draw();
       };
       this.draw = () => {
         const tool = this.options.getTool();
         const viewport = this.options.getViewport();
         const canvas = this.options.getCanvas();
-        if (!this.at || !viewport || !SIZED_TOOLS.includes(tool) || canvas.width < 1 || viewport.width < 1) {
+        const sampling = this.altDown && "clone" === tool;
+        this.options.stage.classList.toggle("is-sampling", sampling);
+        this.drawSource(tool, viewport, canvas);
+        if (!this.at || !viewport || sampling || !SIZED_TOOLS.includes(tool) || canvas.width < 1 || viewport.width < 1) {
           this.el.style.display = "none";
           return;
         }
@@ -8877,15 +8900,54 @@ fn mainFragment(
       this.el.className = "lz-brush-cursor";
       this.el.setAttribute("aria-hidden", "true");
       this.el.style.display = "none";
+      this.source = document.createElement("div");
+      this.source.className = "lz-clone-source";
+      this.source.setAttribute("aria-hidden", "true");
+      this.source.style.display = "none";
       options.stage.appendChild(this.el);
+      options.stage.appendChild(this.source);
       options.stage.addEventListener("pointermove", this.onMove);
       options.stage.addEventListener("pointerleave", this.onLeave);
+      window.addEventListener("keydown", this.onKey);
+      window.addEventListener("keyup", this.onKey);
+      window.addEventListener("blur", this.onBlur);
+    }
+    /**
+     * Marks where the clone stamp is copying from.
+     *
+     * Pinned on the Alt-clicked point until the first stroke, then moving with the
+     * pointer at the stroke's fixed offset -- which is where every dab after that
+     * actually reads. Off the stage the pointer says nothing, so the marker falls back
+     * to the picked point rather than jumping around.
+     *
+     * @param tool     Active tool.
+     * @param viewport Where the canvas sits inside the stage, or null before layout.
+     * @param canvas   Canvas size in its own pixels.
+     */
+    drawSource(tool, viewport, canvas) {
+      const source = this.options.getCloneSource();
+      if ("clone" !== tool || !source || !viewport || canvas.width < 1 || viewport.width < 1) {
+        this.source.style.display = "none";
+        return;
+      }
+      const scale = viewport.width / canvas.width;
+      const offset = this.options.getCloneOffset();
+      const x = offset && this.at ? this.at.x - offset.x * scale : viewport.x + source.x * scale;
+      const y = offset && this.at ? this.at.y - offset.y * scale : viewport.y + source.y * scale;
+      this.source.style.display = "";
+      this.source.style.insetInlineStart = `${x}px`;
+      this.source.style.insetBlockStart = `${y}px`;
     }
     /** Removes the cursor. */
     destroy() {
       this.options.stage.removeEventListener("pointermove", this.onMove);
       this.options.stage.removeEventListener("pointerleave", this.onLeave);
+      window.removeEventListener("keydown", this.onKey);
+      window.removeEventListener("keyup", this.onKey);
+      window.removeEventListener("blur", this.onBlur);
+      this.options.stage.classList.remove("is-sampling");
       this.el.remove();
+      this.source.remove();
     }
   }
   class OptionsBuilder {
@@ -10689,6 +10751,14 @@ fn mainFragment(
       this.offset = offset;
     }
     /**
+     * Where the clone stamp copies from, relative to the stroke.
+     *
+     * @return The fixed offset, or null before any stroke has fixed one.
+     */
+    getCloneOffset() {
+      return this.offset;
+    }
+    /**
      * Prepares a stroke.
      *
      * @param tool Active tool.
@@ -11349,6 +11419,10 @@ fn mainFragment(
     /** Where the clone stamp is currently sampling from, if anywhere. */
     getCloneSource() {
       return this.gesture.cloneSource;
+    }
+    /** Offset from the stroke to the clone sample point, once a stroke fixed one. */
+    getCloneOffset() {
+      return this.gesture.stroke.getCloneOffset();
     }
     /** Forgets the clone sample point. */
     clearCloneSource() {
@@ -12012,7 +12086,9 @@ fn mainFragment(
         getViewport: frame.getViewport,
         getCanvas: frame.getCanvas,
         getTool: frame.getTool,
-        getBrush: frame.getBrush
+        getBrush: frame.getBrush,
+        getCloneSource: () => this.tools.getCloneSource(),
+        getCloneOffset: () => this.tools.getCloneOffset()
       });
     }
     /**
@@ -12459,7 +12535,11 @@ fn mainFragment(
         commitSelection: (next, mode) => selection.combine(next, mode),
         pan: (dx, dy) => renderer.view.pan(dx, dy),
         zoomAt: (factor, x, y) => renderer.view.zoomAt(factor, x, y),
-        onToolStateChange: () => toolset.optionsBar.render(),
+        // The clone sample marker reads the same state, so it redraws here too.
+        onToolStateChange: () => {
+          toolset.optionsBar.render();
+          toolset.cursor.draw();
+        },
         // `place()` rather than `open()`: a press that finishes one piece of text
         // does not also begin the next one.
         onPlaceText: (point) => toolset.text.place(point),
