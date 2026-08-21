@@ -5,7 +5,7 @@ Requires at least: 6.0
 Requires Plugins: desktop-mode
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -138,6 +138,9 @@ This plugin bundles no third-party libraries and makes no external or CDN reques
 Rendering uses PixiJS (MIT), which is bundled by the OpenStation plugin and served from your own server. AllTerrain Photo Editor asks OpenStation for it rather than shipping a second copy: that keeps this plugin small, and two instances of the same rendering library on one page share GPU resources through globals, where tearing one down can break the other.
 
 == Changelog ==
+
+= 1.0.1
+* Clone Stamp: the sample source is now marked on the canvas and follows your brush while painting; holding Alt shows a source-picker cursor.
 
 = 1.0.0 =
 * First release.
